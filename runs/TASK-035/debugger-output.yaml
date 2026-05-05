@@ -1,0 +1,48 @@
+summary: |
+  Root cause was the missing-session classifier, not the handlers themselves.
+  After the UUID shortcut was removed, `classifyOneUpMissingSession` still used
+  "player has any other session key" as the signal for `ERR_GAME_NOT_FOUND`.
+  That heuristic cannot prove the requested `gameID` is invalid; it only proves
+  the player has launched some game before. As a result, invalid-player rows
+  could still be misclassified depending on Redis footprint.
+
+  I replaced that heuristic with a production-valid discriminator: when
+  `oneup:session:{player}:{game}` is missing, the runtime now checks whether the
+  requested `gameID` exists in the upstream 1UP game list. If the game exists,
+  the callback returns `errOneUpInvalidSession` and maps to
+  `ERR_USER_NOT_FOUND`; if the game does not exist, it returns
+  `errOneUpGameNotFound` and maps to `ERR_GAME_NOT_FOUND`.
+
+  I also fixed the test gap the reviewer called out. The old invalid-player and
+  invalid-game tests were stubbing `ensureOneUpSessionFn` and
+  `validateOneUpPlayerGameFn` directly, which skipped the real
+  `redis.Nil -> classifyOneUpMissingSession` path. The new focused tests force
+  `redis.Nil` from the session lookup layer and route the handlers through the
+  real runtime logic for all eight CSV rows across info, balance, bet result,
+  and refund.
+
+  Verification:
+  - `go test ./internal/handlers/providerhdl -count=1`
+  - `go test ./...`
+diagnosis:
+  root_cause: Missing-session classification was using Redis session footprint as a proxy for invalid game, which is ambiguous and caused invalid-player cases to depend on prior session state instead of real game validity.
+  affected_files:
+    - path: /Users/earth/Documents/GitHub/Games-Labs-Provider/internal/handlers/providerhdl/oneup_runtime.go
+      lines: "38-45, 92-155"
+    - path: /Users/earth/Documents/GitHub/Games-Labs-Provider/internal/handlers/providerhdl/oneup_callback_test.go
+      lines: "112-205, 232-359"
+  confidence: high
+artifacts:
+  - path: /Users/earth/Documents/GitHub/Games-Labs-Provider/internal/handlers/providerhdl/oneup_runtime.go
+    action: modified
+    description: Added injectable session-lookup and game-existence helpers, routed Redis misses through them, and replaced the `hasAnySession` heuristic with upstream 1UP game-list validation.
+  - path: /Users/earth/Documents/GitHub/Games-Labs-Provider/internal/handlers/providerhdl/oneup_callback.go
+    action: unchanged
+    description: Handler flow already called the correct runtime helpers; no code change was needed once the runtime classifier was fixed.
+  - path: /Users/earth/Documents/GitHub/Games-Labs-Provider/internal/handlers/providerhdl/oneup_callback_test.go
+    action: modified
+    description: Removed invalid-player/game cases from the direct-stub matrix and added focused tests that drive the real `redis.Nil` classification path for all four callback endpoints.
+next_action:
+  agent: reviewer
+  reason: The scoped runtime fix is applied, the reviewer blockers are addressed directly, and both focused and full service Go test suites pass.
+blockers: []
