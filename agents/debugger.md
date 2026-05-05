@@ -47,9 +47,29 @@ artifacts:
 next_action:
   agent: dev | reviewer | free-roam
   reason: <why this agent should act next>
+context_sources:
+  github:
+    branch: "<branch-or-empty>"
+    pr: "<url-or-empty>"
+  socraticode:
+    status: used | unavailable | failed | fallback | skipped
+    queries:
+      - "<query>"
+    relevant_symbols:
+      - "<file-or-symbol>"
+    notes: "<short note>"
 blockers:
   - <remaining issues after fix, or empty list>
 ```
+
+Keep `context_sources` concise. Do not paste large search results.
+
+## SocratiCode / Context Provider Policy
+
+- Use the configured context provider to form hypotheses and trace relevant flows.
+- Root cause must be confirmed by logs, code, tests, or reproducible behavior.
+- SocratiCode is guidance only. GitHub/local checkout is the source of truth.
+- CI/test evidence overrides index results.
 
 ## Rules
 

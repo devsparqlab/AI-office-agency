@@ -89,6 +89,18 @@ payload =
         "agent" => "reviewer",
         "reason" => "Implementation is ready for review."
       },
+      "context_sources" => {
+        "github" => {
+          "branch" => "",
+          "pr" => ""
+        },
+        "socraticode" => {
+          "status" => "skipped",
+          "queries" => [],
+          "relevant_symbols" => [],
+          "notes" => "Scaffolded output; replace with concise context-provider usage."
+        }
+      },
       "blockers" => []
     }
   when "reviewer"
@@ -109,6 +121,18 @@ payload =
       "next_action" => {
         "agent" => "done",
         "reason" => "All acceptance criteria are met and validation passed."
+      },
+      "context_sources" => {
+        "github" => {
+          "branch" => "",
+          "pr" => ""
+        },
+        "socraticode" => {
+          "status" => "skipped",
+          "queries" => [],
+          "relevant_symbols" => [],
+          "notes" => "Scaffolded output; replace with concise context-provider usage."
+        }
       },
       "transition" => {
         "from_phase" => "review",
@@ -430,6 +454,306 @@ config_bool() {
   esac
 }
 
+config_list_contains() {
+  local key_path="$1"
+  local expected="$2"
+  local config_file="$OFFICE_DIR/office.config.yaml"
+
+  ruby - "$config_file" "$key_path" "$expected" <<'RUBY'
+require "yaml"
+require "date"
+
+config_path, key_path, expected = ARGV
+value = nil
+
+if File.exist?(config_path)
+  data = YAML.safe_load(File.read(config_path), permitted_classes: [Date, Time], aliases: true) || {}
+  value = key_path.split(".").reduce(data) do |memo, key|
+    memo.is_a?(Hash) ? memo[key] : nil
+  end
+end
+
+if Array(value).map(&:to_s).include?(expected)
+  puts "true"
+else
+  puts "false"
+end
+RUBY
+}
+
+yaml_file_text() {
+  local task_file="$1"
+  local pm_output_file="$2"
+
+  ruby - "$task_file" "$pm_output_file" <<'RUBY'
+require "yaml"
+require "date"
+
+task_path, pm_output_path = ARGV
+parts = []
+parts << File.read(task_path) if File.exist?(task_path)
+
+if File.exist?(pm_output_path)
+  data = YAML.safe_load(File.read(pm_output_path), permitted_classes: [Date, Time], aliases: true) || {}
+  parts << data.to_s
+end
+
+puts parts.join("\n")
+RUBY
+}
+
+context_task_is_code_impacting() {
+  local task_file="$1"
+  local pm_output_file="$2"
+  local text
+  text="$(yaml_file_text "$task_file" "$pm_output_file" | tr '[:upper:]' '[:lower:]')"
+
+  if [[ "$text" == *"no code changes"* || "$text" == *"vendor email"* || "$text" == *"communication note"* || "$text" == *"pure communication"* ]]; then
+    return 1
+  fi
+
+  if [[ "$text" == *".go"* || "$text" == *".proto"* || "$text" == *"affected_files"* || "$text" == *"target_services"* || "$text" == *"shared-lib"* || "$text" == *"api-gateway"* || "$text" == *"games-labs-"* || "$text" == *"callback"* || "$text" == *"contract"* ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+context_queries_for_task() {
+  local role="$1"
+  local task_file="$2"
+  local pm_output_file="$3"
+
+  ruby - "$role" "$task_file" "$pm_output_file" <<'RUBY'
+require "yaml"
+require "date"
+
+role, task_path, pm_output_path = ARGV
+queries = []
+
+if File.exist?(task_path)
+  title = File.readlines(task_path).find { |line| line.start_with?("#") }.to_s.gsub(/^#+\s*/, "").strip
+  queries << "#{role} #{title}" unless title.empty?
+end
+
+if File.exist?(pm_output_path)
+  data = YAML.safe_load(File.read(pm_output_path), permitted_classes: [Date, Time], aliases: true) || {}
+  task = data["task"].is_a?(Hash) ? data["task"] : {}
+  title = task["title"].to_s.strip
+  queries << "#{role} #{title}" unless title.empty?
+
+  scope = data["scope"].is_a?(Hash) ? data["scope"] : {}
+  services = Array(scope["target_services"]).map do |entry|
+    entry.is_a?(Hash) ? entry["service"].to_s.strip : nil
+  end.compact.reject(&:empty?)
+  files = Array(scope["affected_files"]).map do |entry|
+    entry.is_a?(Hash) ? entry["path"].to_s.strip : nil
+  end.compact.reject(&:empty?)
+  queries << "affected services #{services.join(' ')}" unless services.empty?
+  queries << "affected files #{files.join(' ')}" unless files.empty?
+end
+
+puts queries.uniq.first(5).join(" | ")
+RUBY
+}
+
+detect_context_provider() {
+  local provider="$1"
+
+  case "$provider" in
+    socraticode)
+      if command -v socraticode >/dev/null 2>&1; then
+        echo "socraticode"
+      else
+        echo "none"
+      fi
+      ;;
+    *)
+      echo "none"
+      ;;
+  esac
+}
+
+build_context_index_section() {
+  local role="$1"
+  local task_file="$2"
+  local status_file="$3"
+  local pm_output_file="$4"
+  local provider="$5"
+  local mode="$6"
+  local fallback="$7"
+  local context_status="skipped"
+  local freshness="unknown"
+  local confidence="low"
+  local queries
+  local detected
+  local output_file
+  local error_file
+
+  queries="$(context_queries_for_task "$role" "$task_file" "$pm_output_file")"
+  [[ -n "$queries" ]] || queries="$role task context"
+
+  if [[ "$CONTEXT_PROVIDER_ENABLED" != "true" ]]; then
+    CONTEXT_PROVIDER_STATUS="skipped"
+    CONTEXT_PROVIDER_FRESHNESS="unknown"
+    CONTEXT_PROVIDER_CONFIDENCE="low"
+    CONTEXT_PROVIDER_NOTE="context provider disabled"
+    cat <<EOF
+--- AI CONTEXT INDEX ---
+provider: $provider
+status: skipped
+freshness: unknown
+confidence: low
+fallback: $fallback
+note: "Context provider is disabled."
+EOF
+    return 0
+  fi
+
+  if [[ "$(config_list_contains "context_provider.roles" "$role")" != "true" ]]; then
+    CONTEXT_PROVIDER_STATUS="skipped"
+    CONTEXT_PROVIDER_FRESHNESS="unknown"
+    CONTEXT_PROVIDER_CONFIDENCE="low"
+    CONTEXT_PROVIDER_NOTE="role not configured"
+    cat <<EOF
+--- AI CONTEXT INDEX ---
+provider: $provider
+status: skipped
+freshness: unknown
+confidence: low
+fallback: $fallback
+note: "Context provider is not configured for role '$role'."
+EOF
+    return 0
+  fi
+
+  if ! context_task_is_code_impacting "$task_file" "$pm_output_file"; then
+    CONTEXT_PROVIDER_STATUS="skipped"
+    CONTEXT_PROVIDER_FRESHNESS="unknown"
+    CONTEXT_PROVIDER_CONFIDENCE="low"
+    CONTEXT_PROVIDER_NOTE="not code-impacting"
+    cat <<EOF
+--- AI CONTEXT INDEX ---
+provider: $provider
+status: skipped
+freshness: unknown
+confidence: low
+fallback: $fallback
+queries:
+  - "$queries"
+note: "Context lookup skipped because this task is not code-impacting."
+EOF
+    return 0
+  fi
+
+  detected="$(detect_context_provider "$provider")"
+  if [[ "$detected" == "none" ]]; then
+    context_status="unavailable"
+    CONTEXT_PROVIDER_STATUS="$context_status"
+    CONTEXT_PROVIDER_FRESHNESS="$freshness"
+    CONTEXT_PROVIDER_CONFIDENCE="$confidence"
+    CONTEXT_PROVIDER_NOTE="provider command unavailable"
+    cat <<EOF
+--- AI CONTEXT INDEX ---
+provider: $provider
+status: unavailable
+freshness: unknown
+confidence: low
+fallback: $fallback
+queries:
+  - "$queries"
+note: "SocratiCode is unavailable. Use local repo inspection, ripgrep, tests, and CI evidence."
+rules:
+  - Treat this section as guidance only.
+  - Verify all code against files on disk before editing.
+  - Use ripgrep for exact identifiers and error strings.
+EOF
+    if [[ "$mode" == "required" ]]; then
+      return 1
+    fi
+    return 0
+  fi
+
+  output_file="$(mktemp)"
+  error_file="$(mktemp)"
+  if socraticode context --role "$role" --task-file "$task_file" --status-file "$status_file" --pm-output "$pm_output_file" >"$output_file" 2>"$error_file"; then
+    if [[ ! -s "$output_file" ]]; then
+      context_status="fallback"
+      CONTEXT_PROVIDER_STATUS="$context_status"
+      CONTEXT_PROVIDER_FRESHNESS="unknown"
+      CONTEXT_PROVIDER_CONFIDENCE="low"
+      CONTEXT_PROVIDER_NOTE="empty index result"
+      rm -f "$output_file" "$error_file"
+      cat <<EOF
+--- AI CONTEXT INDEX ---
+provider: $provider
+status: fallback
+freshness: unknown
+confidence: low
+fallback: $fallback
+queries:
+  - "$queries"
+note: "SocratiCode returned no context. Use local repo inspection, ripgrep, tests, and CI evidence."
+rules:
+  - Treat this section as guidance only.
+  - Verify all code against files on disk before editing.
+  - Use ripgrep for exact identifiers and error strings.
+EOF
+      return 0
+    fi
+
+    CONTEXT_PROVIDER_FRESHNESS="$(grep -E '^freshness:' "$output_file" | head -1 | sed 's/^freshness:[[:space:]]*//' || true)"
+    CONTEXT_PROVIDER_CONFIDENCE="$(grep -E '^confidence:' "$output_file" | head -1 | sed 's/^confidence:[[:space:]]*//' || true)"
+    [[ -n "$CONTEXT_PROVIDER_FRESHNESS" ]] || CONTEXT_PROVIDER_FRESHNESS="unknown"
+    [[ -n "$CONTEXT_PROVIDER_CONFIDENCE" ]] || CONTEXT_PROVIDER_CONFIDENCE="medium"
+    if [[ "$CONTEXT_PROVIDER_FRESHNESS" == "stale" ]]; then
+      CONTEXT_PROVIDER_STATUS="fallback"
+      CONTEXT_PROVIDER_NOTE="stale index result"
+    else
+      CONTEXT_PROVIDER_STATUS="used"
+      CONTEXT_PROVIDER_NOTE="provider context injected"
+    fi
+    cat <<EOF
+--- AI CONTEXT INDEX ---
+provider: $provider
+status: $CONTEXT_PROVIDER_STATUS
+$(cat "$output_file")
+rules:
+  - Treat this section as guidance only.
+  - Verify all code against files on disk before editing.
+  - Use ripgrep for exact identifiers and error strings.
+EOF
+    rm -f "$output_file" "$error_file"
+    return 0
+  fi
+
+  local error_summary
+  error_summary="$(head -3 "$error_file" | tr '\n' ' ' | sed 's/"/'\''/g')"
+  CONTEXT_PROVIDER_STATUS="failed"
+  CONTEXT_PROVIDER_FRESHNESS="unknown"
+  CONTEXT_PROVIDER_CONFIDENCE="low"
+  CONTEXT_PROVIDER_NOTE="$error_summary"
+  rm -f "$output_file" "$error_file"
+  cat <<EOF
+--- AI CONTEXT INDEX ---
+provider: $provider
+status: failed
+freshness: unknown
+confidence: low
+fallback: $fallback
+queries:
+  - "$queries"
+note: "SocratiCode lookup failed. Use local repo inspection, ripgrep, tests, and CI evidence."
+rules:
+  - Treat this section as guidance only.
+  - Verify all code against files on disk before editing.
+  - Use ripgrep for exact identifiers and error strings.
+EOF
+  if [[ "$mode" == "required" ]]; then
+    return 1
+  fi
+}
+
 REVIEWER_QUEUE_PHASE="$(config_value "state_model.reviewer_queue_phase" "in_review")"
 BLOCKED_DISPATCH_GUARD="$(config_bool "dependency_policy.blocked_dispatch_guard" "true")"
 ENFORCE_CURRENT_AGENT_ROUTE="$(config_bool "dependency_policy.enforce_current_agent_route" "true")"
@@ -440,6 +764,15 @@ UNBLOCK_SET_READY="$(config_bool "dependency_policy.on_unblock.set_ready" "true"
 UNBLOCK_ROUTE_FROM_ASSIGNMENT="$(config_bool "dependency_policy.on_unblock.route_from_assignment_primary" "true")"
 DEPENDENCY_GUARD_ENABLED="$(config_bool "dependency_guard.enabled" "true")"
 DEPENDENCY_GUARD_SCRIPT="$(config_value "dependency_guard.script" "scripts/check-service-dependencies.sh")"
+CONTEXT_PROVIDER_ENABLED="$(config_bool "context_provider.enabled" "false")"
+CONTEXT_PROVIDER_NAME="$(config_value "context_provider.provider" "socraticode")"
+CONTEXT_PROVIDER_MODE="$(config_value "context_provider.mode" "optional")"
+CONTEXT_PROVIDER_POLICY="$(config_value "context_provider.policy" "recorded")"
+CONTEXT_PROVIDER_FALLBACK="$(config_value "context_provider.fallback" "repo_search")"
+CONTEXT_PROVIDER_STATUS="skipped"
+CONTEXT_PROVIDER_FRESHNESS="unknown"
+CONTEXT_PROVIDER_CONFIDENCE="low"
+CONTEXT_PROVIDER_NOTE=""
 
 should_run_dependency_guard() {
   case "$1" in
@@ -915,7 +1248,24 @@ if [[ -f "$STATUS_FILE" ]]; then
 $(cat "$STATUS_FILE")"
 fi
 
+CONTEXT_SECTION=""
+if [[ "$AGENT" != "auto" && "$AGENT" != "scaffold" ]]; then
+  if ! CONTEXT_SECTION="$(build_context_index_section "$AGENT" "$TASK_FILE" "$STATUS_FILE" "$PM_OUTPUT_FILE" "$CONTEXT_PROVIDER_NAME" "$CONTEXT_PROVIDER_MODE" "$CONTEXT_PROVIDER_FALLBACK")"; then
+    echo "Context provider failed and mode is required."
+    exit 1
+  fi
+  CONTEXT_PROVIDER_STATUS="$(printf '%s\n' "$CONTEXT_SECTION" | grep -E '^status:' | head -1 | sed 's/^status:[[:space:]]*//' || true)"
+  CONTEXT_PROVIDER_FRESHNESS="$(printf '%s\n' "$CONTEXT_SECTION" | grep -E '^freshness:' | head -1 | sed 's/^freshness:[[:space:]]*//' || true)"
+  CONTEXT_PROVIDER_CONFIDENCE="$(printf '%s\n' "$CONTEXT_SECTION" | grep -E '^confidence:' | head -1 | sed 's/^confidence:[[:space:]]*//' || true)"
+  [[ -n "$CONTEXT_PROVIDER_STATUS" ]] || CONTEXT_PROVIDER_STATUS="skipped"
+  [[ -n "$CONTEXT_PROVIDER_FRESHNESS" ]] || CONTEXT_PROVIDER_FRESHNESS="unknown"
+  [[ -n "$CONTEXT_PROVIDER_CONFIDENCE" ]] || CONTEXT_PROVIDER_CONFIDENCE="low"
+  CONTEXT_PROVIDER_NOTE="$(printf '%s\n' "$CONTEXT_SECTION" | grep -E '^note:' | head -1 | sed 's/^note:[[:space:]]*//' | tr -d '"' || true)"
+  log_meta_event "$TASK_ID" "$META_FILE" "context_provider" "$AGENT" "provider=$CONTEXT_PROVIDER_NAME status=$CONTEXT_PROVIDER_STATUS freshness=$CONTEXT_PROVIDER_FRESHNESS confidence=$CONTEXT_PROVIDER_CONFIDENCE policy=$CONTEXT_PROVIDER_POLICY fallback=$CONTEXT_PROVIDER_FALLBACK note=${CONTEXT_PROVIDER_NOTE:-none}"
+fi
+
 PROMPT="$(cat "$AGENT_FILE")
+${CONTEXT_SECTION}
 ${TASK_SECTION}${STATUS_SECTION}${PM_SECTION}${PREV_SECTION}
 
 Produce your output following the Output Contract in your role definition."

@@ -56,6 +56,24 @@ Use this after saving `status.yaml` or any `<agent>-output.yaml` file to catch
 missing required fields, invalid routing agents, malformed runtime YAML, and
 state mismatches (`phase` vs `state`).
 
+### SocratiCode context provider
+
+`run-agent.sh` can inject a local SocratiCode context section into each role
+prompt for code-impacting work. GitHub/local checkout remains the source of
+truth for code, branches, PRs, and CI; SocratiCode is only an AI working-context
+index.
+
+Default behavior is optional and recorded:
+
+- If `socraticode` is available, the runner adds `--- AI CONTEXT INDEX ---` to
+  the prompt and logs a `context_provider` event in `meta.yaml`.
+- If it is unavailable, fails, or returns no context, the runner falls back to
+  local repo inspection (`rg`, files on disk, tests, CI evidence) without
+  failing the run.
+- For non-code tasks, the runner records `status: skipped`.
+- Agent outputs may include concise `context_sources`; do not paste large search
+  results into YAML handoffs.
+
 ### Run dependency integration scenarios
 
 ```bash

@@ -48,12 +48,32 @@ artifacts:
 next_action:
   agent: done | debugger | free-roam | devops
   reason: <why this agent should act next>
+context_sources:
+  github:
+    branch: "<branch-or-empty>"
+    pr: "<url-or-empty>"
+  socraticode:
+    status: used | unavailable | failed | fallback | skipped
+    queries:
+      - "<query>"
+    relevant_symbols:
+      - "<file-or-symbol>"
+    notes: "<short note>"
 transition:
   from_phase: review
   to_phase: done | debugging | escalated | devops_needed
 blockers:
   - <specific issues Dev must fix, or empty list>
 ```
+
+Keep `context_sources` concise. Do not paste large search results.
+
+## SocratiCode / Context Provider Policy
+
+- Use the configured context provider to estimate impact radius and identify candidate related files, contracts, and tests.
+- Final verdict must be based on the diff, files on disk, tests, and CI evidence.
+- SocratiCode is guidance only. GitHub/local checkout is the source of truth.
+- CI/test evidence overrides index results.
 
 ## Rules
 

@@ -95,6 +95,20 @@ dependency_guard:
   enabled: true
   script: scripts/check-service-dependencies.sh
 
+context_provider:
+  enabled: true
+  provider: socraticode
+  mode: optional
+  policy: recorded
+  fallback: repo_search
+  roles:
+    - pm
+    - dev
+    - dev-2
+    - reviewer
+    - debugger
+    - free-roam
+
 loop_guard:
   max_iterations: 8
   escalate_to: free-roam

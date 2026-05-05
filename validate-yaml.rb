@@ -88,6 +88,31 @@ def validate_base_output(data, label, errors)
   if data.key?("blockers")
     expect_array(data["blockers"], "#{label}.blockers", errors)
   end
+
+  validate_context_sources(data["context_sources"], "#{label}.context_sources", errors) if data.key?("context_sources")
+end
+
+def validate_context_sources(value, label, errors)
+  expect_hash(value, label, errors)
+  return unless value.is_a?(Hash)
+
+  if value.key?("github")
+    expect_hash(value["github"], "#{label}.github", errors)
+    if value["github"].is_a?(Hash)
+      expect_string(value["github"]["branch"], "#{label}.github.branch", errors) if value["github"].key?("branch") && !value["github"]["branch"].to_s.empty?
+      expect_string(value["github"]["pr"], "#{label}.github.pr", errors) if value["github"].key?("pr") && !value["github"]["pr"].to_s.empty?
+    end
+  end
+
+  return unless value.key?("socraticode")
+
+  expect_hash(value["socraticode"], "#{label}.socraticode", errors)
+  return unless value["socraticode"].is_a?(Hash)
+
+  expect_enum(value["socraticode"]["status"], %w[used unavailable failed fallback skipped], "#{label}.socraticode.status", errors) if value["socraticode"].key?("status")
+  expect_string_array(value["socraticode"]["queries"], "#{label}.socraticode.queries", errors) if value["socraticode"].key?("queries")
+  expect_string_array(value["socraticode"]["relevant_symbols"], "#{label}.socraticode.relevant_symbols", errors) if value["socraticode"].key?("relevant_symbols")
+  expect_string(value["socraticode"]["notes"], "#{label}.socraticode.notes", errors) if value["socraticode"].key?("notes") && !value["socraticode"]["notes"].to_s.empty?
 end
 
 def validate_status(data, label, errors)

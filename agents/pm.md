@@ -89,9 +89,29 @@ artifacts:
 next_action:
   agent: dev | dev-2
   reason: <task is ready for implementation>
+context_sources:
+  github:
+    branch: "<branch-or-empty>"
+    pr: "<url-or-empty>"
+  socraticode:
+    status: used | unavailable | failed | fallback | skipped
+    queries:
+      - "<query>"
+    relevant_symbols:
+      - "<file-or-symbol>"
+    notes: "<short note>"
 blockers:
   - <unclear requirements or missing info, or empty list>
 ```
+
+Keep `context_sources` concise. Do not paste large search results.
+
+## SocratiCode / Context Provider Policy
+
+- Use the configured context provider to identify candidate affected services, files, contracts, and tests for code-impacting tasks.
+- Skip context lookup for pure planning, communication, documentation-only, or non-code tasks unless code context is explicitly useful, and record the skip reason.
+- SocratiCode is guidance only. Verify scope against files on disk before creating implementation tasks.
+- GitHub/local checkout is the source of truth. CI/test evidence overrides index results.
 
 ## Rules
 
