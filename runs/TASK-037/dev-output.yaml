@@ -1,0 +1,57 @@
+summary: |
+  Added a User-owned VIP tiers API across `shared-lib`, `Games-Labs-User`, and docs. The `userpb` contract now exposes additive `ListVipTiers` gRPC + grpc-gateway support for `GET /api/v1/vip/tiers`, and the regenerated `userpb` artifacts include the new route and schema.
+
+  In `Games-Labs-User`, I added a deterministic VIP presentation model that merges existing `level_configs` with code-level presets for label/group/color/perks, then exposed it through both the direct HTTP handler (`GET /vip/tiers`) and the gRPC handler (`ListVipTiers`). Focused tests cover mapping, empty configs, fallback/partial-config presentation, the HTTP handler success path, and the gRPC handler success path. I also added the new request to the Postman collection.
+
+  For local validation, `shared-lib` tests pass directly. `Games-Labs-User` still depends on the published `shared-lib` version in `go.mod`, so cross-repo validation was run with a temporary `go.work` linking the local `shared-lib` and `Games-Labs-User` modules instead of adding a forbidden `replace`.
+artifacts:
+  - path: shared-lib/proto/userpb/userpb.proto
+    action: modified
+  - path: shared-lib/proto/userpb/userpb.pb.go
+    action: modified
+  - path: shared-lib/proto/userpb/userpb.pb.gw.go
+    action: modified
+  - path: shared-lib/proto/userpb/userpb_grpc.pb.go
+    action: modified
+  - path: shared-lib/proto/userpb/userpb.swagger.json
+    action: modified
+  - path: shared-lib/proto/userpb/swagger.pb.go
+    action: modified
+  - path: Games-Labs-User/internal/models/user.go
+    action: modified
+  - path: Games-Labs-User/internal/core/ports/services.go
+    action: modified
+  - path: Games-Labs-User/internal/core/services/usersvc/service.go
+    action: modified
+  - path: Games-Labs-User/internal/core/services/usersvc/service_test.go
+    action: modified
+  - path: Games-Labs-User/internal/core/handlers/userhdl/grpc.go
+    action: modified
+  - path: Games-Labs-User/internal/core/handlers/userhdl/vip_handler.go
+    action: created
+  - path: Games-Labs-User/internal/core/handlers/userhdl/vip_handler_test.go
+    action: created
+  - path: Games-Labs-User/cmd/main.go
+    action: modified
+  - path: docs/Games-Labs-APIs.postman_collection.json
+    action: modified
+next_action:
+  agent: reviewer
+  reason: Review the cross-repo VIP tiers implementation and confirm the shared-lib publish/bump follow-up needed for standalone `Games-Labs-User` builds.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "dev TASK-037 vip tiers user service shared-lib Games-Labs-User docs"
+    relevant_symbols:
+      - "shared-lib/proto/userpb/userpb.proto"
+      - "Games-Labs-User/internal/models/user.go"
+      - "Games-Labs-User/internal/core/services/usersvc/service.go"
+      - "Games-Labs-User/internal/core/handlers/userhdl/grpc.go"
+      - "Games-Labs-User/internal/core/handlers/userhdl/vip_handler.go"
+    notes: "SocratiCode was unavailable, so implementation used local repo inspection, proto regeneration, and Go tests."
+blockers:
+  - "Games-Labs-User/go.mod still pins the previously published shared-lib version, so a shared-lib release/version bump is still needed before the User repo builds standalone without a temporary go.work."

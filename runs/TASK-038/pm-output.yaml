@@ -1,0 +1,101 @@
+task:
+  id: "TASK-038"
+  title: "Add Quest overview API in Missions service"
+  short_name: "quest-overview-api"
+  parent: "TASK-037"
+  epic: "Quest + VIP overview phase 1"
+  type: feature
+  priority: high
+  created_at: "2026-05-06"
+scope:
+  target_services:
+    - service: shared-lib
+      reason: "Additive missionspb contract for Quest overview."
+    - service: Games-Labs-Missions
+      reason: "Owner of Quest overview composition."
+    - service: Games-Labs-User
+      reason: "Internal source for user level via GetProfile; no implementation changes expected unless client compatibility requires it."
+    - service: docs
+      reason: "Postman collection must expose the new endpoint for downstream teams."
+  affected_files:
+    - path: "shared-lib/proto/missionspb/missions.proto"
+      action: modify
+      description: "Add GetQuestOverview RPC."
+    - path: "Games-Labs-Missions/internal/clients/user/client.go"
+      action: modify
+      description: "Ensure GetProfile client path can be used by Quest overview."
+    - path: "Games-Labs-Missions/internal/services/quest_overview_service.go"
+      action: create
+      description: "Compose Daily/Monthly quest overview and placeholders."
+    - path: "Games-Labs-Missions/internal/handlers/quest_handler.go"
+      action: create
+      description: "Expose GET /api/v1/quest/overview."
+    - path: "Games-Labs-Missions/internal/routes/apiv1.go"
+      action: modify
+      description: "Register Quest overview route."
+    - path: "Games-Labs-Missions/internal/grpc/missiongrpc/server.go"
+      action: modify
+      description: "Dispatch GetQuestOverview through existing HTTP mux."
+    - path: "Games-Labs-Missions/cmd/main.go"
+      action: modify
+      description: "Wire User gRPC client and Quest overview service."
+    - path: "docs/Games-Labs-APIs.postman_collection.json"
+      action: modify
+      description: "Add GET /api/v1/quest/overview request."
+description: |
+  Add a Missions-owned read-only overview endpoint for the Quest screen. Daily and Monthly data should use existing Missions data. Weekly, Event, and Invite are placeholders in phase 1. User header level comes from User gRPC GetProfile.Data.level and vip_label is derived in Missions.
+acceptance_criteria:
+  - criterion: "GET /api/v1/quest/overview returns an ordered tabs array: daily, weekly, monthly, event, invite."
+  - criterion: "Weekly/Event/Invite are inactive placeholders with empty items arrays."
+  - criterion: "User header derives vip_label from User GetProfile.Data.level and degrades with user.partial=true on User service failure."
+  - criterion: "Missions does not add GetVipTiers or /api/v1/vip/tiers."
+  - criterion: "Focused service and handler tests pass."
+  - criterion: "Postman collection includes the new request."
+plan:
+  approach: |
+    Add the missionspb contract, regenerate code, implement a composition service and route in Missions, wire User GetProfile for level header, and keep non-ready tabs as explicit placeholders.
+  subtasks:
+    - order: 1
+      description: "Update missionspb contract and regenerate generated artifacts."
+      agent: dev-2
+    - order: 2
+      description: "Implement User client usage, overview service, handler, routes, gRPC dispatch, and main wiring."
+      agent: dev-2
+    - order: 3
+      description: "Add tests for composition, tab order, degradation, and handler success; update Postman."
+      agent: dev-2
+  risks:
+    - risk: "Missions may accidentally use its local LevelService as VIP/Game level source."
+      mitigation: "Acceptance criteria explicitly forbids it."
+    - risk: "Weekly/Event/Invite scope expands into new engines."
+      mitigation: "Phase 1 placeholders only."
+  estimated_complexity: high
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "Cross-service contract and composition work, dependent on TASK-037 contract."
+summary: |
+  Created TASK-038 for Card B of quest-vip-overview phase 1: a Missions-owned Quest overview API.
+artifacts:
+  - path: "runs/TASK-038/task.md"
+    action: created
+  - path: "runs/TASK-038/status.yaml"
+    action: created
+next_action:
+  agent: dev-2
+  reason: "Task is scoped and ready once TASK-037 contract is available."
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - "shared-lib/proto/missionspb/missions.proto"
+      - "Games-Labs-Missions/internal/routes/apiv1.go"
+      - "Games-Labs-Missions/internal/grpc/missiongrpc/server.go"
+      - "shared-lib/proto/userpb/userpb.proto"
+    notes: "Used local checkout and reviewed the approved Cursor plan."
+blockers:
+  - "TASK-037 should land first, or at minimum its userpb generated contract should be available before TASK-038 implementation."
