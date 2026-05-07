@@ -1,0 +1,69 @@
+task:
+  id: "TASK-039"
+  title: "Add Invite read-only mission overview API"
+  short_name: "invite-readonly-api"
+  parent: "TASK-038"
+  epic: "Quest overview phase 2"
+  type: feature
+  priority: medium
+  created_at: "2026-05-06"
+scope:
+  target_services:
+    - service: shared-lib
+      reason: "Additive missionspb contract for Invite overview."
+    - service: Games-Labs-Missions
+      reason: "Owner of Invite tab read-only response."
+    - service: docs
+      reason: "Postman collection must expose the new endpoint."
+description: |
+  Add GET /api/v1/missions/invite/overview as a stable read-only API for the Quest Invite tab. The endpoint should return enabled, coming_soon, title, description, rules, rewards_preview, and counters with predictable defaults when no real data/config exists.
+acceptance_criteria:
+  - criterion: "GET /api/v1/missions/invite/overview returns stable Invite tab fields."
+  - criterion: "Missing config/data returns predictable null/zero/default values."
+  - criterion: "No referral flow, invite claim, or attribution behavior is implemented."
+  - criterion: "Focused service and handler tests pass."
+  - criterion: "Postman collection includes the new request."
+plan:
+  approach: |
+    Add the missionspb contract, regenerate code, implement a simple read-only Missions service/handler, and lock response stability with tests.
+  subtasks:
+    - order: 1
+      description: "Update missionspb contract and regenerate generated artifacts."
+      agent: dev
+    - order: 2
+      description: "Implement Invite overview service, handler, route, gRPC dispatch, and main wiring."
+      agent: dev
+    - order: 3
+      description: "Add tests for default response stability and fallback behavior; update Postman."
+      agent: dev
+  risks:
+    - risk: "Invite read-only scope may expand into referral flow."
+      mitigation: "Task explicitly forbids referral, attribution, and claim behavior."
+  estimated_complexity: medium
+assignment:
+  primary: dev
+  parallel: false
+  reason: "Narrow additive API with stable response shape."
+summary: |
+  Created TASK-039 for Quest phase 2 Invite read-only API.
+artifacts:
+  - path: "runs/TASK-039/task.md"
+    action: created
+  - path: "runs/TASK-039/status.yaml"
+    action: created
+next_action:
+  agent: dev
+  reason: "Task is scoped and ready."
+blockers: []
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - "shared-lib/proto/missionspb/missions.proto"
+      - "Games-Labs-Missions/internal/routes/apiv1.go"
+      - "Games-Labs-Missions/internal/grpc/missiongrpc/server.go"
+    notes: "PM card created from user-approved Phase 2 scope."

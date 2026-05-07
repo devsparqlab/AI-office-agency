@@ -1,0 +1,76 @@
+summary: |
+  Resolved the TASK-040 shared-lib publish blocker after the user published the Weekly mission contract. All guarded services now depend on github.com/SparqLab/shared-lib v0.0.0-20260507065339-680bf7e4bbea, which includes missionspb.WeeklyMissionClaimRequest, ClaimWeeklyMission, and the generated /api/v1/missions/weekly routes.
+artifacts:
+  - path: "Games-Labs-Auth/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260507065339-680bf7e4bbea."
+  - path: "Games-Labs-Auth/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Game/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260507065339-680bf7e4bbea."
+  - path: "Games-Labs-Game/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Logs/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260507065339-680bf7e4bbea."
+  - path: "Games-Labs-Logs/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Missions/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260507065339-680bf7e4bbea so Weekly missionspb symbols are available with GOWORK=off."
+  - path: "Games-Labs-Missions/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Order/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260507065339-680bf7e4bbea."
+  - path: "Games-Labs-Order/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-User/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260507065339-680bf7e4bbea."
+  - path: "Games-Labs-User/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Wallet/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260507065339-680bf7e4bbea."
+  - path: "Games-Labs-Wallet/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "api-gateway/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260507065339-680bf7e4bbea."
+  - path: "api-gateway/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+infra_checks:
+  - check: "shared-lib published contract"
+    result: pass
+    details: "Module cache for github.com/SparqLab/shared-lib@v0.0.0-20260507065339-680bf7e4bbea contains missionspb.WeeklyMissionClaimRequest, ClaimWeeklyMission, and /api/v1/missions/weekly routes."
+  - check: "dependency guard"
+    result: pass
+    details: "GOPRIVATE=\"github.com/SparqLab/*\" GONOSUMDB=\"github.com/SparqLab/*\" ./ai-dev-office/scripts/check-service-dependencies.sh passed for Games-Labs-Logs, api-gateway, Games-Labs-Order, Games-Labs-Game, Games-Labs-Auth, Games-Labs-Missions, Games-Labs-User, and Games-Labs-Wallet."
+next_action:
+  agent: reviewer
+  reason: "The shared-lib versioning blocker is resolved and CI-parity dependency guard now passes."
+blockers: []
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - "github.com/SparqLab/shared-lib@v0.0.0-20260507065339-680bf7e4bbea"
+      - "missionspb.WeeklyMissionClaimRequest"
+      - "missionspb.ClaimWeeklyMission"
+      - "/api/v1/missions/weekly"
+      - "ai-dev-office/scripts/check-service-dependencies.sh"
+    notes: "DevOps verification used Go module cache inspection and local dependency guard output."
