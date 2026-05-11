@@ -1,0 +1,68 @@
+task:
+  id: "TASK-045"
+  title: "Verify Event UX consistency across list, detail, and overview"
+  short_name: "event-ux-consistency-pass"
+  parent: "TASK-041"
+  epic: "Quest phase 2.1 event completion"
+  type: feature
+  priority: medium
+  created_at: "2026-05-08"
+scope:
+  target_services:
+    - service: Games-Labs-Missions
+      reason: "Owner of Event and Quest overview read projections."
+    - service: docs
+      reason: "Examples may need refresh after final Event semantics settle."
+description: |
+  Verify that Event list, Event detail, and Quest overview project the same event state semantics after Event claim and detail polish are complete, and make only light consistency fixes where needed.
+acceptance_criteria:
+  - criterion: "List/detail/overview use consistent semantics for progress, claimable, claimed, time windows, and event status."
+  - criterion: "Post-claim state is reflected consistently across surfaces."
+  - criterion: "Changes stay within glue/projection consistency scope."
+  - criterion: "Focused consistency tests pass."
+plan:
+  approach: |
+    Treat this as a final consistency pass after claim and detail tasks land. Add targeted tests first, then make only the smallest glue fixes required.
+  subtasks:
+    - order: 1
+      description: "Compare current event state projections across list, detail, and overview."
+      agent: dev-2
+    - order: 2
+      description: "Add focused consistency tests for post-claim and time-window behavior."
+      agent: dev-2
+    - order: 3
+      description: "Make small glue fixes and refresh docs/examples only if needed."
+      agent: dev-2
+  risks:
+    - risk: "Different screens may show conflicting claim/progress state."
+      mitigation: "Add explicit consistency assertions across projections."
+  estimated_complexity: medium
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "Cross-surface consistency work after upstream tasks complete."
+summary: |
+  Created TASK-045 for the final Event UX consistency pass.
+artifacts:
+  - path: "runs/TASK-045/task.md"
+    action: created
+  - path: "runs/TASK-045/status.yaml"
+    action: created
+next_action:
+  agent: dev-2
+  reason: "Run after TASK-043 and TASK-044 are done."
+blockers:
+  - "TASK-043 must be done so Event claim state exists and can be verified across surfaces."
+  - "TASK-044 must be done so the final Event detail contract is settled before consistency verification."
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - "Games-Labs-Missions/internal/services/event_service.go"
+      - "Games-Labs-Missions/internal/services/quest_overview_service.go"
+      - "docs/Games-Labs-APIs.postman_collection.json"
+    notes: "PM card created from the approved Event UX consistency follow-up plan."

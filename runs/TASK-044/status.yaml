@@ -1,0 +1,37 @@
+---
+task_id: TASK-044
+phase: done
+state: done
+current_agent: done
+iteration: 5
+assigned_to: dev
+created_at: '2026-05-08'
+updated_at: '2026-05-08'
+ready: true
+assignment:
+  primary: dev
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-044/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: Scoped Quest phase 2.1 Card B as Event detail contract polish for the Join/detail/Go
+    UI.
+- phase: pending -> in_review
+  agent: dev
+  reason: The detail contract polish is implemented additively, covered by focused
+    tests, and documented with the updated Postman example.
+- phase: in_review -> done
+  agent: reviewer
+  reason: "Reviewer approved after the Postman Event detail example was attached to the correct request; builds, tests, and JSON validation passed."
+- phase: debugging -> in_review
+  agent: debugger
+  reason: The blocker was fully fixed with a targeted docs change, so the reviewer
+    can re-check the Postman artifact against the acceptance criterion.
+- phase: in_review -> debugging
+  agent: reviewer
+  reason: The implementation is acceptable, but the Postman artifact must be corrected
+    so the example is documented on the right endpoint.

@@ -29,8 +29,8 @@ default_workflow: workflows/hybrid-default.yaml
 
 runner_selector:
   priority:
-    - copilot         # 1st: GitHub Copilot CLI
     - cursor-agent    # 2nd: Cursor CLI Agent
+    - copilot         # 1st: GitHub Copilot CLI
     - cursor          # 3rd: Cursor IDE (interactive)
     - codex           # 4th: Codex CLI
   config_dir: runners/

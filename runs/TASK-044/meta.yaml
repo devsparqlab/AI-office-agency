@@ -1,0 +1,92 @@
+---
+task_id: TASK-044
+events:
+- type: context_provider
+  agent: dev
+  details: provider=socraticode status=unavailable freshness=unknown confidence=low
+    policy=recorded fallback=repo_search note=SocratiCode is unavailable. Use local
+    repo inspection, ripgrep, tests, and CI evidence.
+  timestamp: '2026-05-08T04:52:56Z'
+- type: prompt_assembly
+  agent: dev
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot phase=pending
+    iteration=1 sources=agents/dev.md, runs/TASK-044/task.md, runs/TASK-044/status.yaml,
+    runs/TASK-044/pm-output.yaml
+  timestamp: '2026-05-08T04:52:57Z'
+- type: runner_complete
+  agent: dev
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot output_expected=runs/TASK-044/dev-output.yaml
+  timestamp: '2026-05-08T04:57:43Z'
+- type: context_provider
+  agent: reviewer
+  details: provider=socraticode status=unavailable freshness=unknown confidence=low
+    policy=recorded fallback=repo_search note=SocratiCode is unavailable. Use local
+    repo inspection, ripgrep, tests, and CI evidence.
+  timestamp: '2026-05-08T04:57:58Z'
+- type: prompt_assembly
+  agent: reviewer
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot phase=in_review
+    iteration=2 sources=agents/reviewer.md, runs/TASK-044/task.md, runs/TASK-044/status.yaml,
+    runs/TASK-044/pm-output.yaml, runs/TASK-044/dev-output.yaml
+  timestamp: '2026-05-08T04:57:58Z'
+- type: runner_complete
+  agent: reviewer
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot output_expected=runs/TASK-044/reviewer-output.yaml
+  timestamp: '2026-05-08T04:59:14Z'
+- type: context_provider
+  agent: reviewer
+  details: provider=socraticode status=unavailable freshness=unknown confidence=low
+    policy=recorded fallback=repo_search note=SocratiCode is unavailable. Use local
+    repo inspection, ripgrep, tests, and CI evidence.
+  timestamp: '2026-05-08T05:00:17Z'
+- type: prompt_assembly
+  agent: reviewer
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot phase=in_review
+    iteration=2 sources=agents/reviewer.md, runs/TASK-044/task.md, runs/TASK-044/status.yaml,
+    runs/TASK-044/pm-output.yaml, runs/TASK-044/dev-output.yaml
+  timestamp: '2026-05-08T05:00:17Z'
+- type: runner_complete
+  agent: reviewer
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot output_expected=runs/TASK-044/reviewer-output.yaml
+  timestamp: '2026-05-08T05:01:41Z'
+- type: context_provider
+  agent: debugger
+  details: provider=socraticode status=used freshness=current confidence=medium policy=recorded
+    fallback=repo_search note=none
+  timestamp: '2026-05-08T05:03:00Z'
+- type: prompt_assembly
+  agent: debugger
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot phase=debugging
+    iteration=3 sources=agents/debugger.md, runs/TASK-044/task.md, runs/TASK-044/status.yaml,
+    runs/TASK-044/pm-output.yaml, runs/TASK-044/reviewer-output.yaml
+  timestamp: '2026-05-08T05:03:00Z'
+- type: runner_complete
+  agent: debugger
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot output_expected=runs/TASK-044/debugger-output.yaml
+  timestamp: '2026-05-08T05:05:00Z'
+- type: context_provider
+  agent: reviewer
+  details: provider=socraticode status=used freshness=current confidence=medium policy=recorded
+    fallback=repo_search note=none
+  timestamp: '2026-05-08T05:05:13Z'
+- type: prompt_assembly
+  agent: reviewer
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot phase=in_review
+    iteration=4 sources=agents/reviewer.md, runs/TASK-044/task.md, runs/TASK-044/status.yaml,
+    runs/TASK-044/pm-output.yaml, runs/TASK-044/dev-output.yaml, runs/TASK-044/debugger-output.yaml
+  timestamp: '2026-05-08T05:05:13Z'
+- type: runner_complete
+  agent: reviewer
+  details: task=TASK-044 [event-detail-contract-polish] Polish Event detail contract
+    for UI actions epic=Quest phase 2.1 event completion runner=copilot output_expected=runs/TASK-044/reviewer-output.yaml
+  timestamp: '2026-05-08T05:06:20Z'
+updated_at: '2026-05-08T05:06:20Z'
