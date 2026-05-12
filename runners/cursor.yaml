@@ -36,7 +36,7 @@ health_check:
   note: "Cursor is always available when the IDE is open"
 
 notes: |
-  Cursor is used as the secondary runner (after Copilot, before Codex).
+  Cursor is used as the interactive fallback after Codex and Cursor CLI Agent.
   It excels at interactive, complex tasks that benefit from IDE context.
   Multi-turn conversations let agents iterate without losing context.
   SKILL.md enables automatic agent behavior detection.

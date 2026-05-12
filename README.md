@@ -217,15 +217,16 @@ The source of truth for repo-wide rules is `../AGENTS.md`. In particular, every 
 
 ### Priority Order
 
-1. **GitHub Copilot** — Type: CLI (default), Best for: straightforward tasks and scripted pipelines
+1. **Codex CLI** — Type: CLI (default), Best for: heavy autonomous work and full-auto mode
+1. **Cursor CLI Agent** — Type: CLI, Best for: terminal-driven fallback work with Cursor Agent
 1. **Cursor** — Type: IDE (interactive), Best for: complex/interactive tasks and code navigation
-1. **Codex CLI** — Type: CLI, Best for: heavy autonomous work and full-auto mode
 
 ### Usage
 
 ```bash
-./ai-dev-office/run-agent.sh TASK-011 dev              # Copilot (default)
-./ai-dev-office/run-agent.sh TASK-011 dev codex         # Force Codex
+./ai-dev-office/run-agent.sh TASK-011 dev              # Codex (default)
+./ai-dev-office/run-agent.sh TASK-011 dev codex         # Explicit Codex
+./ai-dev-office/run-agent.sh TASK-011 dev cursor-agent  # Run Cursor CLI Agent
 ./ai-dev-office/run-agent.sh TASK-011 dev cursor        # Generate prompt for Cursor
 ```
 
@@ -235,15 +236,15 @@ For Cursor: open the IDE, read `ai-dev-office/agents/<agent>.md`, read the task 
 
 All runners share the same task files (`runs/<task-id>/`), so you can mix freely:
 
-- Dev on Copilot + Dev-2 on Cursor (different agents, same task)
-- TASK-011 on Copilot + TASK-012 on Codex (different tasks)
-- PM on Cursor -> Dev on Copilot -> Reviewer on Codex (sequential handoff)
+- Dev on Codex + Dev-2 on Cursor (different agents, same task)
+- TASK-011 on Cursor Agent + TASK-012 on Codex (different tasks)
+- PM on Cursor -> Dev on Cursor Agent -> Reviewer on Codex (sequential handoff)
 
 **Do not** run the same agent on the same task with multiple runners simultaneously — they would overwrite each other's output file.
 
 ### Auto-switch
 
-When a runner fails with quota/auth errors, the system suggests the next runner in priority order. Watched patterns: `insufficient_quota`, `quota exceeded`, `rate limit`, `unauthorized`, `invalid api key`, `token expired`.
+When a runner fails with quota/auth errors, the script retries it, then switches to the next runner in priority order. Codex falls back to Cursor CLI Agent, then to Cursor IDE prompt generation. Watched patterns: `insufficient_quota`, `quota exceeded`, `rate limit`, `unauthorized`, `invalid api key`, `token expired`.
 
 ---
 
@@ -280,9 +281,9 @@ ai-dev-office/
   workflows/
     hybrid-default.yaml    # Default hybrid orchestration workflow (v2.0)
   runners/
-    copilot.yaml           # GitHub Copilot CLI runner config (primary)
-    cursor.yaml            # Cursor IDE runner config (secondary)
-    codex.yaml             # Codex CLI runner config (tertiary)
+    codex.yaml             # Codex CLI runner config (primary/default)
+    cursor-agent.yaml      # Cursor CLI Agent runner config (secondary)
+    cursor.yaml            # Cursor IDE runner config (interactive fallback)
   tasks/
     templates/
       new-task.yaml        # Task template (legacy, PM creates tasks now)

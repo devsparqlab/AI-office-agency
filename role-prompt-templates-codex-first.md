@@ -22,7 +22,7 @@ Implement only what task.md and scope require.
 Keep changes minimal, local, and merge-ready.
 Use focused tests for behavior or contract-impacting edits.
 If complexity expands beyond safe scope, escalate to dev-2 or free-roam.
-Use Codex/Cursor for implementation; Copilot inline is optional for boilerplate and test skeletons.
+Use Codex for implementation by default; fall back to Cursor Agent or Cursor IDE only when routing requires it.
 Output artifacts and blockers clearly.
 ```
 

@@ -101,8 +101,9 @@ PM creates `task.md`, `status.yaml`, plans subtasks, and assigns to Dev/Dev-2.
 ### Switch runner
 
 ```bash
-./ai-dev-office/run-agent.sh TASK-NNN dev copilot  # GitHub Copilot
-./ai-dev-office/run-agent.sh TASK-NNN dev codex    # Codex CLI
+./ai-dev-office/run-agent.sh TASK-NNN dev codex         # Codex CLI
+./ai-dev-office/run-agent.sh TASK-NNN dev cursor-agent  # Cursor CLI Agent
+./ai-dev-office/run-agent.sh TASK-NNN dev cursor        # Cursor IDE prompt
 ```
 
 ### In Cursor

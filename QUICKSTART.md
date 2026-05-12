@@ -4,7 +4,7 @@
 - เอกสารสั้นนี้อธิบายวิธีเรียกใช้งาน multi-agent สำหรับงานใน `ai-dev-office` ทั้งจาก CLI และใน IDE (Cursor / VS Code tasks)
 
 Prerequisites
-- ติดตั้ง Ruby และมี `gh` (GitHub CLI) ถ้าจะใช้ runner `copilot` (run-agent.sh เรียก `gh copilot`).
+- ติดตั้ง Ruby และมี Codex CLI สำหรับ runner default `codex`.
 - เปิดสิทธิ์ให้สคริปต์: `chmod +x ai-dev-office/run-agent.sh` ถ้าจำเป็น
 
 พื้นฐานคำสั่ง
@@ -23,13 +23,12 @@ Prerequisites
   ./ai-dev-office/run-agent.sh TASK-030 reviewer
 
 Runner options
-- `copilot` (default): non-interactive via `gh copilot` — เหมาะเมื่อใช้ Copilot CLI
+- `codex` (default): non-interactive via Codex CLI
+- `cursor-agent`: รัน Cursor CLI Agent ใน terminal
 - `cursor`: จะบันทึก prompt เป็น `runs/<TASK>/.cursor-prompt.md` ให้เปิดใน Cursor/IDE แล้วรันแบบ interactive
-- `codex`: ถ้าใช้ runner แบบอื่น ๆ (ตาม `run-agent.sh`)
-- `copilot-chat`: ใหม่ — บันทึก prompt เป็น `runs/<TASK>/.copilot-prompt.md` เพื่อให้คุณเปิดใน VS Code แล้วส่งข้อความเป็น selected text ไปยัง GitHub Copilot Chat (interactive)
 
 Manual Prompt Mode (IDE/CLI)
-- ไฟล์ `.cursor-prompt.md` และ `.copilot-prompt.md` ช่วยให้ context/role prompt เหมือนกับการรันผ่าน `run-agent.sh`, แต่ไม่ใช่การ enforce policy โดยตัวมันเอง
+- ไฟล์ `.cursor-prompt.md` ช่วยให้ context/role prompt เหมือนกับการรันผ่าน `run-agent.sh`, แต่ไม่ใช่การ enforce policy โดยตัวมันเอง
 - การ enforce guardrails (เช่น dependency guard, no `go.work`, no `replace` directive, Dockerfile build rules) เกิดอัตโนมัติเมื่อรันผ่าน `run-agent.sh` ใน stage ที่เกี่ยวข้อง และเกิดซ้ำอีกครั้งใน GitHub Actions
 - ถ้าคุยกับ IDE/CLI ตรง ๆ โดยไม่ผ่าน `run-agent.sh`, ให้รันเช็กเองก่อน push:
 
@@ -42,13 +41,9 @@ Manual Prompt Mode (IDE/CLI)
 
   ./ai-dev-office/run-agent.sh TASK-028 dev-2 cursor
 
-ตัวอย่าง: สร้าง prompt สำหรับส่งใน Copilot Chat (interactive)
+ตัวอย่าง: รันด้วย Cursor CLI Agent
 
-  ./ai-dev-office/run-agent.sh TASK-029 dev-2 copilot-chat
-
-  # จากนั้นเปิดไฟล์:
-  # ai-dev-office/runs/TASK-029/.copilot-prompt.md
-  # เลือกข้อความทั้งหมดแล้วส่งให้ Copilot Chat ใน VS Code (หรือวางในช่อง chat ของ Copilot)
+  ./ai-dev-office/run-agent.sh TASK-029 dev-2 cursor-agent
 
 บันทึกผลลัพธ์
 - หลังจากรัน ให้บันทึก output ของ agent ลงไฟล์ที่ run-agent คาดหวัง (ตัวอย่าง):

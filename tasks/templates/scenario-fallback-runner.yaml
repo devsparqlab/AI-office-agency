@@ -1,9 +1,9 @@
 scenario:
-  name: Codex-to-Copilot Fallback
+  name: Codex-to-Cursor-Agent Fallback
   description: |
     Codex CLI quota is exhausted mid-task. The orchestrator switches
-    to GitHub Copilot CLI and the pipeline continues to completion.
-  expected_flow: Dev[codex] -> Reviewer[codex fails, switch] -> Reviewer[copilot] -> Tester[copilot] -> Done
+    to Cursor CLI Agent and the pipeline continues to completion.
+  expected_flow: Dev[codex] -> Reviewer[codex fails, switch] -> Reviewer[cursor-agent] -> Tester[cursor-agent] -> Done
 
 task:
   id: "DRY-RUN-004"
@@ -35,20 +35,20 @@ expected_outputs:
     trigger: "Codex CLI returns: insufficient_quota"
     action:
       persist_current_state: true
-      switch_runner_to: copilot
+      switch_runner_to: cursor-agent
       log_reason: "Codex CLI quota exhausted after Dev stage"
       log_to: runs/DRY-RUN-004/meta.yaml
 
-  reviewer_copilot:
-    runner: copilot
+  reviewer_cursor_agent:
+    runner: cursor-agent
     summary: "Pagination implementation is correct, follows existing patterns"
     review_verdict: approved
     next_action:
       agent: tester
     blockers: []
 
-  tester_copilot:
-    runner: copilot
+  tester_cursor_agent:
+    runner: cursor-agent
     summary: "2 tests pass: pagination with defaults, pagination with custom values"
     test_results:
       total: 2
@@ -66,11 +66,11 @@ validation_checklist:
     passed: false
   - check: "Switch reason is logged in meta.yaml"
     passed: false
-  - check: "Reviewer receives the same task.md + status.yaml via Copilot"
+  - check: "Reviewer receives the same task.md + status.yaml via Cursor Agent"
     passed: false
   - check: "Handoff contract fields are identical regardless of runner"
     passed: false
-  - check: "Pipeline completes to 'done' on Copilot runner"
+  - check: "Pipeline completes to 'done' on Cursor Agent runner"
     passed: false
-  - check: "status.yaml correctly tracks runner change (codex -> copilot)"
+  - check: "status.yaml correctly tracks runner change (codex -> cursor-agent)"
     passed: false

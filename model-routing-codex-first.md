@@ -20,10 +20,11 @@ Current policy: **Codex-first** (or the Cursor agent you invoke with Codex). Sec
 - Escalate to `free-roam` when blockers repeat, scope is unclear, or risk is too high for a single pass.
 - For high-risk work (multi-service, contract change, production incident), add **human** review or an extra Codex review round with stricter checklist—no separate model required unless evidence shows it's necessary.
 
-## Copilot
+## Runner Fallbacks
 
-- Optional inline accelerator during `dev` / `dev-2` (autocomplete, boilerplate, test skeletons).
-- Does not replace `reviewer` / `debugger` gates.
+- Use Codex first for all automated phases.
+- If Codex is unavailable, switch to Cursor CLI Agent, then Cursor IDE.
+- Fallback runners do not replace `reviewer` / `debugger` gates.
 
 ## Cost and Throughput Guardrails
 

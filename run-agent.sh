@@ -13,7 +13,7 @@ Usage: ./run-agent.sh <TASK_ID> <AGENT> [RUNNER]
 
   TASK_ID   Task identifier (e.g. TASK-003)
   AGENT     Agent role: pm | dev | dev-2 | reviewer | debugger | devops | free-roam
-  RUNNER    Optional: copilot (default) | codex | cursor | cursor-agent
+  RUNNER    Optional: codex (default) | cursor-agent | cursor
             For Cursor: use the IDE directly (see ai-dev-office/SKILL.md)
             For Cursor Agent: runs Cursor in your terminal.
 
@@ -21,15 +21,14 @@ Scaffold mode:
   scaffold  Create a starter <agent>-output.yaml for manual completion.
   --force   Overwrite an existing scaffold target file.
 
-Runner priority: copilot > cursor-agent > cursor (IDE) > codex
+Runner priority: codex > cursor-agent > cursor (IDE)
 
 Examples:
-  ./run-agent.sh TASK-011 pm                  # runs with copilot (default)
+  ./run-agent.sh TASK-011 pm                  # runs with codex (default)
   ./run-agent.sh TASK-011 dev
   ./run-agent.sh TASK-011 dev codex           # force codex runner
-  ./run-agent.sh TASK-011 reviewer copilot    # explicit copilot
+  ./run-agent.sh TASK-011 reviewer cursor-agent # run Cursor CLI agent
   ./run-agent.sh TASK-011 dev cursor          # generate Cursor prompt
-  ./run-agent.sh TASK-011 dev cursor-agent    # run Cursor CLI agent
   ./run-agent.sh TASK-011 scaffold dev
   ./run-agent.sh TASK-011 scaffold reviewer --force
 
@@ -43,7 +42,7 @@ EOF
 
 TASK_ID="$1"
 AGENT="$2"
-RUNNER="${3:-copilot}"
+RUNNER="${3:-codex}"
 
 TASK_DIR="$RUNS_DIR/$TASK_ID"
 AGENT_FILE="$AGENTS_DIR/$AGENT.md"
@@ -442,6 +441,31 @@ end
 RUBY
 }
 
+config_list_values() {
+  local key_path="$1"
+  local fallback="${2:-}"
+  local config_file="$OFFICE_DIR/office.config.yaml"
+
+  ruby - "$config_file" "$key_path" "$fallback" <<'RUBY'
+require "yaml"
+require "date"
+
+config_path, key_path, fallback = ARGV
+value = nil
+
+if File.exist?(config_path)
+  data = YAML.safe_load(File.read(config_path), permitted_classes: [Date, Time], aliases: true) || {}
+  value = key_path.split(".").reduce(data) do |memo, key|
+    memo.is_a?(Hash) ? memo[key] : nil
+  end
+end
+
+values = Array(value).map(&:to_s).reject(&:empty?)
+values = fallback.to_s.split(/[,\s]+/).reject(&:empty?) if values.empty?
+puts values
+RUBY
+}
+
 config_bool() {
   local key_path="$1"
   local fallback="${2:-false}"
@@ -452,6 +476,150 @@ config_bool() {
     true|1|yes|on) echo "true" ;;
     *) echo "false" ;;
   esac
+}
+
+runner_priority_values() {
+  config_list_values "runner_selector.priority" "codex cursor-agent cursor"
+}
+
+runner_trigger_patterns() {
+  config_list_values "runner_selector.trigger_patterns" "insufficient_quota,quota exceeded,rate limit,unauthorized,invalid api key,token expired"
+}
+
+runner_retry_before_switch() {
+  local configured
+  configured="$(config_value "runner_selector.retry_before_switch" "2")"
+  if [[ "$configured" =~ ^[0-9]+$ ]]; then
+    echo "$configured"
+  else
+    echo "2"
+  fi
+}
+
+next_runner_after() {
+  local current="$1"
+  local found="false"
+  local runner
+
+  while IFS= read -r runner; do
+    [[ -n "$runner" ]] || continue
+    if [[ "$found" == "true" ]]; then
+      echo "$runner"
+      return 0
+    fi
+    [[ "$runner" == "$current" ]] && found="true"
+  done < <(runner_priority_values)
+
+  case "$current" in
+    codex) echo "cursor-agent" ;;
+    cursor-agent) echo "cursor" ;;
+    *) return 1 ;;
+  esac
+}
+
+runner_failure_pattern() {
+  local log_file="$1"
+  local pattern
+
+  while IFS= read -r pattern; do
+    [[ -n "$pattern" ]] || continue
+    if grep -Fqi -- "$pattern" "$log_file"; then
+      echo "$pattern"
+      return 0
+    fi
+  done < <(runner_trigger_patterns)
+
+  return 1
+}
+
+run_runner_once() {
+  local runner="$1"
+  local output_log="$2"
+
+  case "$runner" in
+    codex)
+      codex --approval-mode full-auto --quiet -p "$PROMPT" >"$output_log" 2>&1
+      ;;
+    cursor)
+      {
+        echo "Cursor is an interactive IDE runner."
+        echo "Paste the following into Cursor chat or reference @ai-dev-office/agents/$AGENT.md"
+        echo ""
+        echo "--- Prompt (saved to $TASK_DIR/.cursor-prompt.md) ---"
+        echo "$PROMPT" > "$TASK_DIR/.cursor-prompt.md"
+        echo "Prompt saved. Open it in Cursor and run."
+      } >"$output_log" 2>&1
+      ;;
+    cursor-agent)
+      {
+        echo "Launching Cursor CLI Agent..."
+        cursor agent -p "$PROMPT"
+      } >"$output_log" 2>&1
+      ;;
+    *)
+      echo "Error: Unknown runner '$runner'. Use: codex | cursor-agent | cursor" >"$output_log"
+      return 64
+      ;;
+  esac
+}
+
+run_runner_with_fallback() {
+  local current_runner="$1"
+  local auto_switch
+  local retry_limit
+  local retry_count=0
+  local output_log
+  local status
+  local matched_pattern
+  local next_runner
+
+  auto_switch="$(config_bool "runner_selector.auto_switch" "true")"
+  retry_limit="$(runner_retry_before_switch)"
+
+  while true; do
+    output_log="$(mktemp)"
+
+    if run_runner_once "$current_runner" "$output_log"; then
+      cat "$output_log"
+      rm -f "$output_log"
+      RUNNER="$current_runner"
+      if [[ "$current_runner" == "cursor" ]]; then
+        INTERACTIVE_RUNNER="true"
+      else
+        INTERACTIVE_RUNNER="false"
+      fi
+      return 0
+    fi
+
+    status=$?
+    cat "$output_log"
+
+    if [[ "$auto_switch" != "true" ]] || ! matched_pattern="$(runner_failure_pattern "$output_log")"; then
+      rm -f "$output_log"
+      return "$status"
+    fi
+
+    if [[ "$retry_count" -lt "$retry_limit" ]]; then
+      retry_count=$((retry_count + 1))
+      echo "Runner '$current_runner' failed with switchable pattern '$matched_pattern'; retrying ($retry_count/$retry_limit)."
+      log_meta_event "$TASK_ID" "$META_FILE" "runner_retry" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} runner=$current_runner attempt=$retry_count/$retry_limit matched_pattern=$matched_pattern"
+      rm -f "$output_log"
+      continue
+    fi
+
+    next_runner="$(next_runner_after "$current_runner" || true)"
+    if [[ -z "$next_runner" ]]; then
+      echo "Runner '$current_runner' failed with switchable pattern '$matched_pattern', but no fallback runner is configured."
+      rm -f "$output_log"
+      return "$status"
+    fi
+
+    echo "Runner '$current_runner' failed with switchable pattern '$matched_pattern'; switching to '$next_runner'."
+    log_meta_event "$TASK_ID" "$META_FILE" "runner_switch" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} from=$current_runner to=$next_runner matched_pattern=$matched_pattern phase=${CURRENT_PHASE:-unknown} iteration=${CURRENT_ITERATION:-unknown}"
+    current_runner="$next_runner"
+    retry_count=0
+    rm -f "$output_log"
+  done
 }
 
 config_list_contains() {
@@ -1338,42 +1506,7 @@ echo "=== Running $AGENT for $TASK_LABEL (runner: $RUNNER) ==="
 RUN_STARTED_AT_EPOCH="$(date +%s)"
 INTERACTIVE_RUNNER="false"
 
-case "$RUNNER" in
-  copilot-chat)
-    INTERACTIVE_RUNNER="true"
-    # Save the assembled prompt to a file for interactive use with Copilot Chat in an IDE.
-    PROMPT_FILE="$TASK_DIR/.copilot-prompt.md"
-    mkdir -p "$TASK_DIR"
-    echo "$PROMPT" > "$PROMPT_FILE"
-    echo "Prompt saved for Copilot Chat: $PROMPT_FILE"
-    echo "Open it in your IDE, select the content and send to Copilot Chat (or paste into the chat input)."
-    ;;
-  copilot)
-    # GitHub Copilot CLI (via gh): `suggest -t shell` was removed; use -p for non-interactive prompts.
-    gh copilot -p "$PROMPT" --allow-all-tools --silent
-    ;;
-  codex)
-    codex --approval-mode full-auto --quiet -p "$PROMPT"
-    ;;
-  cursor)
-    INTERACTIVE_RUNNER="true"
-    echo "Cursor is an interactive IDE runner."
-    echo "Paste the following into Cursor chat or reference @ai-dev-office/agents/$AGENT.md"
-    echo ""
-    echo "--- Prompt (saved to $TASK_DIR/.cursor-prompt.md) ---"
-    echo "$PROMPT" > "$TASK_DIR/.cursor-prompt.md"
-    echo "Prompt saved. Open it in Cursor and run."
-    ;;
-  cursor-agent)
-    # Cursor CLI Agent (cursor agent -p "prompt")
-    echo "Launching Cursor CLI Agent..."
-    cursor agent -p "$PROMPT"
-    ;;
-  *)
-    echo "Error: Unknown runner '$RUNNER'. Use: copilot | codex | cursor | cursor-agent"
-    exit 1
-    ;;
-esac
+run_runner_with_fallback "$RUNNER" || exit $?
 
 log_meta_event "$TASK_ID" "$META_FILE" "runner_complete" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} runner=$RUNNER output_expected=runs/$TASK_ID/$(basename "$OUTPUT_FILE")"
 
