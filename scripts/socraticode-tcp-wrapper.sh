@@ -6,6 +6,13 @@ REMOTE_SSH_KEY="${SOCRATICODE_SSH_KEY:-$HOME/.ssh/id_ed25519}"
 REMOTE_PORT="${SOCRATICODE_REMOTE_PORT:-3000}"
 REMOTE_PROJECT="${SOCRATICODE_REMOTE_PROJECT:-/app}"
 LOCAL_PROJECT_ROOT="${SOCRATICODE_LOCAL_PROJECT:-/Users/earth/Documents/GitHub}"
+SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SCRIPT_SOURCE" ]]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+  SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
+  [[ "$SCRIPT_SOURCE" != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 
 usage() {
   cat <<'EOF'
@@ -14,6 +21,9 @@ Usage:
   socraticode codebase_status
   socraticode codebase_search --query <text> [--fileFilter <path>] [--languageFilter <lang>] [--includeLinked] [--limit <n>] [--minScore <n>] [--projectPath <path>]
   socraticode codebase_symbol --name <symbol> [--file <path>] [--projectPath <path>]
+  socraticode codebase_graph_query --file <path> [--projectPath <path>]
+  socraticode codebase_graph_stats [--projectPath <path>]
+  socraticode codebase_graph_circular [--projectPath <path>]
 
 Environment:
   SOCRATICODE_REMOTE_HOST
@@ -483,6 +493,21 @@ print_symbol() {
   local_symbol_json "$name" "$file" "$limit"
 }
 
+print_graph_query() {
+  SOCRATICODE_LOCAL_PROJECT="$LOCAL_PROJECT_ROOT" \
+  node "$SCRIPT_DIR/socraticode-graph-helper.js" codebase_graph_query "$@"
+}
+
+print_graph_stats() {
+  SOCRATICODE_LOCAL_PROJECT="$LOCAL_PROJECT_ROOT" \
+  node "$SCRIPT_DIR/socraticode-graph-helper.js" codebase_graph_stats "$@"
+}
+
+print_graph_circular() {
+  SOCRATICODE_LOCAL_PROJECT="$LOCAL_PROJECT_ROOT" \
+  node "$SCRIPT_DIR/socraticode-graph-helper.js" codebase_graph_circular "$@"
+}
+
 cmd="${1:-context}"
 if [[ $# -gt 0 ]]; then
   shift
@@ -531,6 +556,15 @@ case "$cmd" in
     ;;
   codebase_symbol)
     print_symbol "$@"
+    ;;
+  codebase_graph_query)
+    print_graph_query "$@"
+    ;;
+  codebase_graph_stats)
+    print_graph_stats "$@"
+    ;;
+  codebase_graph_circular)
+    print_graph_circular "$@"
     ;;
   --help|-h|help)
     usage
