@@ -1,0 +1,36 @@
+summary: |
+  Root cause confirmed in `ClaimMissionBoost`: the DEV Daily reset rollout changed Mission Boost's fallback idempotency key from the original calendar-day key to `s.dailyReset.bucketKey(s.now())`. That meant enabling the QA interval override also reopened Mission Boost once per interval, which was outside TASK-047's Daily-only scope and could inflate rewards plus downstream weekly/event progress.
+
+  I applied a minimal fix by restoring Mission Boost's default key generation to `todayKey()`, leaving the new shared Daily reset policy in place for Daily missions, watch-ad limits, and overview countdowns only. I also added a regression test that enables the interval override, crosses an interval boundary, and verifies Mission Boost still returns `already_claimed` on the same day.
+diagnosis:
+  root_cause: Mission Boost was accidentally tied to the shared DEV Daily interval bucket, changing its idempotency cadence from once per day to once per interval.
+  affected_files:
+    - path: Games-Labs-Missions/internal/services/mission_service.go
+      lines: "401-405"
+    - path: Games-Labs-Missions/internal/services/mission_service_test.go
+      lines: "282-316"
+  confidence: high
+artifacts:
+  - path: Games-Labs-Missions/internal/services/mission_service.go
+    action: modified
+    description: Restored Mission Boost fallback idempotency keys to the original daily key instead of the DEV interval bucket.
+  - path: Games-Labs-Missions/internal/services/mission_service_test.go
+    action: modified
+    description: Added a regression test proving the DEV interval override does not make Mission Boost claimable again after an interval rollover.
+next_action:
+  agent: reviewer
+  reason: The blocker is fixed in code with a focused regression test, so the reviewer can re-run validation and approve if no other issues remain.
+context_sources:
+  github:
+    branch: "main"
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "reviewer TASK-047: Add DEV-only daily reset override"
+      - "mission_boost cadence and daily reset bucket usage"
+    relevant_symbols:
+      - "Games-Labs-Missions/internal/services/mission_service.go:403"
+      - "Games-Labs-Missions/internal/services/mission_service_test.go:282"
+    notes: "Used local diff, blame, and test evidence as source of truth."
+blockers: []

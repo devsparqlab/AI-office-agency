@@ -1,0 +1,48 @@
+summary: |
+  Implemented a shared Daily reset policy for Games-Labs-Missions and wired the same policy into the mission service and quest overview countdown so QA can opt into short reset windows in local/dev without changing the production default.
+
+  The default remains calendar-based reset at 00:00 Asia/Bangkok. A new DEV-only env config (`DAILY_RESET_MODE`, `DAILY_RESET_INTERVAL_MINUTES`) now enables interval-mode only when `APP_ENV` is local/dev; staging and production-like environments are forced back to the default calendar policy.
+
+  To keep the change rollback-safe and avoid schema churn in date-backed tables, the override is applied to the bucketed Daily mission/watch-ad windows and the overview Daily countdown, which are the surfaced QA-reset paths in scope. Existing monthly and streak persistence remains on its prior calendar-date storage model.
+artifacts:
+  - path: Games-Labs-Missions/README.md
+    action: modified
+  - path: Games-Labs-Missions/cmd/main.go
+    action: modified
+  - path: Games-Labs-Missions/config/config.go
+    action: modified
+  - path: Games-Labs-Missions/config/config_test.go
+    action: created
+  - path: Games-Labs-Missions/internal/models/models.go
+    action: modified
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/daily_reset_policy.go
+    action: created
+  - path: Games-Labs-Missions/internal/services/mission_service.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/mission_service_test.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/quest_overview_service.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/quest_overview_service_test.go
+    action: modified
+next_action:
+  agent: reviewer
+  reason: The DEV-only Daily reset override is wired, documented, and covered with focused tests for default mode, interval mode, rollover, and non-DEV guarding.
+context_sources:
+  github:
+    branch: "main"
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "dev-2 TASK-047: Add DEV-only daily reset override"
+      - "daily reset boundary and countdown flow"
+    relevant_symbols:
+      - "Games-Labs-Missions/internal/services/mission_service.go"
+      - "Games-Labs-Missions/internal/services/quest_overview_service.go"
+      - "Games-Labs-Missions/config/config.go"
+      - "Games-Labs-Missions/internal/repositories/mission_repo.go"
+    notes: "SocratiCode returned no usable context, so the implementation used local repo inspection and repository-backed tests as source of truth."
+blockers: []
