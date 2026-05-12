@@ -1,0 +1,69 @@
+summary: |
+  Approved. The change adds the admin daily-reset RPC and HTTP mapping, regenerates the `missionspb` artifacts, wires the Missions service/gRPC dispatch and admin handler, and documents the DEV QA flow in Postman.
+
+  I verified the reset path clears current Bangkok-day `daily_mission` and `watch_ad` mission logs plus `daily_activity_progress`, while leaving non-daily domains unchanged. `GET /api/v1/missions/progress` and `GET /api/v1/quest/overview` read their affected daily counters from the surfaces this reset clears, and the focused tests cover missing `user_id`, repeat-safe behavior, Bangkok-day scoping, and non-impact on monthly state.
+
+  I also checked the affected `go.mod` files and found no forbidden `replace github.com/SparqLab/shared-lib => ../shared-lib` directive.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    Passed:
+    - `shared-lib`: `go build ./...`, `go test ./...`
+    - `Games-Labs-Missions`: `go build ./...`, `go test ./...`
+    - `api-gateway`: `go build ./...`, `go test ./...`
+artifacts:
+  - path: shared-lib/proto/missionspb/missions.proto
+    issues: []
+  - path: shared-lib/proto/missionspb/missions.pb.go
+    issues: []
+  - path: shared-lib/proto/missionspb/missions.pb.gw.go
+    issues: []
+  - path: shared-lib/proto/missionspb/missions_grpc.pb.go
+    issues: []
+  - path: shared-lib/proto/missionspb/missions.swagger.json
+    issues: []
+  - path: shared-lib/proto/missionspb/swagger.pb.go
+    issues: []
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+    issues: []
+  - path: Games-Labs-Missions/internal/handlers/admin_handler.go
+    issues: []
+  - path: Games-Labs-Missions/internal/handlers/admin_handler_test.go
+    issues: []
+  - path: Games-Labs-Missions/internal/models/models.go
+    issues: []
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    issues: []
+  - path: Games-Labs-Missions/internal/repositories/mission_repo_test.go
+    issues: []
+  - path: Games-Labs-Missions/internal/routes/apiv1.go
+    issues: []
+  - path: Games-Labs-Missions/internal/services/mission_service.go
+    issues: []
+  - path: Games-Labs-Missions/internal/services/mission_service_test.go
+    issues: []
+  - path: docs/Games-Labs-APIs.postman_collection.json
+    issues: []
+next_action:
+  agent: done
+  reason: Review found no error-severity issues and all required builds/tests passed.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "reviewer TASK-046 admin force-reset daily missions per user"
+    relevant_symbols:
+      - "shared-lib/proto/missionspb/missions.proto"
+      - "Games-Labs-Missions/internal/services/mission_service.go"
+      - "Games-Labs-Missions/internal/repositories/mission_repo.go"
+      - "Games-Labs-Missions/internal/services/quest_overview_service.go"
+    notes: "Used local repo inspection and build/test evidence as source of truth."
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

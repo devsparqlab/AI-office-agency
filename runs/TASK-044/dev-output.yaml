@@ -1,0 +1,33 @@
+summary: |
+  Polished the Event detail response in Games-Labs-Missions so the detail screen gets explicit timer, achievement, sub-item, and routing-hint fields without breaking the existing event card payload. `GET /api/v1/missions/events/{event_id}` now adds `reset_at`, `reset_in_seconds`, `remaining_in_seconds`, an `achievement` block, and `items[]` entries with stable per-item states (`go`, `done`, `locked`, `inactive`) plus routing hints such as `action_type` and `deeplink`.
+
+  I kept the change detail-only and additive: no shared-lib/proto update was needed because the public missions event responses are still delivered through `google.protobuf.Struct`, so the contract change lives in the Missions JSON mapping. I also added focused tests for the populated detail payload, inactive/expired item-state behavior, and the fallback routing/default mapping when an event uses an unknown progress source, then refreshed the Postman example to show the final UI-ready shape.
+artifacts:
+  - path: Games-Labs-Missions/internal/models/event.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/event_service.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/event_service_test.go
+    action: modified
+  - path: Games-Labs-Missions/internal/handlers/event_handler_test.go
+    action: modified
+  - path: docs/Games-Labs-APIs.postman_collection.json
+    action: modified
+next_action:
+  agent: reviewer
+  reason: The detail contract polish is implemented additively, covered by focused tests, and documented with the updated Postman example.
+context_sources:
+  github:
+    branch: "Games-Labs-Missions:main"
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "dev TASK-044: Polish Event detail contract for UI actions"
+    relevant_symbols:
+      - "Games-Labs-Missions/internal/models/event.go"
+      - "Games-Labs-Missions/internal/services/event_service.go"
+      - "Games-Labs-Missions/internal/services/event_service_test.go"
+      - "docs/Games-Labs-APIs.postman_collection.json"
+    notes: "SocratiCode was unavailable, so the change used local repo inspection, ripgrep, and repo tests as the source of truth."
+blockers: []

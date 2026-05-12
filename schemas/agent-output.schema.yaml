@@ -80,4 +80,38 @@ properties:
       anyOf:
         - type: string
         - type: object
+  context_sources:
+    type: object
+    additionalProperties: false
+    properties:
+      github:
+        type: object
+        additionalProperties: false
+        properties:
+          branch:
+            type: string
+          pr:
+            type: string
+      socraticode:
+        type: object
+        additionalProperties: false
+        properties:
+          status:
+            type: string
+            enum:
+              - used
+              - unavailable
+              - failed
+              - fallback
+              - skipped
+          queries:
+            type: array
+            items:
+              type: string
+          relevant_symbols:
+            type: array
+            items:
+              type: string
+          notes:
+            type: string
 additionalProperties: true

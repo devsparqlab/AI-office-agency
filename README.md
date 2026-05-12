@@ -56,6 +56,24 @@ Use this after saving `status.yaml` or any `<agent>-output.yaml` file to catch
 missing required fields, invalid routing agents, malformed runtime YAML, and
 state mismatches (`phase` vs `state`).
 
+### SocratiCode context provider
+
+`run-agent.sh` can inject a local SocratiCode context section into each role
+prompt for code-impacting work. GitHub/local checkout remains the source of
+truth for code, branches, PRs, and CI; SocratiCode is only an AI working-context
+index.
+
+Default behavior is optional and recorded:
+
+- If `socraticode` is available, the runner adds `--- AI CONTEXT INDEX ---` to
+  the prompt and logs a `context_provider` event in `meta.yaml`.
+- If it is unavailable, fails, or returns no context, the runner falls back to
+  local repo inspection (`rg`, files on disk, tests, CI evidence) without
+  failing the run.
+- For non-code tasks, the runner records `status: skipped`.
+- Agent outputs may include concise `context_sources`; do not paste large search
+  results into YAML handoffs.
+
 ### Run dependency integration scenarios
 
 ```bash
@@ -74,12 +92,24 @@ ai-dev-office/scripts/check-service-dependencies.sh
 
 This guard enforces:
 - no `go.work` in service roots
-- aligned `github.com/SparqLab/shared-lib` versions across Mission/Order/Game
+- aligned `github.com/SparqLab/shared-lib` versions across all detected dependent repos
+- shared-lib enforcement policy is configurable via `SHARED_LIB_POLICY` (see below)
 - Docker build rules (`no go mod tidy`, `go build -mod=readonly`)
 - compile checks with `GOWORK=off` and `GOFLAGS=-mod=readonly`
+- excluded repo: `Games-Labs-Provider` (temporary local Docker visibility workaround)
 
 `run-agent.sh` automatically executes this guard before `reviewer`, `devops`,
 and `auto` runs (configurable in `office.config.yaml`).
+
+Configuration (environment variables):
+
+- `SHARED_LIB_POLICY`: `aligned` (default), `latest`, or `pinned`.
+  - `aligned`: ensure all guarded services use the same `github.com/SparqLab/shared-lib` version.
+  - `latest`: resolve `shared-lib@latest` and ensure all services match that version (network access required).
+  - `pinned`: enforce a pinned version; set via `GUARD_SHARED_LIB_VERSION` env var or `.shared-lib-version` file at the workspace or repo-parent.
+- `GUARD_SHARED_LIB_VERSION`: when `SHARED_LIB_POLICY=pinned`, set the required version (example: `v1.2.3`).
+- `EXCLUDED_SERVICES`: comma-separated list of service names to skip (default: `Games-Labs-Provider`).
+- `BUILD_TARGET`: set the `go build` target used for CI-parity compile (default: `./cmd`).
 
 ### Scaffold agent output files
 

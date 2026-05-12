@@ -1,0 +1,69 @@
+task:
+  id: "TASK-043"
+  title: "Add Event claim write path"
+  short_name: "event-claim-write-path"
+  parent: "TASK-041"
+  epic: "Quest phase 2.1 event completion"
+  type: feature
+  priority: high
+  created_at: "2026-05-08"
+scope:
+  target_services:
+    - service: shared-lib
+      reason: "Additive missionspb contract for event claim."
+    - service: Games-Labs-Missions
+      reason: "Owner of event claim persistence, locking, and reward issuance."
+    - service: docs
+      reason: "Postman collection must expose the claim endpoint."
+description: |
+  Add POST /api/v1/missions/events/{event_id}/claim with duplicate-safe persistence, locking, and deterministic reward idempotency so the Event Collect button can issue rewards safely.
+acceptance_criteria:
+  - criterion: "Event claim endpoint exists and is wired through HTTP/gRPC."
+  - criterion: "Claim path is duplicate-safe under retries and concurrent requests."
+  - criterion: "Re-claim returns a stable already-claimed outcome without double-crediting."
+  - criterion: "Focused claim tests pass."
+  - criterion: "Postman collection includes the new request."
+plan:
+  approach: |
+    Reuse the Weekly claim safety pattern where appropriate, but keep Event claim state explicit and isolated behind repository methods plus deterministic reward idempotency.
+  subtasks:
+    - order: 1
+      description: "Inspect Weekly claim safety pattern and update missionspb contract."
+      agent: dev-2
+    - order: 2
+      description: "Implement event claim persistence, service behavior, and reward issuance safety."
+      agent: dev-2
+    - order: 3
+      description: "Wire handler/routes/gRPC/main and add tests for success, re-claim, retries, concurrency, and non-claimable cases."
+      agent: dev-2
+  risks:
+    - risk: "Duplicate reward issuance under retries or races."
+      mitigation: "Transactional claim state, locking, deterministic idempotency, and concurrency tests."
+  estimated_complexity: high
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "High-risk write path with reward safety requirements."
+summary: |
+  Created TASK-043 for Event claim write-path completion.
+artifacts:
+  - path: "runs/TASK-043/task.md"
+    action: created
+  - path: "runs/TASK-043/status.yaml"
+    action: created
+next_action:
+  agent: dev-2
+  reason: "Task is scoped and ready."
+blockers: []
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - "Games-Labs-Missions/internal/services/weekly_service.go"
+      - "Games-Labs-Missions/internal/services/event_service.go"
+      - "shared-lib/proto/missionspb/missions.proto"
+    notes: "PM card created from the approved Event claim follow-up plan."

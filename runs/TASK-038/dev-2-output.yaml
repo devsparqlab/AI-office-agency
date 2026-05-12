@@ -1,0 +1,57 @@
+summary: |
+  Added the additive `missionspb.GetQuestOverview` contract with grpc-gateway support for `GET /api/v1/quest/overview`, then regenerated the Missions protobuf, grpc, gateway, and swagger artifacts in `shared-lib` so the new route is wired end-to-end at the contract layer.
+
+  In `Games-Labs-Missions`, I implemented a dedicated quest overview composition service and handler instead of overloading the existing claim/progress handlers. The overview uses existing Missions progress/config data for Daily and Monthly, keeps Weekly/Event/Invite as ordered inactive placeholders with empty `items`, and pulls the header level from User gRPC `GetProfile`. User lookup failures or non-200 profile responses degrade gracefully to `user.partial=true` while still returning a 200 overview payload.
+
+  To stay rollback-safe and avoid inventing unsupported cross-service semantics, `next_level_progress` uses the only User fields currently available (`exp`, with `target=0`) rather than deriving a fake threshold. Validation used a temporary `go.work` linking local `shared-lib` and `Games-Labs-Missions` modules instead of adding a forbidden `replace`.
+artifacts:
+  - path: shared-lib/proto/missionspb/missions.proto
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.pb.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.pb.gw.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions_grpc.pb.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.swagger.json
+    action: modified
+  - path: shared-lib/proto/missionspb/swagger.pb.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/quest_overview_service.go
+    action: created
+  - path: Games-Labs-Missions/internal/services/quest_overview_service_test.go
+    action: created
+  - path: Games-Labs-Missions/internal/handlers/quest_handler.go
+    action: created
+  - path: Games-Labs-Missions/internal/handlers/quest_handler_test.go
+    action: created
+  - path: Games-Labs-Missions/internal/routes/apiv1.go
+    action: modified
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+    action: modified
+  - path: Games-Labs-Missions/cmd/main.go
+    action: modified
+  - path: docs/Games-Labs-APIs.postman_collection.json
+    action: modified
+  - path: ai-dev-office/runs/TASK-038/dev-2-output.yaml
+    action: created
+next_action:
+  agent: reviewer
+  reason: Quest overview contract, wiring, degradation behavior, tests, and Postman docs are in place; reviewer should confirm acceptance criteria and handle the shared-lib publish/bump follow-up for standalone builds.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "dev-2 TASK-038 quest overview API missions shared-lib user docs"
+    relevant_symbols:
+      - "shared-lib/proto/missionspb/missions.proto"
+      - "Games-Labs-Missions/internal/services/quest_overview_service.go"
+      - "Games-Labs-Missions/internal/handlers/quest_handler.go"
+      - "Games-Labs-Missions/internal/grpc/missiongrpc/server.go"
+      - "Games-Labs-Missions/cmd/main.go"
+    notes: "SocratiCode was unavailable, so the implementation used local repo inspection, regenerated proto artifacts, and Go tests."
+blockers:
+  - "Standalone `Games-Labs-Missions` builds with `GOWORK=off` still need a published/aligned `github.com/SparqLab/shared-lib` version that contains the new `missionspb.GetQuestOverview` symbols; local verification used a temporary workspace link instead of a committed `replace`."

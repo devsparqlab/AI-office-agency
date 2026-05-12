@@ -1,0 +1,69 @@
+task:
+  id: "TASK-047"
+  title: "Add DEV-only daily reset override"
+  short_name: "dev-daily-reset-override"
+  parent: "TASK-042"
+  epic: "Mission QA acceleration for Mobile and DEV"
+  type: feature
+  priority: medium
+  created_at: "2026-05-11"
+scope:
+  target_services:
+    - service: Games-Labs-Missions
+      reason: "Owns Daily reset countdown and current-day bucketing behavior."
+    - service: docs
+      reason: "QA-only behavior and caveats need documentation."
+description: |
+  Add an optional DEV-only reset override for Daily missions so QA can simulate rapid natural reset behavior such as 10-minute or 15-minute windows while keeping the default Bangkok-midnight rule unchanged.
+acceptance_criteria:
+  - criterion: "Default behavior remains reset at 00:00 Asia/Bangkok."
+  - criterion: "DEV-only config can enable interval-based Daily reset."
+  - criterion: "Daily countdown and Daily state bucketing use the same reset policy."
+  - criterion: "Override is guarded from staging/production-like environments."
+  - criterion: "Focused tests and docs are added."
+plan:
+  approach: |
+    Add a narrow reset-policy abstraction under Daily helpers, keep the feature disabled by default, and enforce DEV-only guardrails so QA can opt into accelerated rollover safely.
+  subtasks:
+    - order: 1
+      description: "Inspect Daily helpers that currently assume Bangkok-midnight buckets."
+      agent: dev-2
+    - order: 2
+      description: "Add DEV-only config and align countdown plus Daily state bucketing behind one reset policy."
+      agent: dev-2
+    - order: 3
+      description: "Add tests and docs for QA-only usage."
+      agent: dev-2
+  risks:
+    - risk: "Accelerated reset semantics diverge from production and confuse QA."
+      mitigation: "Keep the feature off by default, DEV-only, and clearly documented."
+    - risk: "Countdown and actual rollover drift apart."
+      mitigation: "Drive both from the same reset-policy abstraction."
+  estimated_complexity: medium
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "Mobile explicitly prefers the DEV-only time-window override first."
+summary: |
+  Reprioritized TASK-047 as the first QA unblocker because Mobile explicitly prefers the DEV-only Daily reset override via config or feature flag.
+artifacts:
+  - path: "runs/TASK-047/task.md"
+    action: created
+  - path: "runs/TASK-047/status.yaml"
+    action: created
+next_action:
+  agent: dev-2
+  reason: "Task is now ready to start."
+blockers: []
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "daily reset boundary and countdown flow"
+    relevant_symbols:
+      - "Games-Labs-Missions/internal/services/mission_service.go"
+      - "Games-Labs-Missions/internal/services/quest_overview_service.go"
+    notes: "Task reprioritized ahead of TASK-046 after Mobile preferred the DEV-only override path first."

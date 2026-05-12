@@ -1,0 +1,69 @@
+task:
+  id: "TASK-040"
+  title: "Add Weekly production mission APIs"
+  short_name: "weekly-production-apis"
+  parent: "TASK-038"
+  epic: "Quest overview phase 2"
+  type: feature
+  priority: high
+  created_at: "2026-05-06"
+scope:
+  target_services:
+    - service: shared-lib
+      reason: "Additive missionspb contracts for weekly list and claim."
+    - service: Games-Labs-Missions
+      reason: "Owner of weekly mission progress, reset, and claim state."
+    - service: docs
+      reason: "Postman collection must expose the new endpoints."
+description: |
+  Add GET /api/v1/missions/weekly and POST /api/v1/missions/weekly/{mission_id}/claim. This task owns weekly domain behavior only and should not perform Quest overview v2 integration.
+acceptance_criteria:
+  - criterion: "Weekly list returns real cards with progress, reward, claimable, claimed, and reset metadata."
+  - criterion: "Weekly claim prevents re-claim and behaves safely for repeated attempts."
+  - criterion: "Weekly reset boundary is deterministic and covered by tests."
+  - criterion: "No overview v2 integration is done in this task."
+  - criterion: "Postman collection includes both weekly requests."
+plan:
+  approach: |
+    Implement a standalone weekly domain slice in Missions, including contract, storage boundary, service, handler, routes, tests, and docs.
+  subtasks:
+    - order: 1
+      description: "Inspect existing Missions repository patterns and update missionspb contract."
+      agent: dev-2
+    - order: 2
+      description: "Implement weekly progress/claim storage and service behavior."
+      agent: dev-2
+    - order: 3
+      description: "Wire handler/routes/gRPC/main and add tests for reset, re-claim, idempotency, and handler behavior."
+      agent: dev-2
+  risks:
+    - risk: "Claim endpoint may double-issue rewards under repeated calls."
+      mitigation: "Persist claim state and test repeated/idempotent attempts."
+  estimated_complexity: high
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "Stateful domain work with storage and reward claim risk."
+summary: |
+  Created TASK-040 for Quest phase 2 Weekly production APIs.
+artifacts:
+  - path: "runs/TASK-040/task.md"
+    action: created
+  - path: "runs/TASK-040/status.yaml"
+    action: created
+next_action:
+  agent: dev-2
+  reason: "Task is scoped and ready."
+blockers: []
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - "shared-lib/proto/missionspb/missions.proto"
+      - "Games-Labs-Missions/internal/repositories"
+      - "Games-Labs-Missions/internal/services"
+    notes: "PM card created from user-approved Phase 2 scope."
