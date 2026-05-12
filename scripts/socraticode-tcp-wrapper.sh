@@ -102,13 +102,14 @@ local_search_json() {
   local language_filter="$3"
   local include_linked="$4"
   local limit="$5"
+  local root="$6"
 
   SOCRATICODE_QUERY="$query" \
   SOCRATICODE_FILE_FILTER="$file_filter" \
   SOCRATICODE_LANGUAGE_FILTER="$language_filter" \
   SOCRATICODE_INCLUDE_LINKED="$include_linked" \
   SOCRATICODE_LIMIT="$limit" \
-  SOCRATICODE_ROOT="$LOCAL_PROJECT_ROOT" \
+  SOCRATICODE_ROOT="$root" \
   node <<'NODE'
 const { spawnSync } = require("child_process");
 const path = require("path");
@@ -218,11 +219,12 @@ local_symbol_json() {
   local name="$1"
   local file_filter="$2"
   local limit="$3"
+  local root="$4"
 
   SOCRATICODE_NAME="$name" \
   SOCRATICODE_FILE_FILTER="$file_filter" \
   SOCRATICODE_LIMIT="$limit" \
-  SOCRATICODE_ROOT="$LOCAL_PROJECT_ROOT" \
+  SOCRATICODE_ROOT="$root" \
   node <<'NODE'
 const { spawnSync } = require("child_process");
 const path = require("path");
@@ -370,6 +372,32 @@ print_status() {
   remote_request codebase_status
 }
 
+print_json_error() {
+  local method="$1"
+  local message="$2"
+
+  node -e 'const [method, error] = process.argv.slice(1); process.stdout.write(JSON.stringify({ type: "error", method, error }));' "$method" "$message"
+}
+
+resolve_local_project_root() {
+  local requested_root="${1:-}"
+  local effective_root="$LOCAL_PROJECT_ROOT"
+
+  if [[ -n "$requested_root" ]]; then
+    effective_root="$requested_root"
+  fi
+
+  if [[ "$effective_root" != /* ]]; then
+    effective_root="$(cd "$LOCAL_PROJECT_ROOT" 2>/dev/null && cd "$effective_root" 2>/dev/null && pwd -P || true)"
+  fi
+
+  if [[ -z "$effective_root" || ! -d "$effective_root" ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "$effective_root"
+}
+
 print_search() {
   local -a params=()
   local query=""
@@ -378,7 +406,8 @@ print_search() {
   local include_linked="false"
   local limit=""
   local min_score=""
-  local project_path="$REMOTE_PROJECT"
+  local project_path="$LOCAL_PROJECT_ROOT"
+  local resolved_root=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -442,7 +471,12 @@ print_search() {
     params+=("projectPath" "$project_path")
   fi
 
-  local_search_json "$query" "$file_filter" "$language_filter" "$include_linked" "$limit"
+  if ! resolved_root="$(resolve_local_project_root "$project_path")"; then
+    print_json_error "codebase_search" "Invalid projectPath: $project_path"
+    return 0
+  fi
+
+  local_search_json "$query" "$file_filter" "$language_filter" "$include_linked" "$limit" "$resolved_root"
 }
 
 print_symbol() {
@@ -450,7 +484,8 @@ print_symbol() {
   local name=""
   local file=""
   local limit=""
-  local project_path="$REMOTE_PROJECT"
+  local project_path="$LOCAL_PROJECT_ROOT"
+  local resolved_root=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -490,7 +525,12 @@ print_symbol() {
     params+=("projectPath" "$project_path")
   fi
 
-  local_symbol_json "$name" "$file" "$limit"
+  if ! resolved_root="$(resolve_local_project_root "$project_path")"; then
+    print_json_error "codebase_symbol" "Invalid projectPath: $project_path"
+    return 0
+  fi
+
+  local_symbol_json "$name" "$file" "$limit" "$resolved_root"
 }
 
 print_graph_query() {

@@ -1017,6 +1017,40 @@ puts "Status synced: #{old_phase} -> #{new_phase} (next: #{next_agent})"
 RUBY
 }
 
+next_agent_from_output() {
+  local actor_agent="$1"
+  local output_file="$2"
+
+  ruby - "$actor_agent" "$output_file" <<'RUBY'
+require "yaml"
+require "date"
+require "time"
+
+actor_agent, output_path = ARGV
+
+unless File.exist?(output_path)
+  exit 0
+end
+
+output = YAML.safe_load(File.read(output_path), permitted_classes: [Date, Time], aliases: true) || {}
+next_action = output["next_action"].is_a?(Hash) ? output["next_action"] : {}
+next_agent = next_action["agent"]&.to_s&.strip
+
+if (next_agent.nil? || next_agent.empty?) && actor_agent == "reviewer"
+  verdict = output["review_verdict"].to_s.strip
+  next_agent = case verdict
+               when "approved" then "done"
+               when "changes_requested" then "debugger"
+               when "escalate" then "free-roam"
+               when "infra_failure" then "devops"
+               else nil
+               end
+end
+
+print next_agent.to_s
+RUBY
+}
+
 force_status_route() {
   local task_id="$1"
   local status_file="$2"
@@ -1167,24 +1201,39 @@ fi
 
 if [[ "$AGENT" == "auto" ]]; then
   echo "=== Auto Pipeline for $TASK_ID ==="
-  FLOW=(pm dev reviewer)
-  for STEP in "${FLOW[@]}"; do
+  STEP="pm"
+  while [[ -n "$STEP" ]]; do
     echo ""
     echo ">>> Running $STEP ..."
     "$0" "$TASK_ID" "$STEP" "$RUNNER"
     STEP_OUTPUT="$TASK_DIR/${STEP}-output.yaml"
-    if [[ -f "$STEP_OUTPUT" ]] && grep -q "next_action" "$STEP_OUTPUT" 2>/dev/null; then
-      NEXT=$(grep -A1 "next_action" "$STEP_OUTPUT" | grep "agent:" | head -1 | sed 's/.*agent: *//' | tr -d '[:space:]')
-      if [[ "$NEXT" == "done" ]]; then
-        echo ""
-        echo "=== Task $TASK_ID completed! ==="
-        exit 0
-      fi
-      if [[ "$NEXT" == "debugger" || "$NEXT" == "free-roam" || "$NEXT" == "devops" ]]; then
-        echo ">>> Flow diverged to $NEXT, running..."
-        "$0" "$TASK_ID" "$NEXT" "$RUNNER"
-      fi
+    NEXT="$(next_agent_from_output "$STEP" "$STEP_OUTPUT")"
+
+    if [[ -z "$NEXT" ]]; then
+      case "$STEP" in
+        pm)
+          NEXT="dev"
+          ;;
+        dev|dev-2|debugger|devops)
+          NEXT="reviewer"
+          ;;
+        reviewer|free-roam)
+          NEXT=""
+          ;;
+      esac
     fi
+
+    if [[ "$NEXT" == "done" ]]; then
+      echo ""
+      echo "=== Task $TASK_ID completed! ==="
+      exit 0
+    fi
+
+    if [[ -n "$NEXT" && "$NEXT" != "$STEP" ]]; then
+      echo ">>> Next agent: $NEXT"
+    fi
+
+    STEP="$NEXT"
   done
   echo ""
   echo "=== Pipeline finished for $TASK_ID ==="

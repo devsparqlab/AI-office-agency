@@ -330,9 +330,14 @@ function resolveProjectRoot(args) {
   const explicit = args.projectPath && args.projectPath.trim();
   if (explicit) {
     const resolved = path.resolve(explicit);
-    if (fs.existsSync(resolved)) {
-      return resolved;
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`Invalid projectPath: ${explicit}`);
     }
+    const stat = fs.statSync(resolved);
+    if (!stat.isDirectory()) {
+      throw new Error(`projectPath is not a directory: ${explicit}`);
+    }
+    return resolved;
   }
   return path.resolve(DEFAULT_ROOT);
 }
