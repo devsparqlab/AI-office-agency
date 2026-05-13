@@ -169,6 +169,13 @@ Status summary
   ./ai-dev-office/run-agent.sh status
   ./ai-dev-office/run-agent.sh status TASK-028
 
+Operator helpers
+- ใช้ช่วยก่อน/หลัง workflow โดยไม่แก้ไฟล์ runtime:
+
+  ./ai-dev-office/run-agent.sh intake "Fix wallet callback failure"
+  ./ai-dev-office/run-agent.sh verify TASK-028
+  ./ai-dev-office/run-agent.sh cleanup
+
 6) Conventions / recommendations
 - ตั้งชื่อ `short_name` ให้สั้นและเป็น slug เพื่อให้แสดงใน `TASK_LABEL` (run-agent ใช้ `short_name` อัตโนมัติ)
 - บันทึก `pm-output.yaml` ถ้ามีข้อมูลการตั้งค่าเริ่มต้นของงาน

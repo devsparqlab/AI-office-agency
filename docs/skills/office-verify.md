@@ -18,6 +18,10 @@ Recommend verification commands from task scope and changed artifacts.
 - Required contract checks for `.proto`, gateway, generated code, Docker, CI, or shared-lib changes
 - Skip reason when a command cannot run locally
 
-## Phase 2 Notes
+## Command
 
-Start as a reviewer aid. Do not replace reviewer judgment; make the expected evidence explicit.
+```bash
+./ai-dev-office/run-agent.sh verify TASK-NNN
+```
+
+The command recommends evidence commands only. It does not run build or test commands for the user.

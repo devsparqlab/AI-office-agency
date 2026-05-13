@@ -126,6 +126,20 @@ For a concise read-only CLI summary, run:
 ./ai-dev-office/run-agent.sh status TASK-NNN
 ```
 
+### Operator helpers
+
+Use these read-only helpers before or after normal agent runs:
+
+```bash
+./ai-dev-office/run-agent.sh intake "Fix wallet callback failure"
+./ai-dev-office/run-agent.sh verify TASK-NNN
+./ai-dev-office/run-agent.sh cleanup
+```
+
+- `intake` previews a next task id, task type, priority, scope hints, unknowns, and PM command.
+- `verify` recommends validation/build/test commands from task scope and artifacts.
+- `cleanup` reports validation failures, resolved blocked dependencies, missing dependencies, and route mismatches.
+
 ### Validate runtime files
 
 Run:

@@ -18,6 +18,10 @@ Turn rough user requests into a PM-ready task preview before files are created.
 - One concise clarification question when required
 - Recommended next command, usually `./ai-dev-office/run-agent.sh TASK-NNN pm`
 
-## Phase 2 Notes
+## Command
 
-Implement as a Codex skill first. Keep it non-mutating until the user approves the task preview.
+```bash
+./ai-dev-office/run-agent.sh intake "Fix wallet callback failure"
+```
+
+The command is non-mutating. It previews the task metadata and does not create `runs/<TASK-ID>`.

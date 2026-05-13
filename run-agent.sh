@@ -11,6 +11,9 @@ usage() {
 Usage: ./run-agent.sh <TASK_ID> <AGENT> [RUNNER]
        ./run-agent.sh <TASK_ID> scaffold <dev|dev-2|reviewer> [--force]
        ./run-agent.sh status [TASK_ID]
+       ./run-agent.sh intake "<request>"
+       ./run-agent.sh verify <TASK_ID>
+       ./run-agent.sh cleanup
 
   TASK_ID   Task identifier (e.g. TASK-003)
   AGENT     Agent role: pm | dev | dev-2 | reviewer | debugger | devops | free-roam
@@ -39,6 +42,11 @@ Pipeline shortcut (runs full flow automatically):
 Status:
   ./run-agent.sh status            # summarize all task runs
   ./run-agent.sh status TASK-011   # summarize one task run
+
+Operator helpers:
+  ./run-agent.sh intake "Fix wallet callback failure"
+  ./run-agent.sh verify TASK-011
+  ./run-agent.sh cleanup
 EOF
   exit 1
 }
@@ -150,6 +158,251 @@ RUBY
 
 if [[ "${1:-}" == "status" ]]; then
   show_office_status "${2:-}"
+  exit $?
+fi
+
+show_intake_preview() {
+  local request="$1"
+
+  ruby - "$RUNS_DIR" "$OFFICE_DIR/tasks" "$request" <<'RUBY'
+runs_dir, tasks_dir, request = ARGV
+
+def task_ids_from(path)
+  return [] unless Dir.exist?(path)
+
+  Dir.children(path).map { |entry| entry[/\ATASK-(\d+)\z/, 1] }.compact.map(&:to_i)
+end
+
+def slug(text)
+  value = text.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/^-+|-+$/, "").gsub(/-+/, "-")
+  value.empty? ? "new-task" : value.split("-").first(5).join("-")
+end
+
+lower = request.downcase
+max_id = (task_ids_from(runs_dir) + task_ids_from(tasks_dir)).max || 0
+next_task_id = format("TASK-%03d", max_id + 1)
+
+type =
+  if lower.match?(/\b(bug|fix|fail|failure|error|broken|outage|crash)\b/)
+    "bugfix"
+  elsif lower.match?(/\b(docker|ci|deploy|pipeline|infra|environment)\b/)
+    "devops"
+  elsif lower.match?(/\b(refactor|cleanup|rename)\b/)
+    "refactor"
+  elsif lower.match?(/\b(investigate|research|diagnose|unknown)\b/)
+    "investigation"
+  else
+    "feature"
+  end
+
+priority =
+  if lower.match?(/\b(critical|outage|security|data loss|production down|p0)\b/)
+    "critical"
+  elsif lower.match?(/\b(blocked|blocking|fail|failure|urgent|p1)\b/)
+    "high"
+  else
+    "medium"
+  end
+
+known_services = %w[
+  Games-Labs-Auth Games-Labs-Game Games-Labs-Logs Games-Labs-Missions
+  Games-Labs-Order Games-Labs-Provider Games-Labs-User Games-Labs-Wallet
+  api-gateway shared-lib
+]
+services = known_services.select { |service| lower.include?(service.downcase) }
+
+unknowns = []
+unknowns << "acceptance criteria" unless lower.match?(/\b(should|must|when|then|acceptance|expected)\b/)
+unknowns << "affected files" unless lower.match?(/\b(\.go|\.proto|dockerfile|workflow|yaml|yml|readme|docs?)\b/)
+unknowns << "target service" if services.empty?
+
+puts "Intake preview"
+puts "Task ID: #{next_task_id}"
+puts "Short name: #{slug(request)}"
+puts "Type: #{type}"
+puts "Priority: #{priority}"
+puts "Services: #{services.empty? ? 'unknown' : services.join(', ')}"
+puts "Known scope: #{request}"
+puts "Unknowns: #{unknowns.empty? ? 'none' : unknowns.join(', ')}"
+puts "Question: #{unknowns.empty? ? 'none' : "Please clarify #{unknowns.first}."}"
+puts "Next: ./run-agent.sh #{next_task_id} pm"
+RUBY
+}
+
+show_verify_plan() {
+  local task_id="$1"
+
+  ruby - "$OFFICE_DIR" "$RUNS_DIR" "$task_id" <<'RUBY'
+require "yaml"
+require "date"
+
+office_dir, runs_dir, task_id = ARGV
+task_dir = File.join(runs_dir, task_id)
+
+unless File.directory?(task_dir)
+  warn "Task not found: #{task_id}"
+  exit 1
+end
+
+def load_yaml(path)
+  return {} unless File.exist?(path)
+
+  YAML.safe_load(File.read(path), permitted_classes: [Date, Time], aliases: true) || {}
+rescue Psych::SyntaxError
+  {}
+end
+
+def artifact_paths(data)
+  Array(data["artifacts"]).map do |artifact|
+    artifact.is_a?(Hash) ? artifact["path"].to_s : nil
+  end.compact.reject(&:empty?)
+end
+
+texts = []
+%w[task.md pm-output.yaml dev-output.yaml dev-2-output.yaml debugger-output.yaml devops-output.yaml free-roam-output.yaml reviewer-output.yaml].each do |name|
+  path = File.join(task_dir, name)
+  texts << File.read(path) if File.exist?(path)
+end
+combined = texts.join("\n")
+
+paths = []
+%w[pm-output.yaml dev-output.yaml dev-2-output.yaml debugger-output.yaml devops-output.yaml free-roam-output.yaml reviewer-output.yaml].each do |name|
+  data = load_yaml(File.join(task_dir, name))
+  paths.concat(artifact_paths(data))
+  scope_files = data.dig("scope", "affected_files")
+  paths.concat(Array(scope_files).map { |entry| entry.is_a?(Hash) ? entry["path"].to_s : nil }.compact)
+end
+paths = paths.uniq
+
+commands = []
+commands << "ruby validate-yaml.rb #{task_id}"
+
+services = paths.map { |path| path.split("/").first if path.start_with?("Games-Labs-") || path.start_with?("api-gateway") }.compact.uniq
+services.each do |service|
+  commands << "go test ./#{service}/..." if service.start_with?("Games-Labs-") || service == "api-gateway"
+end
+
+if paths.any? { |path| path.end_with?(".proto") } || combined.downcase.include?("proto")
+  commands << "make proto"
+end
+
+if paths.any? { |path| path.downcase.include?("dockerfile") || path.start_with?(".github/") || path.end_with?("go.mod") } ||
+   combined.downcase.match?(/\b(ci|docker|shared-lib|dependency)\b/)
+  commands << "scripts/check-service-dependencies.sh"
+end
+
+if commands.length == 1 && combined.downcase.match?(/\b(readme|docs|documentation)\b/)
+  commands << "ruby validate-yaml.rb #{task_id}"
+end
+
+puts "Verification plan: #{task_id}"
+puts "Artifacts: #{paths.empty? ? 'none listed' : paths.join(', ')}"
+puts "Commands:"
+commands.uniq.each { |command| puts "  - #{command}" }
+RUBY
+}
+
+show_cleanup_report() {
+  ruby - "$OFFICE_DIR" "$RUNS_DIR" <<'RUBY'
+require "yaml"
+require "date"
+require "open3"
+
+office_dir, runs_dir = ARGV
+validator = File.join(office_dir, "validate-yaml.rb")
+
+def load_yaml(path)
+  return {} unless File.exist?(path)
+
+  YAML.safe_load(File.read(path), permitted_classes: [Date, Time], aliases: true) || {}
+rescue Psych::SyntaxError
+  {}
+end
+
+def validation_pass?(validator, task_id)
+  _stdout, _stderr, status = Open3.capture3("ruby", validator, task_id)
+  status.success?
+end
+
+def expected_agents_for_phase(phase)
+  {
+    "pending" => %w[pm],
+    "assigned" => %w[dev dev-2],
+    "assigned_parallel" => %w[dev dev-2],
+    "review" => %w[reviewer],
+    "in_review" => %w[reviewer],
+    "debugging" => %w[debugger],
+    "debugging_complete" => %w[dev dev-2],
+    "devops_needed" => %w[devops],
+    "devops_complete" => %w[dev dev-2 reviewer],
+    "escalated" => %w[free-roam],
+    "free_roam_complete" => %w[dev dev-2 reviewer],
+    "done" => %w[done],
+    "aborted" => %w[done]
+  }[phase] || []
+end
+
+ids = Dir.children(runs_dir)
+         .select { |entry| entry.match?(/\ATASK(?:-PKG)?-\d+\z/) && File.directory?(File.join(runs_dir, entry)) }
+         .sort_by { |entry| [entry.include?("PKG") ? 1 : 0, entry[/\d+/].to_i, entry] }
+
+puts "Office cleanup report"
+issues = 0
+
+ids.each do |task_id|
+  task_dir = File.join(runs_dir, task_id)
+  status = load_yaml(File.join(task_dir, "status.yaml"))
+  phase = status["phase"].to_s
+  current_agent = status["current_agent"].to_s
+
+  unless validation_pass?(validator, task_id)
+    puts "#{task_id} validation=fail"
+    issues += 1
+  end
+
+  expected = expected_agents_for_phase(phase)
+  if !expected.empty? && !current_agent.empty? && !expected.include?(current_agent)
+    puts "#{task_id} route_mismatch phase=#{phase} current_agent=#{current_agent} expected=#{expected.join(',')}"
+    issues += 1
+  end
+
+  next unless phase == "blocked"
+
+  Array(status["blocked_on"]).map(&:to_s).reject(&:empty?).each do |dep_id|
+    dep_path = File.join(runs_dir, dep_id, "status.yaml")
+    unless File.exist?(dep_path)
+      puts "#{task_id} blocked_dependency_missing=#{dep_id}"
+      issues += 1
+      next
+    end
+
+    dep_status = load_yaml(dep_path)
+    dep_phase = dep_status["phase"].to_s
+    if dep_phase == "done"
+      puts "#{task_id} blocked_dependency_done=#{dep_id}"
+      issues += 1
+    end
+  end
+end
+
+puts "No cleanup issues found." if issues.zero?
+RUBY
+}
+
+if [[ "${1:-}" == "intake" ]]; then
+  [[ $# -ge 2 ]] || usage
+  show_intake_preview "$2"
+  exit $?
+fi
+
+if [[ "${1:-}" == "verify" ]]; then
+  [[ $# -ge 2 ]] || usage
+  show_verify_plan "$2"
+  exit $?
+fi
+
+if [[ "${1:-}" == "cleanup" ]]; then
+  show_cleanup_report
   exit $?
 fi
 

@@ -67,6 +67,18 @@ The status command is read-only. It summarizes current phase, routed agent,
 readiness, blocked dependencies, validation state, and the next suggested
 runner command.
 
+### Use operator helpers
+
+```bash
+./ai-dev-office/run-agent.sh intake "Fix wallet callback failure"
+./ai-dev-office/run-agent.sh verify TASK-011
+./ai-dev-office/run-agent.sh cleanup
+```
+
+These helpers are non-mutating in v2: `intake` previews a PM-ready task,
+`verify` recommends evidence commands, and `cleanup` reports stale or
+inconsistent runtime artifacts without changing them.
+
 ### SocratiCode context provider
 
 `run-agent.sh` can inject a local SocratiCode context section into each role

@@ -18,6 +18,10 @@ Find stale, malformed, or inconsistent runtime artifacts without changing them b
 - Blocked tasks with resolved or missing dependencies
 - Interactive-run outputs that may be stale
 
-## Phase 2 Notes
+## Command
 
-Implement as a read-only report first. Add a separate `--fix` path only after the report format is trusted.
+```bash
+./ai-dev-office/run-agent.sh cleanup
+```
+
+The command is read-only. Add a separate `--fix` path only after the report format is trusted.
