@@ -163,6 +163,16 @@ Run specific agents for TASKs (ตัวอย่าง):
 
   ruby ai-dev-office/validate-yaml.rb <TASK-ID>
 
+Auto pipeline
+- ใช้ `auto` เพื่อให้ runner เดิน workflow ต่อเองจาก PM ไปจนถึง reviewer/done:
+
+  ./ai-dev-office/run-agent.sh TASK-028 auto
+
+- ค่า default ยังเป็น sequential: `pm` -> `dev`/`dev-2` -> `reviewer`.
+- ถ้า PM ตั้ง `assignment.parallel: true` และ subtasks มี `owned_files` ไม่ชนกัน, `auto` จะรัน `dev` และ `dev-2` พร้อมกัน แล้วรวมผลที่ `reviewer`.
+- Parallel logs จะถูกแยกไว้ที่ `runs/<TASK-ID>/dev-parallel.log` และ `runs/<TASK-ID>/dev-2-parallel.log`.
+- Shared files เช่น `go.mod`, `go.sum`, `.proto`, generated proto files, และ `shared-lib/**` ไม่ควรถูกแบ่งให้หลาย agent พร้อมกัน; ให้ทำส่วนนั้นแบบ sequential ก่อน.
+
 Status summary
 - ดูสถานะ task ทั้งหมดหรือ task เดียวแบบ read-only:
 

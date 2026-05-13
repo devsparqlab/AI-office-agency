@@ -18,6 +18,12 @@ Turn rough user requests into a PM-ready task preview before files are created.
 - One concise clarification question when required
 - Recommended next command, usually `./ai-dev-office/run-agent.sh TASK-NNN pm`
 
+## Parallel Intake Guidance
+
+- Recommend parallel PM planning only when work is clearly split by service, layer, or non-overlapping files.
+- If shared files are likely involved (`go.mod`, `go.sum`, `.proto`, generated proto files, or `shared-lib/**`), recommend sequential planning unless one agent can own that shared-file work first.
+- If the request is ambiguous, keep the recommendation sequential and ask for the missing scope.
+
 ## Command
 
 ```bash

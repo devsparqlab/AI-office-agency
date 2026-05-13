@@ -72,6 +72,7 @@ Keep `context_sources` concise. Do not paste large search results.
 
 1. Read `AGENTS.md`, `task.md`, and the relevant existing code before modifying anything.
 2. If `pm-output` is provided, use it as the baseline plan, but refine or reorder work when needed to reduce risk. Document important deviations in `summary`.
+2.1 If `pm-output.assignment.parallel: true`, work only on subtasks where `agent: dev-2` and stay within those subtasks' `owned_files`.
 3. Adhere to the feedback provided in `blockers` and close the loop on every item explicitly.
 4. Stay within the services and files explicitly listed in scope. If additional cross-service changes are needed, document that and escalate when necessary.
 5. Reuse `shared-lib` before creating new shared utilities or types.

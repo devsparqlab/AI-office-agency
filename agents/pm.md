@@ -64,11 +64,19 @@ plan:
     <high-level implementation strategy>
   subtasks:
     - order: 1
+      id: <stable-subtask-id>
       description: <what to do>
       agent: dev | dev-2
+      owned_files:
+        - <file path this agent owns>
+      parallel_safe: false | true
     - order: 2
+      id: <stable-subtask-id>
       description: <what to do>
       agent: dev | dev-2
+      owned_files:
+        - <file path this agent owns>
+      parallel_safe: false | true
   risks:
     - risk: <potential issue>
       mitigation: <how to handle it>
@@ -123,6 +131,9 @@ Keep `context_sources` concise. Do not paste large search results.
 5.1 Set `task.short_name` for new tasks so logs and terminal output can use a compact label; add `task.parent` and/or `task.epic` when the work belongs to a larger stream.
 6. Assign `dev-2` for complex, cross-cutting, or multi-service work. Assign `dev` for focused, single-service tasks.
 7. If parallel mode is chosen, ensure subtasks do not touch the same files.
+7.1 If in doubt, choose sequential (`assignment.parallel: false`). Parallel mode is only for work split cleanly by service, layer, or file ownership.
+7.2 Parallel subtasks must each include `id`, `agent`, `owned_files`, and `parallel_safe: true`.
+7.3 Do not assign shared files to multiple parallel agents. Shared files include `go.mod`, `go.sum`, `.proto` files, generated proto files, and `shared-lib/**`. If shared-file work is required, put that work in a sequential subtask first.
 8. If the request is too vague to plan, set `next_action` to `free-roam` with specific questions in `blockers`.
 9. If the request changes contracts or naming, call that out explicitly in the plan so downstream agents update proto, generated code, gateway mappings, and docs together.
 10. Never write implementation code -- only create the task blueprint.
@@ -135,5 +146,6 @@ Keep `context_sources` concise. Do not paste large search results.
 - `status.yaml` is initialized with `phase: pending`.
 - `acceptance_criteria` has at least one testable criterion per objective.
 - `subtasks` are ordered with dependencies resolved first.
+- Parallel subtasks have non-overlapping `owned_files`; shared-file changes are sequential or assigned to only one lane.
 - `assignment` specifies which dev agent(s) will work on this.
 - `next_action` is set to `dev` or `dev-2` (or `free-roam` if request is too vague).

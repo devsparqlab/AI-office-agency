@@ -1459,7 +1459,9 @@ new_phase =
   case actor_agent
   when "pm"
     case next_agent
-    when "dev", "dev-2" then "assigned"
+    when "dev", "dev-2"
+      assignment = output["assignment"].is_a?(Hash) ? output["assignment"] : {}
+      assignment["parallel"] == true ? "assigned_parallel" : "assigned"
     when "free-roam" then "escalated"
     else old_phase
     end
@@ -1587,6 +1589,160 @@ print next_agent.to_s
 RUBY
 }
 
+parallel_plan_agents() {
+  local pm_output_file="$1"
+
+  ruby - "$pm_output_file" <<'RUBY'
+require "yaml"
+require "date"
+require "time"
+
+pm_output_path = ARGV.fetch(0)
+exit 0 unless File.exist?(pm_output_path)
+
+data = YAML.safe_load(File.read(pm_output_path), permitted_classes: [Date, Time], aliases: true) || {}
+assignment = data["assignment"].is_a?(Hash) ? data["assignment"] : {}
+exit 0 unless assignment["parallel"] == true
+
+plan = data["plan"].is_a?(Hash) ? data["plan"] : {}
+subtasks = plan["subtasks"].is_a?(Array) ? plan["subtasks"] : []
+errors = []
+
+if subtasks.length < 2
+  errors << "parallel assignment requires at least 2 subtasks"
+end
+
+allowed_agents = %w[dev dev-2]
+agents = []
+owned_by_path = {}
+shared_by_agent = Hash.new { |hash, key| hash[key] = [] }
+
+def shared_file?(path)
+  normalized = path.to_s.strip
+  basename = File.basename(normalized)
+  return true if %w[go.mod go.sum].include?(basename)
+  return true if normalized.end_with?(".proto")
+  return true if normalized.end_with?(".pb.go") || normalized.end_with?("_grpc.pb.go")
+  return true if normalized == "shared-lib" || normalized.start_with?("shared-lib/")
+  return true if normalized.include?("/shared-lib/")
+  false
+end
+
+subtasks.each_with_index do |subtask, index|
+  unless subtask.is_a?(Hash)
+    errors << "subtask #{index + 1} must be a map"
+    next
+  end
+
+  agent = subtask["agent"].to_s.strip
+  unless allowed_agents.include?(agent)
+    errors << "subtask #{index + 1} has unsupported parallel agent: #{agent.empty? ? '(empty)' : agent}"
+  end
+  agents << agent if allowed_agents.include?(agent)
+
+  unless subtask["parallel_safe"] == true
+    errors << "subtask #{index + 1} must set parallel_safe: true"
+  end
+
+  owned_files = Array(subtask["owned_files"]).map(&:to_s).map(&:strip).reject(&:empty?)
+  if owned_files.empty?
+    errors << "subtask #{index + 1} must list owned_files"
+  end
+
+  owned_files.each do |path|
+    if owned_by_path.key?(path)
+      errors << "owned file assigned to multiple parallel subtasks: #{path}"
+    else
+      owned_by_path[path] = agent
+    end
+
+    shared_by_agent[agent] << path if allowed_agents.include?(agent) && shared_file?(path)
+  end
+end
+
+unique_agents = agents.uniq
+if unique_agents.length < 2
+  errors << "parallel assignment requires at least 2 distinct agents: dev and dev-2"
+end
+
+shared_agents = shared_by_agent.select { |_agent, paths| !paths.empty? }
+if shared_agents.length > 1
+  details = shared_agents.map { |agent, paths| "#{agent}=#{paths.uniq.join(',')}" }.join(" ")
+  errors << "shared file cannot be modified by multiple parallel agents: #{details}"
+end
+
+if errors.any?
+  warn errors.join("\n")
+  exit 2
+end
+
+puts unique_agents.sort_by { |agent| allowed_agents.index(agent) }
+RUBY
+}
+
+parallel_delay_seconds() {
+  if [[ -n "${AI_DEV_OFFICE_PARALLEL_DELAY_SECONDS:-}" ]]; then
+    echo "$AI_DEV_OFFICE_PARALLEL_DELAY_SECONDS"
+  else
+    ruby -e 'puts rand(1..3)'
+  fi
+}
+
+run_parallel_dev_agents() {
+  local agents_text="$1"
+  local agents_label
+  local agent
+  local index=0
+  local delay
+  local status=0
+  local pids=()
+  local pid_agents=()
+  local pid_logs=()
+
+  agents_label="$(printf '%s\n' "$agents_text" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  echo "Running parallel dev agents: $agents_label"
+
+  while IFS= read -r agent; do
+    [[ -n "$agent" ]] || continue
+    local log_file="$TASK_DIR/${agent}-parallel.log"
+    rm -f "$log_file"
+
+    (
+      if [[ "$index" -gt 0 ]]; then
+        delay="$(parallel_delay_seconds)"
+        sleep "$delay"
+      fi
+      AI_DEV_OFFICE_PARALLEL_AUTO=true AI_DEV_OFFICE_PARALLEL_AUTO_SKIP_STATUS=true "$0" "$TASK_ID" "$agent" "$RUNNER"
+    ) >"$log_file" 2>&1 &
+
+    pids+=("$!")
+    pid_agents+=("$agent")
+    pid_logs+=("$log_file")
+    index=$((index + 1))
+  done <<<"$agents_text"
+
+  index=0
+  for pid in "${pids[@]}"; do
+    agent="${pid_agents[$index]}"
+    local log_file="${pid_logs[$index]}"
+    if wait "$pid"; then
+      echo "Parallel agent $agent completed successfully (log: $log_file)"
+    else
+      local exit_code=$?
+      echo "Parallel agent $agent failed with exit $exit_code (log: $log_file)"
+      tail -40 "$log_file" || true
+      status=1
+    fi
+    index=$((index + 1))
+  done
+
+  return "$status"
+}
+
+mark_parallel_dev_complete() {
+  force_status_route "$TASK_ID" "$STATUS_FILE" "$TODAY" "reviewer" "$REVIEWER_QUEUE_PHASE" "orchestrator" "Parallel dev lanes completed."
+}
+
 force_status_route() {
   local task_id="$1"
   local status_file="$2"
@@ -1706,7 +1862,7 @@ if [[ "$AGENT" != "pm" && "$AGENT" != "free-roam" && "$AGENT" != "auto" && -f "$
     exit 1
   fi
 
-  if [[ "$ENFORCE_CURRENT_AGENT_ROUTE" == "true" && -n "$CURRENT_AGENT" && "$CURRENT_AGENT" != "$AGENT" && "$CURRENT_AGENT" != "done" ]]; then
+  if [[ "$ENFORCE_CURRENT_AGENT_ROUTE" == "true" && -n "$CURRENT_AGENT" && "$CURRENT_AGENT" != "$AGENT" && "$CURRENT_AGENT" != "done" && ! ( "${AI_DEV_OFFICE_PARALLEL_AUTO:-false}" == "true" && ( "$AGENT" == "dev" || "$AGENT" == "dev-2" ) ) ]]; then
     echo "Task $TASK_LABEL is currently routed to '$CURRENT_AGENT', not '$AGENT'."
     echo "Current phase/state: ${CURRENT_PHASE:-unknown}/${CURRENT_STATE:-unknown}"
     exit 1
@@ -1744,6 +1900,29 @@ if [[ "$AGENT" == "auto" ]]; then
     "$0" "$TASK_ID" "$STEP" "$RUNNER"
     STEP_OUTPUT="$TASK_DIR/${STEP}-output.yaml"
     NEXT="$(next_agent_from_output "$STEP" "$STEP_OUTPUT")"
+
+    if [[ "$STEP" == "pm" ]]; then
+      PARALLEL_PLAN_OUTPUT=""
+      PARALLEL_PLAN_STATUS=0
+      PARALLEL_PLAN_OUTPUT="$(parallel_plan_agents "$PM_OUTPUT_FILE" 2>&1)" || PARALLEL_PLAN_STATUS=$?
+      if [[ "$PARALLEL_PLAN_STATUS" -eq 2 ]]; then
+        echo "Parallel plan invalid:"
+        printf '%s\n' "$PARALLEL_PLAN_OUTPUT"
+        exit 1
+      elif [[ "$PARALLEL_PLAN_STATUS" -ne 0 ]]; then
+        printf '%s\n' "$PARALLEL_PLAN_OUTPUT"
+        exit "$PARALLEL_PLAN_STATUS"
+      elif [[ -n "$PARALLEL_PLAN_OUTPUT" ]]; then
+        if run_parallel_dev_agents "$PARALLEL_PLAN_OUTPUT"; then
+          mark_parallel_dev_complete
+          STEP="reviewer"
+          echo ">>> Next agent: reviewer"
+          continue
+        fi
+        echo "Parallel dev agents failed. Review the parallel logs before continuing."
+        exit 1
+      fi
+    fi
 
     if [[ -z "$NEXT" ]]; then
       case "$STEP" in
@@ -1887,6 +2066,8 @@ if [[ -f "$OUTPUT_FILE" ]]; then
     echo "Output file exists but was not updated in this interactive run."
     echo "Skipping status sync to avoid replaying stale artifacts."
     echo "Complete the run in IDE chat, then re-run this command to sync."
+  elif [[ "${AI_DEV_OFFICE_PARALLEL_AUTO_SKIP_STATUS:-false}" == "true" ]]; then
+    echo "Parallel auto lane output saved; parent auto runner will route to reviewer after all lanes finish."
   else
     echo "Syncing status.yaml from $AGENT output..."
     sync_status_from_output "$TASK_ID" "$AGENT" "$STATUS_FILE" "$OUTPUT_FILE" "$TODAY" "$REVIEWER_QUEUE_PHASE"
