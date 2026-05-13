@@ -74,6 +74,145 @@ Default behavior is optional and recorded:
 - Agent outputs may include concise `context_sources`; do not paste large search
   results into YAML handoffs.
 
+#### Command routing and data source
+
+The `socraticode` wrapper currently mixes remote and local backends by design.
+This distinction matters when debugging odd results or wiring a different root.
+
+- `context`, `codebase_status`: remote TCP provider over SSH. These commands
+  talk to the remote SocratiCode service and report provider availability /
+  freshness.
+- `codebase_search`, `codebase_symbol`: local read-only search against the
+  current checkout using `rg`. These commands honor `--projectPath` or
+  `SOCRATICODE_LOCAL_PROJECT`.
+- `codebase_graph_query`, `codebase_graph_stats`, `codebase_graph_circular`:
+  local read-only graph analysis over Go files. These commands honor
+  `--projectPath` or `SOCRATICODE_GRAPH_ROOT`.
+
+Environment overrides:
+
+- `SOCRATICODE_LOCAL_PROJECT`: default local root for search and symbol lookup.
+- `SOCRATICODE_GRAPH_ROOT`: default local root for graph commands.
+- `SOCRATICODE_REMOTE_HOST`, `SOCRATICODE_REMOTE_PORT`,
+  `SOCRATICODE_REMOTE_PROJECT`, `SOCRATICODE_SSH_KEY`: remote TCP provider
+  settings for context and status.
+
+#### JSON response examples
+
+`codebase_status` returns provider-level status from the remote TCP service:
+
+```json
+{
+  "type": "success",
+  "method": "codebase_status",
+  "message": "Codebase is indexed and ready",
+  "status": "active"
+}
+```
+
+`codebase_search` returns local line matches:
+
+```json
+{
+  "type": "success",
+  "method": "codebase_search",
+  "query": "MockAuthService",
+  "projectPath": "/Users/earth/Documents/GitHub/api-gateway",
+  "count": 2,
+  "results": [
+    { "file": "services/auth_service.go", "line": 81, "snippet": "type MockAuthService struct {" }
+  ]
+}
+```
+
+`codebase_symbol` returns a preferred definition plus all matches:
+
+```json
+{
+  "type": "success",
+  "method": "codebase_symbol",
+  "name": "ValidateToken",
+  "projectPath": "/Users/earth/Documents/GitHub/api-gateway",
+  "definition": {
+    "file": "services/auth_service.go",
+    "line": 39,
+    "kind": "method",
+    "isDefinition": true
+  },
+  "matches": []
+}
+```
+
+`codebase_graph_query` returns local package edges for a file:
+
+```json
+{
+  "type": "success",
+  "method": "codebase_graph_query",
+  "file": "api-gateway/services/auth_service.go",
+  "packagePath": "github.com/SparqLab/games-lab/api-gateway/services",
+  "imports": [
+    {
+      "importPath": "github.com/SparqLab/games-lab/api-gateway/middleware",
+      "resolvedPackagePath": "github.com/SparqLab/games-lab/api-gateway/middleware",
+      "resolvedFiles": ["api-gateway/middleware/auth.go"],
+      "local": true
+    }
+  ],
+  "dependents": [
+    {
+      "file": "api-gateway/gateway/http.go",
+      "packagePath": "github.com/SparqLab/games-lab/api-gateway/gateway"
+    }
+  ],
+  "summary": {
+    "directImports": 8,
+    "localImports": 2,
+    "localDependents": 1
+  }
+}
+```
+
+`codebase_graph_stats` returns local graph totals:
+
+```json
+{
+  "type": "success",
+  "method": "codebase_graph_stats",
+  "projectPath": "/Users/earth/Documents/GitHub",
+  "fileCount": 402,
+  "packageCount": 178,
+  "localEdgeCount": 489,
+  "externalEdgeCount": 1853,
+  "topConnectedFiles": [],
+  "topConnectedPackages": [],
+  "orphanFiles": []
+}
+```
+
+`codebase_graph_circular` returns local package cycles:
+
+```json
+{
+  "type": "success",
+  "method": "codebase_graph_circular",
+  "projectPath": "/Users/earth/Documents/GitHub",
+  "cycleCount": 0,
+  "cycles": []
+}
+```
+
+When `--projectPath` is invalid for local commands, the wrapper fails clearly
+instead of falling back silently:
+
+```json
+{
+  "type": "error",
+  "method": "codebase_graph_stats",
+  "error": "Invalid projectPath: /does/not/exist"
+}
+```
+
 ### Run dependency integration scenarios
 
 ```bash
@@ -83,6 +222,18 @@ ai-dev-office/tests/integration/dependency-policy.sh
 Runs integration checks for blocked dispatch guard, automatic unblock on resolved
 dependency, and Dev-to-Reviewer handoff transition into the configured reviewer
 queue phase.
+
+### Run SocratiCode graph smoke checks
+
+```bash
+ai-dev-office/tests/smoke/socraticode-graph.sh
+```
+
+This runs:
+
+- `socraticode codebase_graph_query --file api-gateway/services/auth_service.go`
+- `socraticode codebase_graph_stats`
+- `socraticode codebase_graph_circular`
 
 ### Run dependency guard (CI parity for services)
 

@@ -6,6 +6,7 @@ REMOTE_SSH_KEY="${SOCRATICODE_SSH_KEY:-$HOME/.ssh/id_ed25519}"
 REMOTE_PORT="${SOCRATICODE_REMOTE_PORT:-3000}"
 REMOTE_PROJECT="${SOCRATICODE_REMOTE_PROJECT:-/app}"
 LOCAL_PROJECT_ROOT="${SOCRATICODE_LOCAL_PROJECT:-/Users/earth/Documents/GitHub}"
+GRAPH_PROJECT_ROOT="${SOCRATICODE_GRAPH_ROOT:-$LOCAL_PROJECT_ROOT}"
 SCRIPT_SOURCE="${BASH_SOURCE[0]}"
 while [[ -h "$SCRIPT_SOURCE" ]]; do
   SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
@@ -30,6 +31,8 @@ Environment:
   SOCRATICODE_REMOTE_PORT
   SOCRATICODE_REMOTE_PROJECT
   SOCRATICODE_SSH_KEY
+  SOCRATICODE_LOCAL_PROJECT
+  SOCRATICODE_GRAPH_ROOT
 EOF
 }
 
@@ -534,17 +537,17 @@ print_symbol() {
 }
 
 print_graph_query() {
-  SOCRATICODE_LOCAL_PROJECT="$LOCAL_PROJECT_ROOT" \
+  SOCRATICODE_GRAPH_ROOT="$GRAPH_PROJECT_ROOT" \
   node "$SCRIPT_DIR/socraticode-graph-helper.js" codebase_graph_query "$@"
 }
 
 print_graph_stats() {
-  SOCRATICODE_LOCAL_PROJECT="$LOCAL_PROJECT_ROOT" \
+  SOCRATICODE_GRAPH_ROOT="$GRAPH_PROJECT_ROOT" \
   node "$SCRIPT_DIR/socraticode-graph-helper.js" codebase_graph_stats "$@"
 }
 
 print_graph_circular() {
-  SOCRATICODE_LOCAL_PROJECT="$LOCAL_PROJECT_ROOT" \
+  SOCRATICODE_GRAPH_ROOT="$GRAPH_PROJECT_ROOT" \
   node "$SCRIPT_DIR/socraticode-graph-helper.js" codebase_graph_circular "$@"
 }
 
