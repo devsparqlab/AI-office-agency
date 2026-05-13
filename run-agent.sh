@@ -10,6 +10,7 @@ usage() {
   cat <<EOF
 Usage: ./run-agent.sh <TASK_ID> <AGENT> [RUNNER]
        ./run-agent.sh <TASK_ID> scaffold <dev|dev-2|reviewer> [--force]
+       ./run-agent.sh status [TASK_ID]
 
   TASK_ID   Task identifier (e.g. TASK-003)
   AGENT     Agent role: pm | dev | dev-2 | reviewer | debugger | devops | free-roam
@@ -34,9 +35,123 @@ Examples:
 
 Pipeline shortcut (runs full flow automatically):
   ./run-agent.sh TASK-011 auto
+
+Status:
+  ./run-agent.sh status            # summarize all task runs
+  ./run-agent.sh status TASK-011   # summarize one task run
 EOF
   exit 1
 }
+
+show_office_status() {
+  local task_filter="${1:-}"
+
+  ruby - "$OFFICE_DIR" "$RUNS_DIR" "$task_filter" <<'RUBY'
+require "yaml"
+require "date"
+require "open3"
+
+office_dir, runs_dir, task_filter = ARGV
+validator = File.join(office_dir, "validate-yaml.rb")
+
+def load_yaml(path)
+  return {} unless File.exist?(path)
+
+  YAML.safe_load(File.read(path), permitted_classes: [Date, Time], aliases: true) || {}
+rescue Psych::SyntaxError
+  {}
+end
+
+def list_value(value)
+  Array(value).map(&:to_s).map(&:strip).reject(&:empty?)
+end
+
+def validation_status(validator, task_id)
+  _stdout, _stderr, status = Open3.capture3("ruby", validator, task_id)
+  status.success? ? "pass" : "fail"
+end
+
+def next_command(task_id, status)
+  phase = status["phase"].to_s
+  state = status["state"].to_s
+  current_agent = status["current_agent"].to_s
+
+  return "done" if current_agent == "done" || phase == "done" || state == "done"
+  return "blocked" if phase == "blocked" || state == "blocked"
+  return "none" if current_agent.empty?
+
+  "./run-agent.sh #{task_id} #{current_agent}"
+end
+
+def task_ids(runs_dir)
+  Dir.children(runs_dir)
+     .select { |entry| entry.match?(/\ATASK(?:-PKG)?-\d+\z/) && File.directory?(File.join(runs_dir, entry)) }
+     .sort_by { |entry| [entry.include?("PKG") ? 1 : 0, entry[/\d+/].to_i, entry] }
+end
+
+if task_filter && !task_filter.empty?
+  task_dir = File.join(runs_dir, task_filter)
+  unless File.directory?(task_dir)
+    warn "Task not found: #{task_filter}"
+    exit 1
+  end
+
+  status = load_yaml(File.join(task_dir, "status.yaml"))
+  phase = status["phase"].to_s.empty? ? "unknown" : status["phase"].to_s
+  state = status["state"].to_s.empty? ? phase : status["state"].to_s
+  current_agent = status["current_agent"].to_s.empty? ? "unknown" : status["current_agent"].to_s
+  ready = status.key?("ready") ? status["ready"].to_s : "unknown"
+  iteration = status.key?("iteration") ? status["iteration"].to_s : "unknown"
+  blocked_on = list_value(status["blocked_on"])
+  waiting_for = list_value(status["waiting_for"])
+
+  puts "Task: #{task_filter}"
+  puts "Phase: #{phase}"
+  puts "State: #{state}"
+  puts "Current agent: #{current_agent}"
+  puts "Ready: #{ready}"
+  puts "Iteration: #{iteration}"
+  puts "Blocked on: #{blocked_on.empty? ? 'none' : blocked_on.join(', ')}"
+  puts "Waiting for: #{waiting_for.empty? ? 'none' : waiting_for.join(', ')}"
+  puts "Validation: #{validation_status(validator, task_filter)}"
+  puts "Next: #{next_command(task_filter, status)}"
+  exit 0
+end
+
+ids = task_ids(runs_dir)
+if ids.empty?
+  puts "No task runs found in #{runs_dir}"
+  exit 0
+end
+
+puts "AI Dev Office status"
+ids.each do |task_id|
+  status = load_yaml(File.join(runs_dir, task_id, "status.yaml"))
+  phase = status["phase"].to_s.empty? ? "unknown" : status["phase"].to_s
+  current_agent = status["current_agent"].to_s.empty? ? "unknown" : status["current_agent"].to_s
+  ready = status.key?("ready") ? status["ready"].to_s : "unknown"
+  iteration = status.key?("iteration") ? status["iteration"].to_s : "unknown"
+  blocked_on = list_value(status["blocked_on"])
+  validation = validation_status(validator, task_id)
+  parts = [
+    task_id,
+    "phase=#{phase}",
+    "agent=#{current_agent}",
+    "ready=#{ready}",
+    "iteration=#{iteration}",
+    "validation=#{validation}",
+    "next=#{next_command(task_id, status)}"
+  ]
+  parts << "blocked_on=#{blocked_on.join(',')}" unless blocked_on.empty?
+  puts parts.join(" | ")
+end
+RUBY
+}
+
+if [[ "${1:-}" == "status" ]]; then
+  show_office_status "${2:-}"
+  exit $?
+fi
 
 [[ $# -lt 2 ]] && usage
 

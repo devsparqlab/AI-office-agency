@@ -56,6 +56,17 @@ Use this after saving `status.yaml` or any `<agent>-output.yaml` file to catch
 missing required fields, invalid routing agents, malformed runtime YAML, and
 state mismatches (`phase` vs `state`).
 
+### Check office status
+
+```bash
+./ai-dev-office/run-agent.sh status
+./ai-dev-office/run-agent.sh status TASK-011
+```
+
+The status command is read-only. It summarizes current phase, routed agent,
+readiness, blocked dependencies, validation state, and the next suggested
+runner command.
+
 ### SocratiCode context provider
 
 `run-agent.sh` can inject a local SocratiCode context section into each role

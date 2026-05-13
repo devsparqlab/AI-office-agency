@@ -119,6 +119,12 @@ When working in Cursor, read the agent prompt file directly and follow its contr
 ### Check task status
 
 Read `ai-dev-office/runs/<task-id>/status.yaml` to see current phase, iteration, and history.
+For a concise read-only CLI summary, run:
+
+```bash
+./ai-dev-office/run-agent.sh status
+./ai-dev-office/run-agent.sh status TASK-NNN
+```
 
 ### Validate runtime files
 

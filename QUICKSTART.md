@@ -163,6 +163,12 @@ Run specific agents for TASKs (ตัวอย่าง):
 
   ruby ai-dev-office/validate-yaml.rb <TASK-ID>
 
+Status summary
+- ดูสถานะ task ทั้งหมดหรือ task เดียวแบบ read-only:
+
+  ./ai-dev-office/run-agent.sh status
+  ./ai-dev-office/run-agent.sh status TASK-028
+
 6) Conventions / recommendations
 - ตั้งชื่อ `short_name` ให้สั้นและเป็น slug เพื่อให้แสดงใน `TASK_LABEL` (run-agent ใช้ `short_name` อัตโนมัติ)
 - บันทึก `pm-output.yaml` ถ้ามีข้อมูลการตั้งค่าเริ่มต้นของงาน
@@ -190,18 +196,14 @@ Run specific agents for TASKs (ตัวอย่าง):
 - `devops`: จัดการปัญหาอินฟรา, CI/CD, deployment, และข้อผิดพลาดที่ต้องการสิทธิ์โครงสร้างพื้นฐาน.
   - Example: `./ai-dev-office/run-agent.sh TASK-028 devops`
 
-- `tester`: รันชุดทดสอบหรือออกแบบกรณีทดสอบ — ผลลัพธ์เป็นไฟล์ทดสอบหรือรายงาน (เช่น `tester-output.yaml`).
-  - Example: `./ai-dev-office/run-agent.sh TASK-028 tester`
-
-- `planner`: สร้างแผนงาน (tasks/subtasks, milestones) และรายละเอียดการทำงานสำหรับ `pm`/`dev`.
-  - Example: `./ai-dev-office/run-agent.sh TASK-028 planner`
-
 - `free-roam`: การสำรวจ/escalation — รันเพื่อหาทางออกเมื่องานติดหรือมีความไม่ชัดเจนสูง.
   - Example: `./ai-dev-office/run-agent.sh TASK-028 free-roam`
+
+Legacy role files:
+- `agents/tester.md` และ `agents/planner.md` ยังอยู่เพื่ออ้างอิงงานเก่า แต่ v2 runtime ใช้ `reviewer` สำหรับ review/test verification และใช้ `pm` สำหรับ planning.
 
 หมายเหตุ:
 - ชื่อไฟล์ output ต้องเป็น `runs/<TASK-ID>/<agent>-output.yaml` เพื่อให้ `run-agent.sh` และ `validate-yaml.rb` ทำงานร่วมกันได้
 - โฟลว์ตัวอย่างทั่วไป: `pm` → `dev`/`dev-2` → `reviewer` → (`debugger` | `devops` | `free-roam`) → `reviewer` → `done`
 
 ต้องการให้ผมสร้างไฟล์ `ai-dev-office/quickrun.sh` ใน repo เลยไหมครับ? ถ้าใช่ ผมจะเพิ่มสคริปต์และตั้งไว้ executable instruction ด้วย
-
