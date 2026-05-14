@@ -2,7 +2,6 @@
 
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
 
 const DEFAULT_ROOT = process.env.SOCRATICODE_GRAPH_ROOT || process.env.SOCRATICODE_LOCAL_PROJECT || "/Users/earth/Documents/GitHub";
 const IGNORE_DIRS = new Set([".git", "node_modules", "dist", "build", "vendor", ".idea", ".vscode"]);
@@ -15,22 +14,23 @@ function rel(root, absPath) {
   return normalize(path.relative(root, absPath));
 }
 
-function runRgFiles(cwd, patterns = []) {
-  const args = ["--files", "--hidden"];
-  for (const pattern of patterns) {
-    args.push("--glob", pattern);
+function walkFiles(root, current = "") {
+  const absDir = path.resolve(root, current);
+  const entries = fs.readdirSync(absDir, { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const relative = current ? path.join(current, entry.name) : entry.name;
+    const normalized = normalize(relative);
+    if (entry.isDirectory()) {
+      if (IGNORE_DIRS.has(entry.name)) continue;
+      files.push(...walkFiles(root, relative));
+      continue;
+    }
+    files.push(normalized);
   }
-  const result = spawnSync("rg", args, { cwd, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
-  if (result.error) {
-    throw result.error;
-  }
-  if (result.status !== 0 && result.status !== 1) {
-    throw new Error(result.stderr || `rg exited with status ${result.status}`);
-  }
-  return (result.stdout || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+
+  return files;
 }
 
 function parseGoModModulePath(goModAbs) {
@@ -43,13 +43,7 @@ function parseGoModModulePath(goModAbs) {
 }
 
 function collectModules(root) {
-  const goModFiles = runRgFiles(root, [
-    "!**/.git/**",
-    "!**/node_modules/**",
-    "!**/dist/**",
-    "!**/build/**",
-    "!**/vendor/**",
-  ]).filter((file) => path.basename(file) === "go.mod");
+  const goModFiles = walkFiles(root).filter((file) => path.basename(file) === "go.mod");
 
   return goModFiles
     .map((relativeGoMod) => {
@@ -69,13 +63,7 @@ function collectModules(root) {
 }
 
 function collectGoFiles(root) {
-  return runRgFiles(root, [
-    "!**/.git/**",
-    "!**/node_modules/**",
-    "!**/dist/**",
-    "!**/build/**",
-    "!**/vendor/**",
-  ]).filter((file) => file.endsWith(".go"));
+  return walkFiles(root).filter((file) => file.endsWith(".go"));
 }
 
 function findModuleForFile(fileAbs, modules) {

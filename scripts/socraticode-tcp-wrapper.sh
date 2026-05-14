@@ -5,6 +5,7 @@ REMOTE_HOST="${SOCRATICODE_REMOTE_HOST:-socraticode@192.168.1.140}"
 REMOTE_SSH_KEY="${SOCRATICODE_SSH_KEY:-$HOME/.ssh/id_ed25519}"
 REMOTE_PORT="${SOCRATICODE_REMOTE_PORT:-4444}"
 REMOTE_PROJECT="${SOCRATICODE_REMOTE_PROJECT:-/app}"
+REMOTE_CANONICAL_PROJECT="${SOCRATICODE_REMOTE_CANONICAL_PROJECT:-D:\\llm}"
 LOCAL_PROJECT_ROOT="${SOCRATICODE_LOCAL_PROJECT:-/Users/earth/Documents/GitHub}"
 GRAPH_PROJECT_ROOT="${SOCRATICODE_GRAPH_ROOT:-$LOCAL_PROJECT_ROOT}"
 SCRIPT_SOURCE="${BASH_SOURCE[0]}"
@@ -97,6 +98,64 @@ remote_probe() {
     return 0
   fi
   return 1
+}
+
+normalize_remote_path() {
+  local requested="${1:-}"
+  local normalized
+  local remote_norm
+  local local_norm
+
+  if [[ -z "$requested" ]]; then
+    printf '\n'
+    return 0
+  fi
+
+  normalized="$(printf '%s' "$requested" | tr '[:upper:]' '[:lower:]' | tr '\\' '/')"
+  remote_norm="$(printf '%s' "$REMOTE_CANONICAL_PROJECT" | tr '[:upper:]' '[:lower:]' | tr '\\' '/')"
+  local_norm="$(printf '%s' "$LOCAL_PROJECT_ROOT" | tr '[:upper:]' '[:lower:]' | tr '\\' '/')"
+
+  case "$normalized" in
+    "$remote_norm"|"$remote_norm"/*|d:/llm|d:/llm/*)
+      printf '%s\n' "${requested//\//\\}"
+      return 0
+      ;;
+    "$local_norm"|"$local_norm"/*)
+      local suffix="${requested#"$LOCAL_PROJECT_ROOT"}"
+      suffix="${suffix#\"}"
+      suffix="${suffix#/}"
+      suffix="${suffix//\//\\}"
+      if [[ -n "$suffix" ]]; then
+        printf '%s\\%s\n' "$REMOTE_CANONICAL_PROJECT" "$suffix"
+      else
+        printf '%s\n' "$REMOTE_CANONICAL_PROJECT"
+      fi
+      return 0
+      ;;
+  esac
+
+  printf '%s\n' "$requested"
+}
+
+ps_quote() {
+  local value="${1:-}"
+  value="${value//\'/\'\'}"
+  printf "'%s'" "$value"
+}
+
+remote_node_request() {
+  local ps_command="$1"
+  local ps_script
+  local encoded
+
+  ps_script=$(cat <<PS
+\$ErrorActionPreference = 'Stop'
+${ps_command}
+PS
+)
+
+  encoded="$(printf '%s' "$ps_script" | iconv -t UTF-16LE | base64 | tr -d '\n')"
+  ssh -i "$REMOTE_SSH_KEY" -T "$REMOTE_HOST" powershell -NoProfile -EncodedCommand "$encoded"
 }
 
 local_search_json() {
@@ -390,6 +449,15 @@ resolve_local_project_root() {
     effective_root="$requested_root"
   fi
 
+  local normalized_root
+  normalized_root="$(printf '%s' "$effective_root" | tr '[:upper:]' '[:lower:]' | tr '\\' '/')"
+
+  case "$normalized_root" in
+    d:/llm)
+      effective_root="$LOCAL_PROJECT_ROOT"
+      ;;
+  esac
+
   if [[ "$effective_root" != /* ]]; then
     effective_root="$(cd "$LOCAL_PROJECT_ROOT" 2>/dev/null && cd "$effective_root" 2>/dev/null && pwd -P || true)"
   fi
@@ -402,7 +470,6 @@ resolve_local_project_root() {
 }
 
 print_search() {
-  local -a params=()
   local query=""
   local file_filter=""
   local language_filter=""
@@ -410,7 +477,7 @@ print_search() {
   local limit=""
   local min_score=""
   local project_path="$LOCAL_PROJECT_ROOT"
-  local resolved_root=""
+  local resolved_root="$REMOTE_CANONICAL_PROJECT"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -452,43 +519,34 @@ print_search() {
     esac
   done
 
-  if [[ -n "$query" ]]; then
-    params+=("query" "$query")
+  if [[ -n "$project_path" ]]; then
+    resolved_root="$(normalize_remote_path "$(resolve_local_project_root "$project_path" 2>/dev/null || printf '%s' "$project_path")")"
+    [[ -n "$resolved_root" ]] || resolved_root="$REMOTE_CANONICAL_PROJECT"
   fi
+
+  local ps_command="Set-Location $(ps_quote "$REMOTE_CANONICAL_PROJECT"); node $(ps_quote "$REMOTE_CANONICAL_PROJECT\\ai-dev-office\\scripts\\socraticode-central-query.js") codebase_search --query $(ps_quote "$query")"
   if [[ -n "$file_filter" ]]; then
-    params+=("fileFilter" "$file_filter")
+    ps_command+=" --fileFilter $(ps_quote "$(normalize_remote_path "$file_filter")")"
   fi
   if [[ -n "$language_filter" ]]; then
-    params+=("languageFilter" "$language_filter")
+    ps_command+=" --languageFilter $(ps_quote "$language_filter")"
   fi
-  if [[ -n "$include_linked" ]]; then
-    params+=("includeLinked" "$include_linked")
+  if [[ "$include_linked" == "true" ]]; then
+    ps_command+=" --includeLinked true"
   fi
   if [[ -n "$limit" ]]; then
-    params+=("limit" "$limit")
+    ps_command+=" --limit $(ps_quote "$limit")"
   fi
-  if [[ -n "$min_score" ]]; then
-    params+=("minScore" "$min_score")
-  fi
-  if [[ -n "$project_path" ]]; then
-    params+=("projectPath" "$project_path")
-  fi
-
-  if ! resolved_root="$(resolve_local_project_root "$project_path")"; then
-    print_json_error "codebase_search" "Invalid projectPath: $project_path"
-    return 0
-  fi
-
-  local_search_json "$query" "$file_filter" "$language_filter" "$include_linked" "$limit" "$resolved_root"
+  ps_command+=" --projectPath $(ps_quote "$resolved_root")"
+  remote_node_request "$ps_command"
 }
 
 print_symbol() {
-  local -a params=()
   local name=""
   local file=""
   local limit=""
   local project_path="$LOCAL_PROJECT_ROOT"
-  local resolved_root=""
+  local resolved_root="$REMOTE_CANONICAL_PROJECT"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -518,37 +576,94 @@ print_symbol() {
     esac
   done
 
-  if [[ -n "$name" ]]; then
-    params+=("name" "$name")
-  fi
-  if [[ -n "$file" ]]; then
-    params+=("file" "$file")
-  fi
   if [[ -n "$project_path" ]]; then
-    params+=("projectPath" "$project_path")
+    resolved_root="$(normalize_remote_path "$(resolve_local_project_root "$project_path" 2>/dev/null || printf '%s' "$project_path")")"
+    [[ -n "$resolved_root" ]] || resolved_root="$REMOTE_CANONICAL_PROJECT"
   fi
 
-  if ! resolved_root="$(resolve_local_project_root "$project_path")"; then
-    print_json_error "codebase_symbol" "Invalid projectPath: $project_path"
-    return 0
+  local ps_command="Set-Location $(ps_quote "$REMOTE_CANONICAL_PROJECT"); node $(ps_quote "$REMOTE_CANONICAL_PROJECT\\ai-dev-office\\scripts\\socraticode-central-query.js") codebase_symbol --name $(ps_quote "$name")"
+  if [[ -n "$file" ]]; then
+    ps_command+=" --file $(ps_quote "$(normalize_remote_path "$file")")"
   fi
-
-  local_symbol_json "$name" "$file" "$limit" "$resolved_root"
+  if [[ -n "$limit" ]]; then
+    ps_command+=" --limit $(ps_quote "$limit")"
+  fi
+  ps_command+=" --projectPath $(ps_quote "$resolved_root")"
+  remote_node_request "$ps_command"
 }
 
 print_graph_query() {
-  SOCRATICODE_GRAPH_ROOT="$GRAPH_PROJECT_ROOT" \
-  node "$SCRIPT_DIR/socraticode-graph-helper.js" codebase_graph_query "$@"
+  local file=""
+  local project_path="$GRAPH_PROJECT_ROOT"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --file)
+        file="${2:-}"
+        shift 2
+        ;;
+      --projectPath)
+        project_path="${2:-}"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  local ps_command="Set-Location $(ps_quote "$REMOTE_CANONICAL_PROJECT"); node $(ps_quote "$REMOTE_CANONICAL_PROJECT\\ai-dev-office\\scripts\\socraticode-graph-helper.js") codebase_graph_query --file $(ps_quote "$(normalize_remote_path "$file")") --projectPath $(ps_quote "$(normalize_remote_path "$project_path")")"
+  remote_node_request "$ps_command"
 }
 
 print_graph_stats() {
-  SOCRATICODE_GRAPH_ROOT="$GRAPH_PROJECT_ROOT" \
-  node "$SCRIPT_DIR/socraticode-graph-helper.js" codebase_graph_stats "$@"
+  local project_path="$GRAPH_PROJECT_ROOT"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --projectPath)
+        project_path="${2:-}"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  local ps_command="Set-Location $(ps_quote "$REMOTE_CANONICAL_PROJECT"); node $(ps_quote "$REMOTE_CANONICAL_PROJECT\\ai-dev-office\\scripts\\socraticode-graph-helper.js") codebase_graph_stats --projectPath $(ps_quote "$(normalize_remote_path "$project_path")")"
+  remote_node_request "$ps_command"
 }
 
 print_graph_circular() {
-  SOCRATICODE_GRAPH_ROOT="$GRAPH_PROJECT_ROOT" \
-  node "$SCRIPT_DIR/socraticode-graph-helper.js" codebase_graph_circular "$@"
+  local project_path="$GRAPH_PROJECT_ROOT"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --projectPath)
+        project_path="${2:-}"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  local ps_command="Set-Location $(ps_quote "$REMOTE_CANONICAL_PROJECT"); node $(ps_quote "$REMOTE_CANONICAL_PROJECT\\ai-dev-office\\scripts\\socraticode-graph-helper.js") codebase_graph_circular --projectPath $(ps_quote "$(normalize_remote_path "$project_path")")"
+  remote_node_request "$ps_command"
 }
 
 cmd="${1:-context}"

@@ -105,12 +105,12 @@ This distinction matters when debugging odd results or wiring a different root.
 - `context`, `codebase_status`: remote TCP provider over SSH. These commands
   talk to the remote SocratiCode service and report provider availability /
   freshness.
-- `codebase_search`, `codebase_symbol`: local read-only search against the
-  current checkout using `rg`. These commands honor `--projectPath` or
-  `SOCRATICODE_LOCAL_PROJECT`.
+- `codebase_search`, `codebase_symbol`: remote read-only search against the
+  central index on `d:\llm`. These commands honor `--projectPath` and map the
+  canonical Windows root aliases (`d:\llm`, `D:/llm`) to the central machine.
 - `codebase_graph_query`, `codebase_graph_stats`, `codebase_graph_circular`:
-  local read-only graph analysis over Go files. These commands honor
-  `--projectPath` or `SOCRATICODE_GRAPH_ROOT`.
+  remote read-only graph analysis against the central checkout on `d:\llm`.
+  These commands honor `--projectPath` and use the same canonical root mapping.
 
 Environment overrides:
 
@@ -133,7 +133,7 @@ Environment overrides:
 }
 ```
 
-`codebase_search` returns local line matches:
+`codebase_search` returns remote line matches from the central index:
 
 ```json
 {
@@ -148,7 +148,8 @@ Environment overrides:
 }
 ```
 
-`codebase_symbol` returns a preferred definition plus all matches:
+`codebase_symbol` returns a preferred definition plus all matches from the
+central checkout:
 
 ```json
 {
@@ -166,7 +167,7 @@ Environment overrides:
 }
 ```
 
-`codebase_graph_query` returns local package edges for a file:
+`codebase_graph_query` returns remote package edges for a file:
 
 ```json
 {
@@ -196,7 +197,7 @@ Environment overrides:
 }
 ```
 
-`codebase_graph_stats` returns local graph totals:
+`codebase_graph_stats` returns remote graph totals:
 
 ```json
 {
@@ -213,7 +214,7 @@ Environment overrides:
 }
 ```
 
-`codebase_graph_circular` returns local package cycles:
+`codebase_graph_circular` returns remote package cycles:
 
 ```json
 {
