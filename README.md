@@ -96,6 +96,7 @@ Default behavior is optional and recorded:
 - For non-code tasks, the runner records `status: skipped`.
 - Agent outputs may include concise `context_sources`; do not paste large search
   results into YAML handoffs.
+- For Codex sessions in this workspace, SocratiCode MCP is the preferred query path. Use MCP tools before shell wrappers for `codebase_status`, `codebase_search`, `codebase_symbol`, and graph commands.
 
 #### Command routing and data source
 

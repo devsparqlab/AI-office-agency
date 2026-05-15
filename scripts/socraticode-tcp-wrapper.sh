@@ -66,6 +66,7 @@ remote_request() {
   local payload_json
   local ps_script
   local encoded
+  local output
 
   payload_json="$(build_request_json "$method" "$@")"
 
@@ -88,7 +89,15 @@ PS
 )
 
   encoded="$(printf '%s' "$ps_script" | iconv -t UTF-16LE | base64 | tr -d '\n')"
-  ssh -i "$REMOTE_SSH_KEY" -T "$REMOTE_HOST" powershell -NoProfile -EncodedCommand "$encoded"
+  output="$(ssh -i "$REMOTE_SSH_KEY" -T "$REMOTE_HOST" powershell -NoProfile -EncodedCommand "$encoded" 2>&1)" || {
+    if printf '%s' "$output" | grep -qi "Operation not permitted\|connect to host .* port 22"; then
+      print_json_error "$method" "SSH to the central SocratiCode host is blocked in this environment. Use an approved network session or the MCP socraticode tool."
+      return 0
+    fi
+    printf '%s\n' "$output" >&2
+    return 1
+  }
+  printf '%s\n' "$output"
 }
 
 remote_probe() {
@@ -147,6 +156,7 @@ remote_node_request() {
   local ps_command="$1"
   local ps_script
   local encoded
+  local output
 
   ps_script=$(cat <<PS
 \$ErrorActionPreference = 'Stop'
@@ -155,7 +165,15 @@ PS
 )
 
   encoded="$(printf '%s' "$ps_script" | iconv -t UTF-16LE | base64 | tr -d '\n')"
-  ssh -i "$REMOTE_SSH_KEY" -T "$REMOTE_HOST" powershell -NoProfile -EncodedCommand "$encoded"
+  output="$(ssh -i "$REMOTE_SSH_KEY" -T "$REMOTE_HOST" powershell -NoProfile -EncodedCommand "$encoded" 2>&1)" || {
+    if printf '%s' "$output" | grep -qi "Operation not permitted\|connect to host .* port 22"; then
+      print_json_error "socraticode" "SSH to the central SocratiCode host is blocked in this environment. Use an approved network session or the MCP socraticode tool."
+      return 0
+    fi
+    printf '%s\n' "$output" >&2
+    return 1
+  }
+  printf '%s\n' "$output"
 }
 
 local_search_json() {
