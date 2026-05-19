@@ -6,8 +6,8 @@ runner:
 invocation:
   command: codex
   args:
-    - "--approval-mode"
-    - "full-auto"
+    - "--ask-for-approval"
+    - "never"
     - "--quiet"
   prompt_flag: "-p"
   workdir_flag: "--cd"

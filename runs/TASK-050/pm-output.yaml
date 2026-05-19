@@ -1,0 +1,154 @@
+task:
+  id: "TASK-050"
+  title: "Verify Turnover/Spend Daily Missions End-to-End"
+  short_name: "verify-turnover-spend-daily-missions-e2e"
+  parent: "TASK-049"
+  epic: "Mobile Missions integration"
+  type: investigation
+  priority: high
+  created_at: "2026-05-18"
+scope:
+  target_services:
+    - service: Games-Labs-Order
+      reason: "Owns THB spend and exchange/turnover order fulfillment events that feed Daily Activity progress."
+    - service: Games-Labs-Missions
+      reason: "Owns player.activity.v1 consumption, daily_activity_progress, quest overview status, and claim-daily."
+    - service: docs
+      reason: "Mobile and QA need repeatable staging/dev verification steps."
+  affected_files:
+    - path: Games-Labs-Order/internal/core/services/ordersvc/player_activity.go
+      action: inspect
+      description: "Confirm spend/turnover settled and reverse event payloads match shared-lib player.activity.v1 contract."
+    - path: Games-Labs-Order/internal/core/services/ordersvc/service.go
+      action: inspect
+      description: "Confirm fulfillment paths call the correct player activity publisher functions."
+    - path: Games-Labs-Order/internal/core/services/ordersvc/service_test.go
+      action: modify_if_needed
+      description: "Add or adjust focused coverage for spend/turnover event payloads only if gaps are found."
+    - path: Games-Labs-Missions/internal/services/mission_service.go
+      action: inspect
+      description: "Confirm TURNOVER_AMOUNT and SPEND_AMOUNT mapping to daily progress, promotional filtering, reverse handling, and Bangkok reset bucket."
+    - path: Games-Labs-Missions/internal/services/daily_activity_consumer_test.go
+      action: modify_if_needed
+      description: "Add spend-specific or E2E consumer coverage if current tests only prove turnover."
+    - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+      action: inspect
+      description: "Confirm active configured rules and daily progress persistence use the same fields seeded/admin-created activities expose."
+    - path: Games-Labs-Missions/internal/services/quest_overview_service_test.go
+      action: modify_if_needed
+      description: "Add status progression assertions only if existing tests do not cover turnover/spend progress flowing into overview."
+    - path: Games-Labs-Missions/README.md
+      action: modify
+      description: "Add a concise staging/dev QA checklist for turnover and THB spend Daily Missions."
+description: |
+  Prove that the Phase 1 Daily Activity contract works end-to-end for the two currently production-meaningful conditions: TURNOVER_AMOUNT and SPEND_AMOUNT in THB. The target chain is configured Daily Activity -> Order player.activity.v1 event -> Missions consumer -> daily_activity_progress -> GET /api/v1/quest/overview status -> POST /api/v1/missions/claim-daily -> claimed state.
+
+  This task is verification and hardening, not new product design. Do not add any-game play missions, Diamonds spend missions, weekly/monthly missions, or Game SettleRound wiring here.
+acceptance_criteria:
+  - criterion: "Order THB purchase fulfillment is verified to publish PlayerActivityEventTypeSpendSettled with schema_version v1, positive settled_amount, non-empty user/source fields, source_service order, source_reference_type order, and deterministic event_id."
+  - criterion: "Order exchange/turnover fulfillment is verified to publish PlayerActivityEventTypeTurnoverSettled with schema_version v1, positive settled_amount, non-empty user/source fields, source_service order, source_reference_type order, and deterministic event_id."
+  - criterion: "Order reverse/refund paths are verified or documented for spend/turnover reverse events, including reverse_of_event_id."
+  - criterion: "Missions consumer maps TURNOVER_AMOUNT from turnover.settled and SPEND_AMOUNT from spend.settled THB only, ignores promotional events, and buckets progress by Asia/Bangkok day."
+  - criterion: "Missions consumer persists daily_activity_progress for active configured rules and handles duplicate events idempotently."
+  - criterion: "At least one focused test proves SPEND_AMOUNT consumer behavior if existing coverage is turnover-only."
+  - criterion: "GET /api/v1/quest/overview status progression can be demonstrated for not_started/in_progress/claimable/claimed using seeded or admin-configured turnover/spend rows."
+  - criterion: "POST /api/v1/missions/claim-daily succeeds only after a configured activity is claimable, then overview/progress reflects claimed."
+  - criterion: "README includes repeatable staging/dev QA steps for Mobile, including which API Mobile calls and confirmation that Mobile never updates mission status manually."
+  - criterion: "go test ./... passes in every service touched, or any skipped service is explicitly documented with a valid reason."
+plan:
+  approach: |
+    Start with evidence. Inspect Order publisher payloads and fulfillment hooks, then inspect Missions consumer mapping/persistence and existing tests. Add only the missing tests/docs needed to make the turnover/spend chain provable. Keep implementation changes narrow and avoid broad refactors because TASK-049 already changed the Daily Activity API surface.
+  subtasks:
+    - order: 1
+      id: order-event-contract-audit
+      description: "Audit Games-Labs-Order player_activity.go and fulfillment/refund call sites for spend settled, spend reverse, turnover settled, and turnover reverse events."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Order/internal/core/services/ordersvc/player_activity.go
+        - Games-Labs-Order/internal/core/services/ordersvc/service.go
+        - Games-Labs-Order/internal/core/services/ordersvc/service_test.go
+      parallel_safe: false
+    - order: 2
+      id: missions-consumer-contract-audit
+      description: "Audit Games-Labs-Missions consumer mapping and repository persistence for TURNOVER_AMOUNT/SPEND_AMOUNT, including idempotency, promotional filtering, reverse handling, and Bangkok day buckets."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/internal/services/mission_service.go
+        - Games-Labs-Missions/internal/services/daily_activity_consumer_test.go
+        - Games-Labs-Missions/internal/repositories/mission_repo.go
+      parallel_safe: false
+    - order: 3
+      id: fill-verification-gaps
+      description: "Add the smallest focused tests needed to cover any missing spend/turnover path, especially SPEND_AMOUNT consumer behavior if it is not already tested."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Order/internal/core/services/ordersvc/service_test.go
+        - Games-Labs-Missions/internal/services/daily_activity_consumer_test.go
+        - Games-Labs-Missions/internal/services/quest_overview_service_test.go
+      parallel_safe: false
+    - order: 4
+      id: staging-qa-checklist
+      description: "Document a repeatable staging/dev QA checklist for configured turnover and THB spend Daily Missions, including overview status progression and claim-daily behavior."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/README.md
+      parallel_safe: false
+    - order: 5
+      id: final-verification
+      description: "Run go test ./... in each touched service and record results in dev-2 output/status."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Order
+        - Games-Labs-Missions
+      parallel_safe: false
+  risks:
+    - risk: "Order and Missions may already have partial coverage, making extra tests easy to duplicate."
+      mitigation: "Inspect existing tests first and add only missing assertions."
+    - risk: "RabbitMQ wiring is environment-specific and hard to fully prove locally."
+      mitigation: "Verify producer and consumer code paths with tests, then document explicit staging RabbitMQ checks."
+    - risk: "SPEND_AMOUNT can be confused with Diamonds spend."
+      mitigation: "Keep wording and QA steps explicit: SPEND_AMOUNT is THB spend only; Diamonds spend is TASK-057."
+    - risk: "Round/play-game questions may leak into this task."
+      mitigation: "Keep Game SettleRound and ROUND_COUNT_* in TASK-052/TASK-053; no changes here."
+  estimated_complexity: medium
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "The work crosses Order and Missions, but should remain sequential so event contract evidence, tests, and docs stay consistent."
+summary: |
+  TASK-050 is ready for dev-2. It should produce confidence that turnover and THB spend Daily Missions are already backend-owned and mobile-ready: Mobile reads overview/progress and calls claim-daily only after backend progress makes the item claimable.
+artifacts:
+  - path: runs/TASK-050/task.md
+    action: created
+    description: "Roadmap task definition for turnover/spend Daily Mission E2E verification."
+  - path: runs/TASK-050/status.yaml
+    action: modified
+    description: "Updated PM handoff and assignment metadata for dev-2."
+  - path: runs/TASK-050/pm-output.yaml
+    action: created
+    description: "Created PM output contract for TASK-050."
+next_action:
+  agent: dev-2
+  reason: "Implementation/verification can start now with Order event audit, Missions consumer audit, focused tests, and README QA checklist."
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "Games-Labs-Order publish turnover.settled spend.settled player.activity.v1 Missions consumer daily_activity_progress claim-daily quest overview"
+      - "publishTurnoverSettled publishSpendSettled PlayerActivityEventTypeTurnoverSettled PlayerActivityEventTypeSpendSettled order service"
+      - "HandlePlayerActivityEvent ApplyDailyActivityForward daily_activity_progress ListDailyActivityProgress ClaimDailyMission"
+    relevant_symbols:
+      - Games-Labs-Order/internal/core/services/ordersvc/player_activity.go:publishDailyActivitiesForOrder
+      - Games-Labs-Order/internal/core/services/ordersvc/player_activity.go:publishTurnoverSettled
+      - Games-Labs-Order/internal/core/services/ordersvc/service.go:ConfirmPayment
+      - Games-Labs-Order/internal/core/services/ordersvc/service.go:settleTurnover
+      - Games-Labs-Missions/internal/services/mission_service.go:HandlePlayerActivityEvent
+      - Games-Labs-Missions/internal/services/mission_service.go:mapPlayerActivityEventToDailyProgress
+      - Games-Labs-Missions/internal/repositories/mission_repo.go:ListActiveDailyActivityRules
+      - Games-Labs-Missions/internal/repositories/mission_repo.go:ApplyDailyActivityForward
+    notes: "SocratiCode was used with projectPath d:\\llm as requested by AGENTS.md; local files were checked as source of truth after the search."
+blockers:
+  - "Automated PM runner failed because the local Codex CLI rejected the existing --approval-mode argument in ai-dev-office/run-agent.sh. PM output was prepared manually in this Codex session."

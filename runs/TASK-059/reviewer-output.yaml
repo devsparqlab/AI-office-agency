@@ -1,0 +1,59 @@
+summary: |
+  Approved. TASK-059 documentation alignment is complete on disk. README and Postman agree that
+  `POST /api/v1/missions/claim-daily` is the canonical Daily Activity claim path (body:
+  `user_id`, `mission_id`, optional `idempotency_key`), while
+  `POST /api/v1/missions/{mission_id}/claim-reward` is generic/legacy and must not be used for
+  Daily items from `quest/overview`. Mobile migration impact and backward compatibility are
+  documented in README prose. Debugger fixed the correct Postman `Claim daily` entry and restored
+  unrelated `First register` edits.
+
+  Re-verified in this session: scoped dependency guard, `go build`/`go test` for Games-Labs-Missions
+  and api-gateway, and valid Postman JSON.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    Scoped dependency guard (TASK-059 scope):
+    - ./ai-dev-office/scripts/check-service-dependencies.sh Games-Labs-Missions api-gateway
+    - PASS — shared-lib v0.0.0-20260515091340-53a33b53f9e0; CI-parity compile GOWORK=off
+
+    Games-Labs-Missions:
+    - go build ./...  (exit 0)
+    - go test ./...   (exit 0)
+
+    api-gateway:
+    - go build ./...  (exit 0)
+    - go test ./...   (exit 0)
+
+    Postman: python3 -m json.tool api-gateway/docs/Games-Labs-APIs.postman_collection.json (valid)
+    No replace github.com/SparqLab/shared-lib => ../shared-lib in scoped go.mod files.
+artifacts:
+  - path: /Users/earth/Documents/GitHub/Games-Labs-Missions/README.md
+    issues:
+      - line: "210-217"
+        severity: suggestion
+        description: |
+          Optional PM pass to tick task.md acceptance checkboxes; engineering contract is already
+          documented in README prose.
+  - path: /Users/earth/Documents/GitHub/api-gateway/docs/Games-Labs-APIs.postman_collection.json
+    issues: []
+next_action:
+  agent: done
+  reason: Docs aligned; scoped guard and builds/tests pass; no error-severity findings.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries:
+      - "TASK-059 claim-daily claim-reward Postman README"
+    relevant_symbols:
+      - "Games-Labs-Missions/README.md"
+      - "api-gateway/docs/Games-Labs-APIs.postman_collection.json"
+    notes: "Final verdict from on-disk docs, scoped dependency guard, and local build/test."
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

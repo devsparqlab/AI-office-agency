@@ -1,0 +1,34 @@
+---
+task_id: TASK-051
+events:
+- type: context_provider
+  agent: pm
+  details: provider=socraticode status=used freshness=current confidence=medium policy=recorded
+    fallback=repo_search note=Remote SocratiCode TCP server responded to codebase_status.
+  timestamp: '2026-05-18T04:36:53Z'
+- type: prompt_assembly
+  agent: pm
+  details: task=TASK-051 epic=none runner=codex phase=pending iteration=0 sources=agents/pm.md,
+    runs/TASK-051/task.md, runs/TASK-051/status.yaml
+  timestamp: '2026-05-18T04:36:53Z'
+- type: runner_complete
+  agent: pm
+  details: task=TASK-051 epic=none runner=codex output_expected=runs/TASK-051/pm-output.yaml
+  timestamp: '2026-05-18T04:38:48Z'
+- type: context_provider
+  agent: dev-2
+  details: provider=socraticode status=used freshness=current confidence=medium policy=recorded
+    fallback=repo_search note=Remote SocratiCode TCP server responded to codebase_status.
+  timestamp: '2026-05-18T04:40:12Z'
+- type: prompt_assembly
+  agent: dev-2
+  details: task=TASK-051 [daily-activity-smoke] Backoffice Daily Activity Smoke Test
+    epic=Mobile Missions integration runner=codex phase=assigned iteration=1 sources=agents/dev-2.md,
+    runs/TASK-051/task.md, runs/TASK-051/status.yaml, runs/TASK-051/pm-output.yaml
+  timestamp: '2026-05-18T04:40:12Z'
+- type: runner_complete
+  agent: dev-2
+  details: task=TASK-051 [daily-activity-smoke] Backoffice Daily Activity Smoke Test
+    epic=Mobile Missions integration runner=codex output_expected=runs/TASK-051/dev-2-output.yaml
+  timestamp: '2026-05-18T04:45:16Z'
+updated_at: '2026-05-18T04:45:16Z'

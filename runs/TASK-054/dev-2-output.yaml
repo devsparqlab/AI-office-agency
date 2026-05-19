@@ -1,0 +1,41 @@
+summary: Added backend-configurable Daily Activity UI metadata for Mobile rendering and wired it through admin persistence plus quest overview payloads.
+artifacts:
+  - path: Games-Labs-Missions/migrations/019_add_daily_activity_ui_metadata.sql
+    action: created
+    description: Adds sort_order, icon_key, image_url, deeplink_url, cta_action, and cta_label to daily_activities.
+  - path: Games-Labs-Missions/internal/models/models.go
+    action: modified
+    description: Adds DailyActivity UI metadata fields.
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    action: modified
+    description: Persists, reads, and orders Daily Activities by UI metadata while preserving existing condition behavior.
+  - path: Games-Labs-Missions/internal/handlers/mission_handler.go
+    action: modified
+    description: Allows admin create/update responses to set and return UI metadata.
+  - path: Games-Labs-Missions/internal/services/quest_overview_service.go
+    action: modified
+    description: Passes Daily Activity UI metadata through GET /api/v1/quest/overview.
+  - path: Games-Labs-Missions/internal/repositories/mission_repo_test.go
+    action: modified
+    description: Covers repository persistence and readback of UI metadata.
+  - path: Games-Labs-Missions/internal/handlers/mission_handler_test.go
+    action: modified
+    description: Covers admin list/detail/create/activate response metadata.
+  - path: Games-Labs-Missions/internal/services/mission_service_test.go
+    action: modified
+    description: Updates progress fixtures and verifies UI metadata survives mission progress reads.
+  - path: Games-Labs-Missions/internal/services/quest_overview_service_test.go
+    action: modified
+    description: Verifies overview Daily items include metadata.
+  - path: Games-Labs-Missions/README.md
+    action: modified
+    description: Documents Mobile display metadata fields and removes the UI metadata item from Phase 2 gaps.
+next_action:
+  agent: reviewer
+  reason: Review TASK-054 implementation and rerun Missions tests.
+blockers: []
+context_sources:
+  socraticode:
+    status: skipped
+    queries: []
+    notes: Local task files and repository code were sufficient for this scoped implementation.

@@ -906,7 +906,7 @@ run_runner_once() {
 
   case "$runner" in
     codex)
-      codex --approval-mode full-auto --quiet -p "$PROMPT" >"$output_log" 2>&1
+      codex --ask-for-approval never exec --skip-git-repo-check "$PROMPT" >"$output_log" 2>&1
       ;;
     cursor)
       {
