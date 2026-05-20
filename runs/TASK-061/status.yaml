@@ -1,0 +1,53 @@
+---
+task_id: TASK-061
+phase: done
+state: done
+current_agent: done
+iteration: 4
+assigned_to: dev-2
+created_at: '2026-05-20'
+updated_at: '2026-05-20'
+ready: true
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-061/reviewer-output.yaml
+history:
+- phase: created -> blocked
+  agent: orchestrator
+  reason: Split from TASK-058 as consumer phase; must wait for TASK-060 producer readiness
+    so Missions does not implement scoped turnover against nonexistent or incomplete
+    events.
+- phase: blocked -> pending
+  agent: orchestrator
+  reason: TASK-060 reached done with reviewed Game producer contract, migration, tests,
+    and verification evidence; Missions consumer phase can now be planned.
+- phase: pending -> assigned
+  agent: pm
+  reason: PM blueprint complete in task.md and pm-output.yaml — repository constants,
+    validation, mapper, tests, README, and risks scoped to Games-Labs-Missions; prerequisite
+    TASK-060 documented.
+- phase: assigned -> assigned
+  agent: pm
+  reason: TASK-060 complete; Missions consumer scope is defined with concrete files
+    and test expectations — ready for implementation.
+- phase: assigned -> in_review
+  agent: dev-2
+  reason: Acceptance criteria addressed in-code and documented; reviewer should verify
+    `go test` / lint CI for Games-Labs-Missions.
+- phase: in_review -> devops_needed
+  agent: reviewer
+  reason: Unblock repeatable `go build`/`go test` evidence (CI runner or hardened-agent
+    policy) then re-run reviewer gate; no code defects identified statically.
+- phase: devops_needed -> in_review
+  agent: devops
+  reason: Manual session recorded verification evidence in runs/TASK-061/verification-evidence.md;
+    TASK-061 validation passed, Games-Labs-Missions go test ./... passed, and Games-Labs-Missions
+    go build ./... passed.
+- phase: in_review -> done
+  agent: reviewer
+  reason: Scoped turnover consumer logic, validation, docs, and tests satisfy TASK-061;
+    no error-severity findings and recorded build/test evidence is affirmative.
