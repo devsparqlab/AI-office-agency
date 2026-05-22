@@ -1,0 +1,24 @@
+---
+task_id: TASK-064
+phase: pending
+state: pending
+current_agent: dev-2
+iteration: 0
+assigned_to: dev-2
+created_at: '2026-05-21'
+updated_at: '2026-05-21'
+ready: true
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: pm
+  to: dev-2
+  artifact: runs/TASK-064/pm-output.yaml
+history:
+  - phase: created -> pending
+    agent: pm
+    reason: >-
+      User confirmed the root cause for unfiltered authenticated ListGame behavior was
+      missing USER_API_URL in the Games-Labs-Game cluster runtime, and asked to track
+      the manifest/workflow env wiring fix as a dedicated ai-dev-office task.

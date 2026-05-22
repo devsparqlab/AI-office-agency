@@ -1,0 +1,125 @@
+task_id: TASK-063
+agent: dev-2
+status: completed
+completed_at: '2026-05-21T17:35:00+0700'
+
+summary: |
+  Implemented Golden Pass category playability metadata end to end.
+
+  In shared-lib, `gamepb.CategoryGame` now exposes optional `is_playable` and
+  `playability_reason` fields, with regenerated protobuf/OpenAPI artifacts. After
+  the user published shared-lib, Games-Labs-Game was bumped to
+  `github.com/SparqLab/shared-lib v0.0.0-20260521084502-88c071b64c68` and
+  `ListCategory` was updated to remain a public catalog while annotating each
+  game for authenticated users using the same Golden Pass access rule already
+  used by `List` and `LaunchGame`.
+
+  Guest `ListCategory` responses now leave playability metadata unset
+  (`null`/unknown). Authenticated responses mark playable games with
+  `is_playable=true` and locked games with `is_playable=false`,
+  `playability_reason=level_locked`. User lookup failure returns the catalog
+  with unknown metadata instead of failing the endpoint. `LaunchGame` behavior
+  remains unchanged.
+
+changes:
+  - service: shared-lib
+    files:
+      - proto/gamepb/game.proto
+      - proto/gamepb/game.pb.go
+      - proto/gamepb/game.swagger.json
+      - proto/gamepb/swagger.pb.go
+      - proto/admin/admingamepb/admingame.swagger.json
+      - proto/admin/admingamepb/swagger.pb.go
+    details:
+      - Added optional `is_playable` and `playability_reason` to `gamepb.CategoryGame`.
+      - Regenerated protobuf/OpenAPI artifacts with `make buf`.
+  - service: Games-Labs-Game
+    files:
+      - go.mod
+      - go.sum
+      - internal/models/category.go
+      - internal/core/ports/services.go
+      - internal/core/repositories/game.go
+      - internal/core/services/gamesvc/level_access.go
+      - internal/core/services/gamesvc/service.go
+      - internal/core/services/gamesvc/service_golden_pass_test.go
+      - internal/core/handlers/gamehdl/grpc.go
+      - internal/core/handlers/gamehdl/grpc_test.go
+      - README.md
+    details:
+      - Bumped shared-lib to published version `v0.0.0-20260521084502-88c071b64c68` with no replace directive.
+      - Threaded optional `userID` through `ListCategory` and annotated category games without filtering them out.
+      - Extended category-game repository reads to load `games.level` so playability can be evaluated server-side.
+      - Added guest/authenticated/failure-path service tests and handler metadata mapping coverage.
+
+tests:
+  - command: make buf
+    cwd: shared-lib
+    result: passed
+  - command: go test ./...
+    cwd: shared-lib
+    result: passed
+  - command: go test ./...
+    cwd: Games-Labs-Game
+    result: passed
+
+notes:
+  - "ListCategory stays discoverability-first: locked games remain visible and only carry metadata."
+  - "null playability means not evaluated, not locked."
+  - "Missions failures still fall back to normal user-level evaluation only; only user-level lookup failure leaves metadata unknown."
+
+artifacts:
+  - path: shared-lib/proto/gamepb/game.proto
+    action: modified
+  - path: shared-lib/proto/gamepb/game.pb.go
+    action: modified
+  - path: shared-lib/proto/gamepb/game.swagger.json
+    action: modified
+  - path: shared-lib/proto/gamepb/swagger.pb.go
+    action: modified
+  - path: shared-lib/proto/admin/admingamepb/admingame.swagger.json
+    action: modified
+  - path: shared-lib/proto/admin/admingamepb/swagger.pb.go
+    action: modified
+  - path: Games-Labs-Game/go.mod
+    action: modified
+  - path: Games-Labs-Game/go.sum
+    action: modified
+  - path: Games-Labs-Game/internal/models/category.go
+    action: modified
+  - path: Games-Labs-Game/internal/core/ports/services.go
+    action: modified
+  - path: Games-Labs-Game/internal/core/repositories/game.go
+    action: modified
+  - path: Games-Labs-Game/internal/core/services/gamesvc/level_access.go
+    action: modified
+  - path: Games-Labs-Game/internal/core/services/gamesvc/service.go
+    action: modified
+  - path: Games-Labs-Game/internal/core/services/gamesvc/service_golden_pass_test.go
+    action: modified
+  - path: Games-Labs-Game/internal/core/handlers/gamehdl/grpc.go
+    action: modified
+  - path: Games-Labs-Game/internal/core/handlers/gamehdl/grpc_test.go
+    action: created
+  - path: Games-Labs-Game/README.md
+    action: modified
+
+blockers: []
+
+next_action:
+  agent: reviewer
+  reason: Implementation and fresh verification are complete; request final review against TASK-063 acceptance criteria and module policy.
+
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - shared-lib/proto/gamepb/game.proto
+      - Games-Labs-Game/internal/core/services/gamesvc/service.go
+      - Games-Labs-Game/internal/core/handlers/gamehdl/grpc.go
+      - Games-Labs-Game/internal/core/repositories/game.go
+    notes: Local workspace inspection plus fresh shared-lib and Games-Labs-Game verification were sufficient.
