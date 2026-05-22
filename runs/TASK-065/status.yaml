@@ -1,0 +1,35 @@
+---
+task_id: TASK-065
+phase: done
+state: done
+current_agent: done
+iteration: 1
+assigned_to: dev-2
+created_at: '2026-05-22'
+updated_at: '2026-05-22'
+ready: true
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-065/reviewer-output.yaml
+history:
+  - phase: created -> pending
+    agent: pm
+    reason: >-
+      User requested a short follow-up after TASK-063 reconciliation to add
+      focused test coverage for ListGame/ListUserGame/ListCategory and sync
+      both Postman collection copies with /api/v1/game/my-games.
+  - phase: pending -> in_review
+    agent: dev-2
+    reason: >-
+      Verified the current workspace already contains focused playability tests
+      for ListGame/ListUserGame/ListCategory and both Postman collection copies
+      already include /api/v1/game/my-games.
+  - phase: in_review -> done
+    agent: reviewer
+    reason: >-
+      Review passed with fresh Games-Labs-Game test verification and confirmed
+      Postman collection alignment for /api/v1/game/my-games.

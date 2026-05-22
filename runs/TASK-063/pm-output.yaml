@@ -1,7 +1,7 @@
 task:
   id: "TASK-063"
-  title: "Golden Pass Category Playability Metadata"
-  short_name: "golden-pass-category-playability"
+  title: "Golden Pass User Game Playability APIs"
+  short_name: "golden-pass-user-game-playability"
   parent: "TASK-062"
   epic: "Store & Pass economy"
   type: feature
@@ -12,53 +12,53 @@ scope:
   target_services:
     - service: shared-lib
       reason: >
-        Extend gamepb.CategoryGame with optional is_playable and playability_reason
-        fields so the ListCategory contract can carry user-aware playability metadata.
+        Extend gamepb.Game and gamepb.CategoryGame with optional is_playable and
+        playability_reason fields, add ListUserGame, and regenerate gamepb artifacts.
     - service: Games-Labs-Game
       reason: >
-        Preserve ListCategory as a public catalog while annotating each returned game
-        with guest-unknown or authenticated playability metadata using the same Golden
-        Pass rule already used by List and LaunchGame.
+        Keep ListGame and ListCategory discoverability-first with metadata, add
+        ListUserGame as the filtered authenticated list, and preserve LaunchGame
+        enforcement.
   affected_files:
     - path: "shared-lib/proto/gamepb/game.proto"
       action: modify
-      description: "Add optional is_playable and playability_reason to CategoryGame."
+      description: "Add ListUserGame plus optional playability fields on Game and CategoryGame."
     - path: "shared-lib/proto/gamepb/game.pb.go"
       action: modify
-      description: "Regenerated protobuf output for CategoryGame optionals."
+      description: "Regenerated protobuf output for the new endpoint and optional fields."
     - path: "shared-lib/proto/gamepb/game.pb.gw.go"
       action: modify
-      description: "Regenerated grpc-gateway output if changed."
+      description: "Regenerated grpc-gateway output for ListUserGame and updated schemas."
     - path: "shared-lib/proto/gamepb/game_grpc.pb.go"
       action: modify
-      description: "Regenerated grpc stubs if changed."
+      description: "Regenerated grpc stubs for ListUserGame."
     - path: "shared-lib/proto/gamepb/game.swagger.json"
       action: modify
-      description: "Generated OpenAPI reflects the new CategoryGame fields."
+      description: "Generated OpenAPI reflects ListUserGame and playability fields."
     - path: "shared-lib/proto/gamepb/swagger.pb.go"
       action: modify
       description: "Regenerated embedded swagger output."
+    - path: "Games-Labs-Game/internal/models/game.go"
+      action: modify
+      description: "Carry optional playability metadata on Game responses."
     - path: "Games-Labs-Game/internal/models/category.go"
       action: modify
-      description: "Carry optional playability metadata on internal category-game response models."
+      description: "Carry optional playability metadata on CategoryGame responses."
     - path: "Games-Labs-Game/internal/core/ports/services.go"
       action: modify
-      description: "Thread optional userID into ListCategory explicitly."
+      description: "Expose ListUserGame and updated list semantics."
     - path: "Games-Labs-Game/internal/core/services/gamesvc/service.go"
       action: modify
-      description: "Annotate category games without filtering them out; guest null semantics."
+      description: "Annotate ListGame/ListCategory and filter ListUserGame."
     - path: "Games-Labs-Game/internal/core/services/gamesvc/level_access.go"
       action: modify
-      description: "Expose reusable helpers for category-game playability evaluation."
+      description: "Expose reusable helpers for metadata annotation and filtering."
     - path: "Games-Labs-Game/internal/core/handlers/gamehdl/grpc.go"
       action: modify
-      description: "Read optional userid from metadata and map playability fields to proto."
-    - path: "Games-Labs-Game/internal/core/services/gamesvc/service_golden_pass_test.go"
-      action: modify
-      description: "Guest/authenticated/failure path coverage for ListCategory annotations."
+      description: "Map ListUserGame and playability fields to proto."
     - path: "Games-Labs-Game/README.md"
       action: modify
-      description: "Document public catalog plus optional playability semantics."
+      description: "Should document the delivered ListGame/ListUserGame/ListCategory split."
     - path: "Games-Labs-Game/go.mod"
       action: modify
       description: "Bump to the published shared-lib version after proto publish."
@@ -67,55 +67,58 @@ scope:
       description: "Dependency lockfile update after published shared-lib bump."
 
 description: |
-  Add user-aware playability metadata to the public ListCategory catalog so FE/Mobile
-  can show whether each game is currently playable without hiding locked games or
-  duplicating Golden Pass rules client-side.
+  Add user-aware playability metadata and a filtered authenticated user-game line
+  so FE/Mobile can both browse the full catalog and request only currently playable
+  games without duplicating Golden Pass rules client-side.
 
-  Chosen product behavior:
-  - keep ListCategory as a public catalog,
-  - return all games as today,
-  - when no authenticated user context exists, return unknown/null metadata,
-  - when authenticated, annotate each game with is_playable and optional
-    playability_reason using the same effective_max rule as TASK-062,
+  Delivered behavior:
+  - keep ListGame as a discoverability-first list and annotate games when authenticated,
+  - add ListUserGame as the filtered authenticated list at /api/v1/game/my-games,
+  - keep ListCategory public and annotate games there as well,
+  - when no authenticated user context exists, return unknown/null metadata on
+    discoverability endpoints,
   - keep LaunchGame as final enforcement.
 
-  AGENTS.md policy applies here: because this change adds new cross-service proto/types
-  in shared-lib, implementation must stop after the shared-lib change and wait for the
-  user to publish/bump shared-lib before proceeding to Games-Labs-Game.
+  AGENTS.md policy applied here: because this change added new cross-service proto/types
+  in shared-lib, implementation stopped after the shared-lib change and resumed only after
+  the user published/bumped shared-lib.
 
 acceptance_criteria:
-  - criterion: "shared-lib gamepb.CategoryGame includes optional is_playable and playability_reason; generated artifacts are updated."
+  - criterion: "shared-lib gamepb.Game and gamepb.CategoryGame include optional is_playable and playability_reason; generated artifacts are updated."
+  - criterion: "ListUserGame is exposed at GET /api/v1/game/my-games."
+  - criterion: "ListGame remains a discoverability list and does not filter out locked games."
   - criterion: "ListCategory remains a public catalog and does not filter out locked games."
-  - criterion: "Guest ListCategory returns null playability metadata."
-  - criterion: "Authenticated ListCategory uses the same Golden Pass effective_max rule as List and LaunchGame."
+  - criterion: "Guest ListGame/ListCategory returns null playability metadata."
+  - criterion: "Authenticated ListGame/ListCategory uses the same Golden Pass effective_max rule as LaunchGame."
+  - criterion: "ListUserGame returns only playable games for the authenticated user."
   - criterion: "Locked games return is_playable=false and playability_reason=level_locked."
-  - criterion: "User lookup failure does not fail ListCategory and returns null metadata."
+  - criterion: "User lookup failure does not fail ListGame/ListCategory and returns null metadata."
   - criterion: "Missions pass/config failure falls back to normal user-level evaluation only."
   - criterion: "LaunchGame behavior remains unchanged."
   - criterion: "Games-Labs-Game uses a published shared-lib version with no committed replace."
-  - criterion: "README and tests are updated."
+  - criterion: "README is updated, and any remaining focused test or external API doc gaps are called out explicitly."
 
 plan:
   approach: |
-    (1) Update shared-lib gamepb.CategoryGame with optional playability metadata and
-        regenerate artifacts.
+    (1) Update shared-lib gamepb.Game and gamepb.CategoryGame with optional playability
+        metadata, add ListUserGame, and regenerate artifacts.
 
     (2) Stop and wait for the user to publish / bump shared-lib. Do not implement
         downstream consumer changes before the published module exists.
 
     (3) Bump Games-Labs-Game to the published shared-lib version, then thread optional
-        userid through ListCategory and annotate category games with guest-unknown or
-        authenticated playability metadata using shared Golden Pass helpers.
+        userid through ListGame/ListCategory for discoverability metadata and implement
+        ListUserGame as the filtered authenticated line using shared Golden Pass helpers.
 
-    (4) Add focused tests for guest, authenticated no-pass, authenticated Golden Pass,
-        and failure paths; update README and verify no replace directive remains.
+    (4) Add focused tests and update README where possible; if missing in the final tree,
+        record the gap honestly in task artifacts.
   subtasks:
     - order: 1
-      id: "shared-lib-category-playability-proto"
+      id: "shared-lib-user-game-playability-proto"
       description: >
-        Add optional is_playable and playability_reason to gamepb.CategoryGame and
-        regenerate shared-lib artifacts. Stop after this subtask and ask the user to
-        publish/bump shared-lib before continuing.
+        Add optional is_playable and playability_reason to gamepb.Game and
+        gamepb.CategoryGame, add ListUserGame, and regenerate shared-lib artifacts.
+        Stop after this subtask and ask the user to publish/bump shared-lib before continuing.
       agent: dev-2
       owned_files:
         - "shared-lib/proto/gamepb/game.proto"
@@ -126,14 +129,16 @@ plan:
         - "shared-lib/proto/gamepb/swagger.pb.go"
       parallel_safe: false
     - order: 2
-      id: "game-category-annotation"
+      id: "game-user-game-playability"
       description: >
         After published shared-lib is available, bump Games-Labs-Game to that module
-        version and implement user-aware ListCategory annotation without filtering.
+        version and implement discoverability metadata on ListGame/ListCategory plus
+        the filtered authenticated ListUserGame endpoint.
       agent: dev-2
       owned_files:
         - "Games-Labs-Game/go.mod"
         - "Games-Labs-Game/go.sum"
+        - "Games-Labs-Game/internal/models/game.go"
         - "Games-Labs-Game/internal/models/category.go"
         - "Games-Labs-Game/internal/core/ports/services.go"
         - "Games-Labs-Game/internal/core/services/gamesvc/service.go"
@@ -141,20 +146,21 @@ plan:
         - "Games-Labs-Game/internal/core/handlers/gamehdl/grpc.go"
       parallel_safe: false
     - order: 3
-      id: "tests-and-readme"
+      id: "docs-and-tests"
       description: >
-        Add focused ListCategory playability tests, document null semantics in README,
-        and verify LaunchGame behavior is unchanged.
+        Add or restore focused playability tests for ListGame/ListUserGame/ListCategory,
+        document endpoint roles and null semantics in README, and verify LaunchGame
+        behavior is unchanged.
       agent: dev-2
       owned_files:
-        - "Games-Labs-Game/internal/core/services/gamesvc/service_golden_pass_test.go"
         - "Games-Labs-Game/README.md"
       parallel_safe: false
     - order: 4
-      id: "review-category-playability"
+      id: "review-user-game-playability"
       description: >
-        Reviewer verifies shared-lib publish/bump sequencing was honored, consumer go.mod
-        has no replace, ListCategory preserves public-catalog semantics, and tests pass.
+        Reviewer verifies shared-lib publish/bump sequencing was honored, consumer
+        go.mod has no replace, ListGame/ListUserGame/ListCategory semantics match the
+        delivered API split, and any remaining test/documentation gaps are recorded.
       agent: reviewer
       owned_files: []
       parallel_safe: false
@@ -163,8 +169,8 @@ plan:
       mitigation: "Make publish/bump a mandatory stop between subtask 1 and subtask 2."
     - risk: "Clients misread null as locked."
       mitigation: "Document null as not evaluated and reserve false for evaluated lock states only."
-    - risk: "ListCategory playability drifts from List/LaunchGame."
-      mitigation: "Reuse existing Golden Pass helpers and evaluate request-level state once."
+    - risk: "ListGame/ListUserGame/ListCategory semantics drift or are documented inconsistently."
+      mitigation: "Reuse existing Golden Pass helpers, document the split explicitly, and keep task artifacts aligned to shipped behavior."
   estimated_complexity: medium
 
 assignment:
@@ -175,22 +181,27 @@ assignment:
     with explicit publish/bump sequencing required by AGENTS.md.
 
 summary: |
-  TASK-063 follows TASK-062 by keeping ListCategory public while adding optional
-  per-game playability metadata for authenticated clients. shared-lib owns the
-  response contract fields; Games-Labs-Game annotates games using the existing
-  Golden Pass access rule and returns null metadata for guests or unknown user
-  context. Implementation must pause after shared-lib until the user publishes
-  and bumps the new module version.
+  TASK-063 follows TASK-062 by splitting game-list responsibilities more clearly:
+  ListGame and ListCategory remain discoverability-first and can expose playability
+  metadata, while ListUserGame provides a filtered authenticated list at
+  /api/v1/game/my-games. shared-lib owns the additive response contract fields and
+  new endpoint; Games-Labs-Game reuses the existing Golden Pass access rule across
+  all three lines.
 
 artifacts:
   - path: runs/TASK-063/task.md
-    action: created
+    action: modified
+    description: "Task record updated to match shipped ListGame/ListUserGame/ListCategory behavior."
   - path: runs/TASK-063/status.yaml
-    action: created
+    action: unchanged
+    description: "Workflow state remains done."
+  - path: runs/TASK-063/pm-output.yaml
+    action: modified
+    description: "PM handoff updated to reflect the delivered API split."
 
 next_action:
   agent: dev-2
-  reason: "Start with shared-lib proto/artifact update only, then stop for shared-lib publish/bump before touching Games-Labs-Game."
+  reason: "If this task is reopened, the remaining follow-up is focused service/handler test coverage and any external API docs for /api/v1/game/my-games."
 
 context_sources:
   github:
@@ -203,7 +214,8 @@ context_sources:
       - "shared-lib/proto/gamepb/game.proto"
       - "Games-Labs-Game/internal/core/handlers/gamehdl/grpc.go"
       - "Games-Labs-Game/internal/core/services/gamesvc/service.go"
+      - "Games-Labs-Game/internal/models/game.go"
       - "Games-Labs-Game/internal/models/category.go"
-    notes: "Derived from the approved design spec plus direct workspace inspection."
+    notes: "Updated after reviewing the current tree and reconciling task artifacts with shipped behavior."
 
 blockers: []

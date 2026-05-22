@@ -4,22 +4,21 @@ status: completed
 completed_at: '2026-05-21T17:35:00+0700'
 
 summary: |
-  Implemented Golden Pass category playability metadata end to end.
+  Implemented Golden Pass user-game playability APIs end to end.
 
-  In shared-lib, `gamepb.CategoryGame` now exposes optional `is_playable` and
-  `playability_reason` fields, with regenerated protobuf/OpenAPI artifacts. After
-  the user published shared-lib, Games-Labs-Game was bumped to
-  `github.com/SparqLab/shared-lib v0.0.0-20260521084502-88c071b64c68` and
-  `ListCategory` was updated to remain a public catalog while annotating each
-  game for authenticated users using the same Golden Pass access rule already
-  used by `List` and `LaunchGame`.
+  In shared-lib, `gamepb.Game` and `gamepb.CategoryGame` now expose optional
+  `is_playable` and `playability_reason` fields, and a new `ListUserGame`
+  endpoint is available at `/api/v1/game/my-games`. After the user published
+  shared-lib, Games-Labs-Game was bumped to
+  `github.com/SparqLab/shared-lib v0.0.0-20260521084502-88c071b64c68`.
 
-  Guest `ListCategory` responses now leave playability metadata unset
-  (`null`/unknown). Authenticated responses mark playable games with
-  `is_playable=true` and locked games with `is_playable=false`,
-  `playability_reason=level_locked`. User lookup failure returns the catalog
-  with unknown metadata instead of failing the endpoint. `LaunchGame` behavior
-  remains unchanged.
+  Delivered behavior:
+  - `ListGame` is discoverability-first and returns all games; authenticated
+    responses annotate games with playability metadata.
+  - `ListUserGame` is the filtered authenticated list and returns only playable games.
+  - `ListCategory` remains a public catalog and is also annotated for authenticated users.
+  - user lookup failure leaves discoverability responses unannotated instead of failing.
+  - `LaunchGame` behavior remains unchanged.
 
 changes:
   - service: shared-lib
@@ -31,26 +30,28 @@ changes:
       - proto/admin/admingamepb/admingame.swagger.json
       - proto/admin/admingamepb/swagger.pb.go
     details:
-      - Added optional `is_playable` and `playability_reason` to `gamepb.CategoryGame`.
+      - Added optional `is_playable` and `playability_reason` to `gamepb.Game` and `gamepb.CategoryGame`.
+      - Added `ListUserGame` at `GET /api/v1/game/my-games`.
       - Regenerated protobuf/OpenAPI artifacts with `make buf`.
   - service: Games-Labs-Game
     files:
       - go.mod
       - go.sum
+      - internal/models/game.go
       - internal/models/category.go
       - internal/core/ports/services.go
       - internal/core/repositories/game.go
       - internal/core/services/gamesvc/level_access.go
       - internal/core/services/gamesvc/service.go
-      - internal/core/services/gamesvc/service_golden_pass_test.go
       - internal/core/handlers/gamehdl/grpc.go
-      - internal/core/handlers/gamehdl/grpc_test.go
       - README.md
     details:
       - Bumped shared-lib to published version `v0.0.0-20260521084502-88c071b64c68` with no replace directive.
-      - Threaded optional `userID` through `ListCategory` and annotated category games without filtering them out.
+      - Threaded optional `userID` through `ListGame` and `ListCategory` and annotated discoverability responses without filtering them out.
+      - Added `ListUserGame` as the filtered authenticated line using the same Golden Pass access rule.
       - Extended category-game repository reads to load `games.level` so playability can be evaluated server-side.
-      - Added guest/authenticated/failure-path service tests and handler metadata mapping coverage.
+      - README now documents the delivered ListGame/ListUserGame/ListCategory split.
+      - Focused service/handler tests are not present in the current tree and should be tracked as follow-up work.
 
 tests:
   - command: make buf
@@ -64,9 +65,10 @@ tests:
     result: passed
 
 notes:
-  - "ListCategory stays discoverability-first: locked games remain visible and only carry metadata."
+  - "ListGame and ListCategory stay discoverability-first: locked games remain visible and only carry metadata."
+  - "ListUserGame is the filtered authenticated line."
   - "null playability means not evaluated, not locked."
-  - "Missions failures still fall back to normal user-level evaluation only; only user-level lookup failure leaves metadata unknown."
+  - "Missions failures still fall back to normal user-level evaluation only; only user-level lookup failure leaves discoverability metadata unknown."
 
 artifacts:
   - path: shared-lib/proto/gamepb/game.proto
@@ -85,6 +87,8 @@ artifacts:
     action: modified
   - path: Games-Labs-Game/go.sum
     action: modified
+  - path: Games-Labs-Game/internal/models/game.go
+    action: modified
   - path: Games-Labs-Game/internal/models/category.go
     action: modified
   - path: Games-Labs-Game/internal/core/ports/services.go
@@ -95,12 +99,8 @@ artifacts:
     action: modified
   - path: Games-Labs-Game/internal/core/services/gamesvc/service.go
     action: modified
-  - path: Games-Labs-Game/internal/core/services/gamesvc/service_golden_pass_test.go
-    action: modified
   - path: Games-Labs-Game/internal/core/handlers/gamehdl/grpc.go
     action: modified
-  - path: Games-Labs-Game/internal/core/handlers/gamehdl/grpc_test.go
-    action: created
   - path: Games-Labs-Game/README.md
     action: modified
 
@@ -108,7 +108,7 @@ blockers: []
 
 next_action:
   agent: reviewer
-  reason: Implementation and fresh verification are complete; request final review against TASK-063 acceptance criteria and module policy.
+  reason: "Implementation is complete; task artifacts should reflect the shipped ListGame/ListUserGame/ListCategory split and any remaining test/doc gaps."
 
 context_sources:
   github:

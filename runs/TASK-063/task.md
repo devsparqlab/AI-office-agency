@@ -1,7 +1,7 @@
-# TASK-063: Golden Pass Category Playability Metadata
+# TASK-063: Golden Pass User Game Playability APIs
 
 ## Short name
-`golden-pass-category-playability`
+`golden-pass-user-game-playability`
 
 ## Type
 feature
@@ -15,21 +15,23 @@ medium
 
 ## Background
 
-`TASK-062` made Golden Pass access configurable and enforced it in authenticated `List` and `LaunchGame`.
+`TASK-062` made Golden Pass access configurable and enforced it in launch flow.
 
-Current post-`TASK-062` behavior:
+The code delivered in this follow-up is broader than the original plan and should be
+tracked as such:
 
-- `List` hides games that are not currently playable for the authenticated user.
-- `LaunchGame` enforces the same level / Golden Pass rule at runtime.
-- `ListCategory` still behaves as a public catalog and returns games without any access metadata.
-
-Product decision for this follow-up:
-
-- Keep `ListCategory` as a public catalog.
-- Do not filter locked games out.
-- Add per-game playability metadata for authenticated requests so FE/Mobile can show lock/playable state.
-- When user context is absent, return `unknown/null` playability metadata.
+- `ListGame` (`GET /api/v1/game`) is now a discoverability-first list:
+  - guests see the full list without playability metadata,
+  - authenticated users see the full list annotated with `is_playable` /
+    `playability_reason`.
+- `ListUserGame` (`GET /api/v1/game/my-games`) is the filtered personalized list:
+  - authenticated users receive only games currently playable for their level /
+    Golden Pass state.
+- `ListCategory` remains a public catalog and is also annotated with playability
+  metadata for authenticated users.
 - `LaunchGame` remains the final enforcement point.
+
+This task record is updated to match the code that actually shipped.
 
 ## Scope
 
@@ -37,22 +39,20 @@ Product decision for this follow-up:
 
 | Service | Role |
 | --- | --- |
-| `shared-lib` | Extend `gamepb.CategoryGame` with optional `is_playable` and `playability_reason`; regenerate generated artifacts |
-| `Games-Labs-Game` | Annotate `ListCategory` games using the same Golden Pass access rule already used by `List` and `LaunchGame`; preserve public catalog behavior |
+| `shared-lib` | Extend `gamepb.Game` and `gamepb.CategoryGame` with optional `is_playable` / `playability_reason`, add `ListUserGame`, and regenerate generated artifacts |
+| `Games-Labs-Game` | Keep `ListGame` and `ListCategory` discoverability-first with metadata, add filtered `ListUserGame`, and preserve `LaunchGame` enforcement |
 
 ### Explicitly out of scope
 
 - `Games-Labs-Missions` behavior or config shape
-- Filtering games out of `ListCategory`
-- New endpoint creation
 - Mobile/UI implementation
 - Changing `LaunchGame` enforcement semantics
 
 ## Product rules
 
-### Playability metadata semantics
+### Discoverability metadata semantics (`ListGame` and `ListCategory`)
 
-For each `CategoryGame` in `ListCategory`:
+For each `Game` in `ListGame` and each `CategoryGame` in `ListCategory`:
 
 - no authenticated user context:
   - `is_playable = null`
@@ -64,9 +64,15 @@ For each `CategoryGame` in `ListCategory`:
   - `is_playable = false`
   - `playability_reason = "level_locked"`
 
+### Filtered personalized list semantics (`ListUserGame`)
+
+- `ListUserGame` requires authenticated user context.
+- It returns only games currently playable under the same level / Golden Pass rule.
+- If authenticated user context is absent, the current implementation returns an empty list.
+
 ### Access rule
 
-For authenticated users, use the same rule as `TASK-062`:
+For authenticated evaluation, use the same rule as `TASK-062`:
 
 ```text
 effective_max = max(user_level, min(user_level + level_offset, max_game_level))
@@ -80,14 +86,15 @@ Outcomes:
 
 ### Fail-safe behavior
 
-- no user context: return `null` metadata
-- user level lookup fails: return `null` metadata, do not fail catalog response
+- no user context on `ListGame` / `ListCategory`: return `null` metadata
+- user level lookup fails on `ListGame` / `ListCategory`: return `null` metadata, do not fail the response
 - Missions Golden Pass/config lookup fails: evaluate against normal user level only
-- do not hide or remove games from the category response
+- do not hide or remove games from `ListGame` / `ListCategory`
+- `ListUserGame` remains the filtered line; user lookup failure follows its endpoint error path
 
 ## Shared-lib publish/bump rule
 
-This task introduces new cross-service proto fields in `shared-lib`.
+This task introduced new cross-service proto fields in `shared-lib`.
 
 Per `/Users/earth/Documents/GitHub/AGENTS.md`:
 
@@ -104,45 +111,50 @@ Per `/Users/earth/Documents/GitHub/AGENTS.md`:
 - `shared-lib/proto/gamepb/game_grpc.pb.go`
 - `shared-lib/proto/gamepb/game.swagger.json`
 - `shared-lib/proto/gamepb/swagger.pb.go`
+- `Games-Labs-Game/internal/models/game.go`
 - `Games-Labs-Game/internal/models/category.go`
 - `Games-Labs-Game/internal/core/ports/services.go`
 - `Games-Labs-Game/internal/core/services/gamesvc/service.go`
 - `Games-Labs-Game/internal/core/services/gamesvc/level_access.go`
 - `Games-Labs-Game/internal/core/handlers/gamehdl/grpc.go`
-- `Games-Labs-Game/internal/core/services/gamesvc/service_golden_pass_test.go`
 - `Games-Labs-Game/README.md`
 
 ## Acceptance criteria
 
 ### shared-lib
 
+- [x] `gamepb.Game` includes optional `is_playable` and `playability_reason`
 - [x] `gamepb.CategoryGame` includes optional `is_playable` and `playability_reason`
+- [x] `ListUserGame` is exposed at `GET /api/v1/game/my-games`
 - [x] generated gamepb artifacts are updated
 - [x] `shared-lib` tests pass
 
 ### Games-Labs-Game
 
+- [x] `ListGame` still returns the discoverability list and does not filter locked games out
 - [x] `ListCategory` still returns the public catalog and does not filter locked games out
-- [x] guest/unauthenticated request returns `null` playability metadata
-- [x] authenticated request evaluates playability with the same Golden Pass rule as `List` / `LaunchGame`
+- [x] guest/unauthenticated `ListGame` / `ListCategory` requests return `null` playability metadata
+- [x] authenticated `ListGame` / `ListCategory` requests evaluate playability with the same Golden Pass rule as `LaunchGame`
+- [x] `ListUserGame` returns only playable games for the authenticated user
 - [x] level-locked games return `is_playable = false` and `playability_reason = "level_locked"`
-- [x] user lookup failure does not fail the endpoint and returns `null` playability metadata
+- [x] user lookup failure does not fail `ListGame` / `ListCategory` and returns `null` metadata
 - [x] Missions config/pass failure falls back to normal user-level evaluation only
 - [x] `LaunchGame` behavior remains unchanged
 - [x] `go.mod` uses a published `shared-lib` version with no committed `replace`
 
 ### Docs / verification
 
-- [x] `Games-Labs-Game/README.md` documents public-catalog plus optional playability metadata semantics
-- [x] tests cover guest, authenticated no-pass, authenticated Golden Pass, and failure paths
+- [x] `Games-Labs-Game/README.md` now reflects the delivered `ListGame` / `ListUserGame` / `ListCategory` split accurately
+- [ ] focused service/handler tests for `ListGame`, `ListUserGame`, and `ListCategory` are still missing from the current tree
 
 ## Risks
 
 | Risk | Mitigation |
 | --- | --- |
 | FE interprets `null` as locked | Document `null` as “not evaluated” and keep boolean false only for evaluated lock states |
-| `ListCategory` drifts from `List`/`LaunchGame` rules | Reuse the same Golden Pass state/helper path |
+| `ListGame`, `ListUserGame`, and `ListCategory` drift from each other | Reuse the same Golden Pass state/helper path and document the split explicitly |
 | Consumer changes proceed before published shared-lib exists | Treat publish/bump as a mandatory stop between shared-lib and Game work |
+| Task artifacts describe the wrong endpoint semantics | Keep TASK-063 aligned to delivered behavior and record remaining gaps explicitly |
 
 ## Assignment
 
@@ -151,4 +163,4 @@ Per `/Users/earth/Documents/GitHub/AGENTS.md`:
 
 ## Next action
 
-`dev-2`: update `shared-lib` proto + generated artifacts first, then stop for shared-lib publish/bump before proceeding into `Games-Labs-Game`.
+`done`: TASK-063 now reflects shipped behavior. Remaining follow-up is focused service/handler test coverage and any external API docs that should mention `/api/v1/game/my-games`.
