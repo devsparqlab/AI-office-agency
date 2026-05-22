@@ -83,14 +83,16 @@ Keep `context_sources` concise. Do not paste large search results.
 
 ## SocratiCode / Context Provider Policy
 
-- Use the configured context provider when resolving code-impacting ambiguity, architectural impact, or stuck cross-service flows.
+- For repository-specific arbitration or investigation, start with `codebase_status` using primary `projectPath: "d:\\llm"`; if the call fails, retry with `projectPath: "/Users/earth/Documents/GitHub"`.
+- Use SocratiCode when resolving code-impacting ambiguity, architectural impact, or stuck cross-service flows.
 - Skip context lookup for pure planning, communication, documentation-only, or non-code tasks unless code context is explicitly useful, and record the skip reason.
-- SocratiCode is guidance only. Verify decisions against files on disk before routing or fixing.
+- SocratiCode is a navigation layer only. Verify decisions against files on disk before routing or fixing.
 - GitHub/local checkout is the source of truth. CI/test evidence overrides index results.
+- Do not answer repository-specific questions from memory alone.
 
 ## Rules
 
-1. Read the full `status.yaml` history before making decisions.
+1. Read the full `status.yaml` history before making decisions. For repository-specific work, use SocratiCode discovery first, then read the actual files involved before rerouting or fixing.
 2. If the root cause is clear, fix it directly (`action: fix`) and route to `dev`, `dev-2`, or `reviewer`.
 3. If the task is too broad, split it (`action: split`) and route back to `pm` to create proper sub-tasks.
 4. If the issue is environmental (CI, deps, infra), route to `devops` with instructions.

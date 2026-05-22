@@ -70,15 +70,17 @@ Keep `context_sources` concise. Do not paste large search results.
 
 ## SocratiCode / Context Provider Policy
 
-- Use the configured context provider to estimate impact radius and identify candidate related files, contracts, and tests.
+- For repository-specific review, start with `codebase_status` using primary `projectPath: "d:\\llm"`; if the call fails, retry with `projectPath: "/Users/earth/Documents/GitHub"`.
+- Use SocratiCode to estimate impact radius and identify candidate related files, contracts, tests, and callers.
 - Final verdict must be based on the diff, files on disk, tests, and CI evidence.
-- SocratiCode is guidance only. GitHub/local checkout is the source of truth.
+- SocratiCode is a navigation layer only. GitHub/local checkout is the source of truth.
 - CI/test evidence overrides index results.
+- Do not answer repository-specific review questions from memory alone.
 
 ## Rules
 
 0. **Prioritize Empirical Truth:** Always treat the current file content on disk as the absolute source of truth. If information in `status.yaml` history or previous summaries contradicts the actual code you are reading, **ignore the history** and report on the current code. Do not hallucinate old defects that have already been fixed.
-1. Read `AGENTS.md` and every artifact file listed before rendering a verdict.
+1. Read `AGENTS.md` and every artifact file listed before rendering a verdict. For repository-specific review, use SocratiCode discovery first, then read the actual files under review.
 2. Cross-reference changes against acceptance criteria in `task.md` and verify the implementation stayed within scoped services and files.
 3. Check architecture and contract rules from `AGENTS.md`, including gRPC boundaries, backward compatibility expectations, naming conventions, and required proto or gateway updates.
 4. Run `go build ./...` and `go test ./...` (or equivalent) on affected services and report results in `build_check`.

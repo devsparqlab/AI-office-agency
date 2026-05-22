@@ -61,14 +61,16 @@ Keep `context_sources` concise. Do not paste large search results.
 
 ## SocratiCode / Context Provider Policy
 
-- Use the configured context provider before editing unfamiliar areas, shared libraries, callbacks, proto/contracts, or cross-service flows.
+- For repository-specific implementation, start with `codebase_status` using primary `projectPath: "d:\\llm"`; if the call fails, retry with `projectPath: "/Users/earth/Documents/GitHub"`.
+- Use SocratiCode before editing unfamiliar areas, shared libraries, callbacks, proto/contracts, or cross-service flows.
 - For small localized fixes, direct repo inspection is acceptable, but record the fallback or skip reason in `context_sources`.
-- SocratiCode is guidance only. Verify all code against files on disk before editing.
+- SocratiCode is a navigation layer only. Verify all code against files on disk before editing.
 - GitHub/local checkout is the source of truth. CI/test evidence overrides index results.
+- Do not answer repository-specific implementation questions from memory alone.
 
 ## Rules
 
-1. Read `AGENTS.md`, `task.md`, and the relevant existing code before modifying anything.
+1. Read `AGENTS.md`, `task.md`, and the relevant existing code before modifying anything. For repository-specific work, use SocratiCode discovery first, then read the actual files you will change.
 2. If `pm-output` is provided, follow its `subtasks` order and `affected_files` list. Do not deviate without documenting why.
 2.1 If `pm-output.assignment.parallel: true`, work only on subtasks where `agent: dev` and stay within those subtasks' `owned_files`.
 3. Stay within the services and files explicitly listed in scope. If the safe fix requires cross-service work outside scope, escalate instead of guessing.

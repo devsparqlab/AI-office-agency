@@ -86,6 +86,13 @@ prompt for code-impacting work. GitHub/local checkout remains the source of
 truth for code, branches, PRs, and CI; SocratiCode is only an AI working-context
 index.
 
+#### Codebase truth and navigation
+
+- Repository source code is the authoritative source of truth.
+- SocratiCode is the primary discovery and navigation layer for repository-specific work.
+- Agents must treat SocratiCode search results, symbol summaries, and graph output as navigation aids, not final evidence.
+- When indexed context and repository source code conflict, repository source code wins.
+
 Default behavior is optional and recorded:
 
 - If `socraticode` is available, the runner adds `--- AI CONTEXT INDEX ---` to
@@ -96,7 +103,72 @@ Default behavior is optional and recorded:
 - For non-code tasks, the runner records `status: skipped`.
 - Agent outputs may include concise `context_sources`; do not paste large search
   results into YAML handoffs.
-- For Codex sessions in this workspace, SocratiCode MCP is the preferred query path. Use MCP tools before shell wrappers for `codebase_status`, `codebase_search`, `codebase_symbol`, and graph commands.
+- For Codex sessions in this workspace, agents must use SocratiCode MCP as the primary query path for repository-specific discovery. Use MCP tools before shell wrappers for `codebase_status`, `codebase_search`, `codebase_symbol`, `codebase_symbols`, and graph commands.
+
+#### Capability layers and exposure gaps
+
+- Central SocratiCode MCP server is the backend capability layer.
+- Local `socraticode` CLI wrapper is the shell-access layer for the same discovery system.
+- Codex or Cursor session tools are the session-exposed layer and may expose only a subset of backend capabilities.
+- A missing tool in the session-exposed layer does not mean the backend capability is missing.
+- When a required capability exists in the backend or CLI layer but is not exposed in the current session, agents must say so explicitly and fall back to the local `socraticode` CLI wrapper before falling back to manual repository inspection.
+
+#### Required repository discovery flow
+
+Before answering a repository-specific question or planning code-impacting work:
+
+1. Run `codebase_status` with primary `projectPath: "d:\\llm"`; if the call fails (error, unavailable, unindexed, invalid path), retry with `projectPath: "/Users/earth/Documents/GitHub"`.
+2. Use SocratiCode to locate the relevant files, symbols, endpoints, configs, contracts, or related services.
+3. Read the actual repository files before making implementation claims, routing decisions, or review verdicts.
+4. Verify implementation details against source code, tests, and command output.
+
+Agents must not answer codebase-specific questions from memory alone.
+
+If both projectPath attempts fail or SocratiCode is unavailable, misconfigured, or not indexed, the agent must explicitly say so in its output and fall back to direct repository inspection.
+
+#### SocratiCode tool routing
+
+Use `codebase_status` first when:
+
+- starting repository-specific investigation
+- verifying index readiness
+- confirming the configured project is available
+
+Use `codebase_search` when:
+
+- locating implementation
+- locating endpoints
+- locating handlers
+- locating configs
+- locating protobuf definitions
+- locating database access
+- locating event publishers or consumers
+- locating docs tied to implementation
+
+Use `codebase_symbol` when:
+
+- inspecting a specific function
+- inspecting a struct
+- inspecting an interface
+- inspecting a method
+- inspecting a package-level symbol
+
+Use `codebase_symbols` when:
+
+- listing symbols in a file
+- discovering candidate symbols by name before drilling into one
+
+Use graph tools when available for:
+
+- tracing dependencies
+- impact analysis
+- caller/callee analysis
+- circular dependency investigation
+
+Codex session note:
+
+- `codebase_graph_query` and `codebase_graph_stats` may exist in the backend and local CLI wrapper even when they are not exposed in the current Codex MCP tool surface.
+- In that case, use `socraticode codebase_graph_query ...` or `socraticode codebase_graph_stats ...` through the local wrapper and record the fallback in `context_sources.socraticode`.
 
 #### Command routing and data source
 

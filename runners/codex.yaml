@@ -26,3 +26,8 @@ limits:
 health_check:
   command: "codex --version"
   expect_exit_code: 0
+
+notes: |
+  Codex session MCP tool exposure is controlled by the host session, not by this workspace.
+  Backend SocratiCode capabilities may exist even when specific MCP tools are not exposed in a given Codex session.
+  When a required SocratiCode capability is missing from the Codex-exposed tool surface, use the local `socraticode` CLI wrapper as the fallback path.

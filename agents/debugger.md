@@ -66,14 +66,16 @@ Keep `context_sources` concise. Do not paste large search results.
 
 ## SocratiCode / Context Provider Policy
 
-- Use the configured context provider to form hypotheses and trace relevant flows.
+- For repository-specific debugging, start with `codebase_status` using primary `projectPath: "d:\\llm"`; if the call fails, retry with `projectPath: "/Users/earth/Documents/GitHub"`.
+- Use SocratiCode to form hypotheses, trace relevant flows, and identify affected symbols or callers.
 - Root cause must be confirmed by logs, code, tests, or reproducible behavior.
-- SocratiCode is guidance only. GitHub/local checkout is the source of truth.
+- SocratiCode is a navigation layer only. GitHub/local checkout is the source of truth.
 - CI/test evidence overrides index results.
+- Do not answer repository-specific debugging questions from memory alone.
 
 ## Rules
 
-1. Read `AGENTS.md`, the failing code, and related files before diagnosing.
+1. Read `AGENTS.md`, the failing code, and related files before diagnosing. For repository-specific debugging, use SocratiCode discovery first, then read the actual files involved in the failure.
 2. Prefer minimal fixes -- do not refactor unrelated code.
 3. Stay within the scoped services and files unless escalation is required.
 4. If confidence is `low`, set `next_action` to `free-roam` instead of `dev` or `reviewer`.

@@ -116,15 +116,17 @@ Keep `context_sources` concise. Do not paste large search results.
 
 ## SocratiCode / Context Provider Policy
 
-- Use the configured context provider to identify candidate affected services, files, contracts, and tests for code-impacting tasks.
+- For repository-specific planning, start with `codebase_status` using primary `projectPath: "d:\\llm"`; if the call fails, retry with `projectPath: "/Users/earth/Documents/GitHub"`.
+- Use SocratiCode to identify candidate affected services, files, contracts, endpoints, configs, and tests for code-impacting tasks.
 - Skip context lookup for pure planning, communication, documentation-only, or non-code tasks unless code context is explicitly useful, and record the skip reason.
-- SocratiCode is guidance only. Verify scope against files on disk before creating implementation tasks.
+- SocratiCode is a navigation layer only. Verify scope against files on disk before creating implementation tasks.
 - GitHub/local checkout is the source of truth. CI/test evidence overrides index results.
+- Do not answer repository-specific planning questions from memory alone.
 
 ## Rules
 
 1. Read `AGENTS.md` before creating the task and keep the plan aligned with its architecture, naming, and safety rules.
-2. Always explore the target service's existing code structure before creating the task.
+2. Always explore the target service's existing code structure before creating the task. For repository-specific tasks, use SocratiCode discovery first, then read the actual files.
 3. Write acceptance criteria that are specific and testable -- avoid vague requirements.
 4. Scope the task explicitly: every service or cross-service file that may be changed must appear in `target_services` or `affected_files`.
 5. Identify cross-service dependencies up front (for example `shared-lib`, `api-gateway`, `.proto` files, generated code, and docs).
