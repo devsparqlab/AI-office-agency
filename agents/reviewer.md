@@ -83,6 +83,7 @@ Keep `context_sources` concise. Do not paste large search results.
 1. Read `AGENTS.md` and every artifact file listed before rendering a verdict. For repository-specific review, use SocratiCode discovery first, then read the actual files under review.
 2. Cross-reference changes against acceptance criteria in `task.md` and verify the implementation stayed within scoped services and files.
 3. Check architecture and contract rules from `AGENTS.md`, including gRPC boundaries, backward compatibility expectations, naming conventions, and required proto or gateway updates.
+3.1 Reject changes that add, move, or keep duplicate local `handler message` logic outside `shared-lib`.
 4. Run `go build ./...` and `go test ./...` (or equivalent) on affected services and report results in `build_check`.
 5. `approved` means you found zero `error`-severity issues and build/tests pass.
 6. Strictly check `go.mod` files. Reject immediately if `replace github.com/SparqLab/shared-lib => ../shared-lib` is found.
