@@ -51,6 +51,11 @@ Runs PM -> Dev -> Reviewer -> Done automatically, with divergence to Debugger/De
 Auto mode now respects dependency-gated tasks: if `status.yaml` is `blocked`,
 the pipeline stops instead of dispatching downstream agents.
 
+When PM sets `assignment.parallel: true` with valid parallel subtasks (`parallel_safe: true`,
+non-overlapping owned files, distinct `dev` and `dev-2` lanes), auto mode runs both dev agents
+concurrently, writes `dev-parallel.log` and `dev-2-parallel.log`, then routes directly to Reviewer.
+See `workflows/hybrid-default.yaml` and `tests/integration/auto-parallel.sh`.
+
 ### Validate runtime files
 
 ```bash
@@ -70,7 +75,7 @@ state mismatches (`phase` vs `state`).
 
 The status command is read-only. It summarizes current phase, routed agent,
 readiness, blocked dependencies, validation state, and the next suggested
-runner command.
+runner command. Task ids may use `TASK-NNN` or package-style `TASK-PKG-NNN`.
 
 ### Use operator helpers
 
@@ -82,7 +87,8 @@ runner command.
 
 These helpers are non-mutating in v2: `intake` previews a PM-ready task,
 `verify` recommends evidence commands, and `cleanup` reports stale or
-inconsistent runtime artifacts without changing them.
+inconsistent runtime artifacts without changing them. Skill guides:
+`docs/skills/office-intake.md`, `docs/skills/office-verify.md`, `docs/skills/office-cleanup.md`.
 
 ### SocratiCode context provider
 
@@ -106,9 +112,12 @@ Default behavior is optional and recorded:
   local repo inspection (`rg`, files on disk, tests, CI evidence) without
   failing the run.
 - For non-code tasks, the runner records `status: skipped`.
+- Context injection applies to `pm`, `dev`, `dev-2`, `reviewer`, `debugger`, and `free-roam` (not `devops`; see `office.config.yaml`).
 - Agent outputs may include concise `context_sources`; do not paste large search
   results into YAML handoffs.
-- For Codex sessions in this workspace, agents must use SocratiCode MCP as the primary query path for repository-specific discovery. Use MCP tools before shell wrappers for `codebase_status`, `codebase_search`, `codebase_symbol`, `codebase_symbols`, and graph commands.
+- **Cursor sessions:** use MCP server `user-socraticode` first (see `.cursor/rules/socraticode.mdc`). Start with `codebase_status` and `codebase_list_projects`; use `codebase_search`, `codebase_symbol`, `codebase_symbols`, `codebase_health`, `codebase_graph_query`, `codebase_graph_circular`, `codebase_impact`, and `codebase_flow` as needed.
+- **Codex sessions:** use SocratiCode MCP as the primary query path when exposed; otherwise fall back to the CLI wrapper before manual repo inspection.
+- Shared discovery policy and tool routing summary: `../AGENTS.md` (Codebase Discovery Policy).
 
 #### Capability layers and exposure gaps
 
@@ -116,7 +125,7 @@ Default behavior is optional and recorded:
 - Local `socraticode` CLI wrapper is the shell-access layer for the same discovery system.
 - Codex or Cursor session tools are the session-exposed layer and may expose only a subset of backend capabilities.
 - A missing tool in the session-exposed layer does not mean the backend capability is missing.
-- When a required capability exists in the backend or CLI layer but is not exposed in the current session, agents must say so explicitly and fall back to the local `socraticode` CLI wrapper before falling back to manual repository inspection.
+- When a required capability exists in the backend or CLI layer but is not exposed in the current session, agents must say so explicitly and fall back to `scripts/socraticode-tcp-wrapper.sh` or the `socraticode` CLI before manual repository inspection.
 
 #### Required repository discovery flow
 
@@ -170,10 +179,10 @@ Use graph tools when available for:
 - caller/callee analysis
 - circular dependency investigation
 
-Codex session note:
+Session exposure note:
 
-- `codebase_graph_query` and `codebase_graph_stats` may exist in the backend and local CLI wrapper even when they are not exposed in the current Codex MCP tool surface.
-- In that case, use `socraticode codebase_graph_query ...` or `socraticode codebase_graph_stats ...` through the local wrapper and record the fallback in `context_sources.socraticode`.
+- `codebase_graph_query` and `codebase_graph_stats` may exist in the backend and local CLI wrapper even when they are not exposed in the current session MCP tool surface.
+- In that case, use `socraticode codebase_graph_query ...` or `socraticode codebase_graph_stats ...` through `scripts/socraticode-tcp-wrapper.sh` and record the fallback in `context_sources.socraticode`.
 
 #### Command routing and data source
 
@@ -315,15 +324,28 @@ instead of falling back silently:
 }
 ```
 
-### Run dependency integration scenarios
+### Run integration tests
 
 ```bash
+# Individual scenarios
 ai-dev-office/tests/integration/dependency-policy.sh
+ai-dev-office/tests/integration/dependency-guard.sh
+ai-dev-office/tests/integration/auto-parallel.sh
+ai-dev-office/tests/integration/context-provider.sh
+ai-dev-office/tests/integration/operator-commands.sh
+ai-dev-office/tests/integration/status-command.sh
+ai-dev-office/tests/integration/runner-fallback.sh
 ```
 
-Runs integration checks for blocked dispatch guard, automatic unblock on resolved
-dependency, and Dev-to-Reviewer handoff transition into the configured reviewer
-queue phase.
+| Script | What it checks |
+|--------|----------------|
+| `dependency-policy.sh` | Blocked dispatch guard, automatic unblock, Dev-to-Reviewer handoff |
+| `dependency-guard.sh` | `check-service-dependencies.sh` integration with runner |
+| `auto-parallel.sh` | PM parallel plan validation and auto-mode concurrent dev lanes |
+| `context-provider.sh` | SocratiCode context injection and fallback recording |
+| `operator-commands.sh` | `intake`, `verify`, and `cleanup` helper behavior |
+| `status-command.sh` | `status` summary output and next-command routing |
+| `runner-fallback.sh` | Runner auto-switch on quota/auth failures |
 
 ### Run SocratiCode graph smoke checks
 
@@ -414,6 +436,9 @@ User Request -> PM -> Dev/Dev-2 -> Reviewer -> Done
 Dependency gate:
 Blocked (waiting on TASK-X/TASK-Y) --unblock when upstream done--> Assigned/In Review
 
+Loop guard:
+iteration >= loop_guard.max_iterations --escalate--> Free Roam
+
 Free Roam can reroute to any agent or send back to PM to re-split.
 ```
 
@@ -426,6 +451,8 @@ Free Roam can reroute to any agent or send back to PM to re-split.
 - `waiting_for` describes the semantic condition (for example `contract_freeze`).
 - `ready: false` means "do not dispatch yet"; `ready: true` means routing is allowed.
 - `current_agent` is enforced by `run-agent.sh`; running a different agent is rejected.
+- `iteration` is tracked in `status.yaml`; when it reaches `loop_guard.max_iterations` (default `8` in `office.config.yaml`), the runner routes to `free-roam` and stops.
+- Manual or DevOps verification notes may be recorded in `runs/<task-id>/verification-evidence.md` and referenced from reviewer output.
 
 ## Baseline Rules
 
@@ -460,9 +487,10 @@ The source of truth for repo-wide rules is `../AGENTS.md`. In particular, every 
 
 ### Parallel Development
 
-1. PM splits task into subtasks for Dev and Dev-2
-2. Run both in separate terminals
-3. Both outputs are collected by Reviewer in a single review
+1. PM splits task into subtasks for Dev and Dev-2 with `parallel: true`, distinct owned files, and `parallel_safe: true` on each subtask
+2. Either run both in separate terminals, or use `./run-agent.sh TASK-NNN auto` to launch both lanes concurrently
+3. Review parallel logs (`dev-parallel.log`, `dev-2-parallel.log`) if auto mode fails
+4. Reviewer collects both `dev-output.yaml` and `dev-2-output.yaml` in a single review
 
 ---
 
@@ -471,8 +499,8 @@ The source of truth for repo-wide rules is `../AGENTS.md`. In particular, every 
 ### Priority Order
 
 1. **Codex CLI** — Type: CLI (default), Best for: heavy autonomous work and full-auto mode
-1. **Cursor CLI Agent** — Type: CLI, Best for: terminal-driven fallback work with Cursor Agent
-1. **Cursor** — Type: IDE (interactive), Best for: complex/interactive tasks and code navigation
+2. **Cursor CLI Agent** — Type: CLI, Best for: terminal-driven fallback work with Cursor Agent
+3. **Cursor** — Type: IDE (interactive), Best for: complex/interactive tasks and code navigation
 
 ### Usage
 
@@ -508,9 +536,21 @@ ai-dev-office/
   office.config.yaml      # Main configuration (v2.0)
   SKILL.md                # Cursor/Codex skill for auto-detection
   README.md               # This file
+  role-prompt-templates-codex-first.md  # Concise Codex-first starter prompts per role
   run-agent.sh            # Single-terminal runner script
   validate-yaml.rb        # Runtime validator for status and agent output YAML
   migrate-legacy-runtime.rb  # Helper to upgrade selected legacy runtime YAML files
+  scripts/
+    check-service-dependencies.sh  # CI-parity dependency guard
+    socraticode-tcp-wrapper.sh   # CLI fallback for SocratiCode MCP gaps
+    socraticode-central-query.js # Remote index query helper
+    socraticode-graph-helper.js    # Remote graph query helper
+  tests/
+    integration/          # Runner, guard, parallel, operator, and status tests
+    smoke/                # SocratiCode graph smoke checks
+  docs/
+    skills/               # Operator helper guides (intake, verify, cleanup)
+    superpowers/          # Office usability specs and implementation plans
   schemas/
     status.schema.yaml        # Validation schema for runs/<task-id>/status.yaml
     meta.schema.yaml          # Validation schema for runs/<task-id>/meta.yaml
@@ -541,17 +581,23 @@ ai-dev-office/
     templates/
       new-task.yaml        # Task template (legacy, PM creates tasks now)
   runs/
-    <task-id>/
+    <task-id>/             # TASK-NNN or TASK-PKG-NNN
       task.md              # Task description (created by PM)
       status.yaml          # Current runtime state and dependency gating
       pm-output.yaml       # PM's plan and assignment
       meta.yaml            # Event log (audit/history), not dispatch source of truth
+      .cursor-prompt.md    # Generated Cursor prompt (when using cursor runner)
+      verification-evidence.md  # Optional manual build/test evidence (often DevOps)
+      dev-parallel.log     # Auto parallel lane log (when applicable)
+      dev-2-parallel.log   # Auto parallel lane log (when applicable)
       <agent>-output.yaml  # Each agent's output
+```
 
 Task metadata in `pm-output.yaml` supports a stable `task.id`, a full `task.title`,
 an optional compact `task.short_name` for logs and terminal displays, plus
 optional `task.parent` / `task.epic` fields for grouped or child work.
-```
+Concise role starters for Codex-first sessions: `role-prompt-templates-codex-first.md`.
+Agent permission boundaries: `SKILL.md`.
 
 ## Legacy Agents
 
