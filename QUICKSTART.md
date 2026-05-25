@@ -1,226 +1,181 @@
 # QUICKSTART — ai-dev-office
 
-วัตถุประสงค์
-- เอกสารสั้นนี้อธิบายวิธีเรียกใช้งาน multi-agent สำหรับงานใน `ai-dev-office` ทั้งจาก CLI และใน IDE (Cursor / VS Code tasks)
+เอกสารสั้นสำหรับเริ่มใช้ multi-agent workflow จาก CLI หรือ IDE (Cursor / VS Code tasks)
 
-Prerequisites
-- ติดตั้ง Ruby และมี Codex CLI สำหรับ runner default `codex`.
-- เปิดสิทธิ์ให้สคริปต์: `chmod +x ai-dev-office/run-agent.sh` ถ้าจำเป็น
+รายละเอียดเต็ม: [README.md](README.md) · กฎ repo: [../AGENTS.md](../AGENTS.md)
 
-พื้นฐานคำสั่ง
-- เรียก agent เดี่ยว ๆ (ตัวอย่างที่คุณขอ):
+---
 
-  ./ai-dev-office/run-agent.sh TASK-028 dev-2
-  ./ai-dev-office/run-agent.sh TASK-028 reviewer
+## Prerequisites
 
-  ./ai-dev-office/run-agent.sh TASK-029 dev-2
-  ./ai-dev-office/run-agent.sh TASK-031 dev-2
+- Ruby (สำหรับ `validate-yaml.rb`)
+- Codex CLI ถ้าใช้ runner default `codex`
+- สิทธิ์รันสคริปต์: `chmod +x ai-dev-office/run-agent.sh` (ถ้าจำเป็น)
 
-  ./ai-dev-office/run-agent.sh TASK-029 reviewer
-  ./ai-dev-office/run-agent.sh TASK-031 reviewer
+---
 
-  ./ai-dev-office/run-agent.sh TASK-030 dev-2
-  ./ai-dev-office/run-agent.sh TASK-030 reviewer
+## Flow มาตรฐาน
 
-Runner options
-- `codex` (default): non-interactive via Codex CLI
-- `cursor-agent`: รัน Cursor CLI Agent ใน terminal
-- `cursor`: จะบันทึก prompt เป็น `runs/<TASK>/.cursor-prompt.md` ให้เปิดใน Cursor/IDE แล้วรันแบบ interactive
+```bash
+TASK_ID="TASK-NNN"
 
-Manual Prompt Mode (IDE/CLI)
-- ไฟล์ `.cursor-prompt.md` ช่วยให้ context/role prompt เหมือนกับการรันผ่าน `run-agent.sh`, แต่ไม่ใช่การ enforce policy โดยตัวมันเอง
-- การ enforce guardrails (เช่น dependency guard, no `go.work`, no `replace` directive, Dockerfile build rules) เกิดอัตโนมัติเมื่อรันผ่าน `run-agent.sh` ใน stage ที่เกี่ยวข้อง และเกิดซ้ำอีกครั้งใน GitHub Actions
-- ถ้าคุยกับ IDE/CLI ตรง ๆ โดยไม่ผ่าน `run-agent.sh`, ให้รันเช็กเองก่อน push:
+# 1) เริ่มงาน — PM สร้าง task.md, status.yaml, pm-output.yaml
+./ai-dev-office/run-agent.sh $TASK_ID pm
 
-- การตั้งค่าที่เกี่ยวข้อง (env): `SHARED_LIB_POLICY` (`aligned`|`latest`|`pinned`), `GUARD_SHARED_LIB_VERSION` (เมื่อ `pinned`), `EXCLUDED_SERVICES` และ `BUILD_TARGET`.
-- ถ้าคุยกับ IDE/CLI ตรง ๆ โดยไม่ผ่าน `run-agent.sh`, ให้รันเช็กเองก่อน push:
+# 2) Implement — ตามที่ PM assign
+./ai-dev-office/run-agent.sh $TASK_ID dev
+# หรืองานข้าม service / ซับซ้อน:
+./ai-dev-office/run-agent.sh $TASK_ID dev-2
 
-  bash ai-dev-office/scripts/check-service-dependencies.sh
-
-ตัวอย่าง: รันใน Cursor (เซฟ prompt แล้วเปิดใน Cursor)
-
-  ./ai-dev-office/run-agent.sh TASK-028 dev-2 cursor
-
-ตัวอย่าง: รันด้วย Cursor CLI Agent
-
-  ./ai-dev-office/run-agent.sh TASK-029 dev-2 cursor-agent
-
-บันทึกผลลัพธ์
-- หลังจากรัน ให้บันทึก output ของ agent ลงไฟล์ที่ run-agent คาดหวัง (ตัวอย่าง):
-
-  ai-dev-office/runs/TASK-028/dev-2-output.yaml
-
-- รันตัวตรวจสอบการตั้งค่า/validation:
-
-  ruby ai-dev-office/validate-yaml.rb TASK-028
-
-ตัวอย่างสคริปต์รวม (แบบรวดเร็ว)
-- หากต้องการสั่งทุกรายการต่อกัน สามารถรันสคริปต์เดียว (ตัวอย่าง):
-
-  #!/usr/bin/env bash
-  set -euo pipefail
-  ./ai-dev-office/run-agent.sh TASK-028 dev-2
-  ./ai-dev-office/run-agent.sh TASK-028 reviewer
-  ./ai-dev-office/run-agent.sh TASK-029 dev-2
-  ./ai-dev-office/run-agent.sh TASK-029 reviewer
-  ./ai-dev-office/run-agent.sh TASK-030 dev-2
-  ./ai-dev-office/run-agent.sh TASK-030 reviewer
-  ./ai-dev-office/run-agent.sh TASK-031 dev-2
-  ./ai-dev-office/run-agent.sh TASK-031 reviewer
-
-VS Code `tasks.json` snippet
-- ใส่ลงใน `.vscode/tasks.json` เพื่อเรียกคำสั่งจาก Command Palette หรือปุ่มลัด:
-
-  {
-    "version": "2.0.0",
-    "tasks": [
-      {
-        "label": "ai: TASK-028 dev-2",
-        "type": "shell",
-        "command": "./ai-dev-office/run-agent.sh TASK-028 dev-2",
-        "group": "build",
-        "presentation": { "reveal": "always" }
-      },
-      {
-        "label": "ai: TASK-028 reviewer",
-        "type": "shell",
-        "command": "./ai-dev-office/run-agent.sh TASK-028 reviewer",
-        "presentation": { "reveal": "always" }
-      }
-    ]
-  }
-
-คำแนะนำสั้นๆ
-- ถ้าใช้ `cursor` runner: เปิดไฟล์ `ai-dev-office/runs/<TASK>/.cursor-prompt.md` ใน Cursor แล้วส่งผลลัพธ์กลับเป็น `-output.yaml` และรัน `validate-yaml.rb`.
-- ตรวจสอบว่า `ai-dev-office/run-agent.sh` อยู่ใน repository และมีสิทธิ์รัน: [ai-dev-office/run-agent.sh](ai-dev-office/run-agent.sh)
-- ไฟล์ task และผลลัพธ์จะอยู่ที่: [ai-dev-office/runs/](ai-dev-office/runs/)
-- ใช้ `ruby ai-dev-office/validate-yaml.rb <TASK-ID>` เพื่อยืนยันรูปแบบ runtime
-
-ต้องการให้ผมเพิ่ม
-- สร้างไฟล์ `.vscode/tasks.json` อัตโนมัติหรือ
-- สร้างสคริปต์ `ai-dev-office/quickrun.sh` ที่รันชุดคำสั่งตามที่ระบุ?
-
-ไฟล์นี้ถูกสร้างเพื่อช่วยเริ่มต้นอย่างรวดเร็ว — บอกผมว่าต้องการให้ผมสร้างไฟล์ tasks หรือสคริปต์จริงไหม
-
-ตัวอย่างสำหรับ TASKs ในอนาคต (templates)
---
-1) `runs/<TASK-ID>/task.md` — ตัวอย่างโครงสร้างเบื้องต้น
-
-```yaml
-task:
-  id: TASK-028
-  title: Short task title
-  short_name: short-name
-  epic: optional-epic
-  description: |
-    คำอธิบายสั้น ๆ ของงานและเงื่อนไขที่ต้องการ
-  priority: medium
-  owner: team-or-person
+# 3) Review — ตรวจ scope, build/test, approve หรือส่งกลับ
+./ai-dev-office/run-agent.sh $TASK_ID reviewer
 ```
 
-2) Output filename convention
-- Agent outputs ต้องถูกบันทึกเป็น: `runs/<TASK-ID>/<agent>-output.yaml` (ตัวอย่าง: `runs/TASK-028/dev-2-output.yaml`).
+โฟลว์ทั่วไป: `pm` → `dev`/`dev-2` → `reviewer` → (`debugger` | `devops` | `free-roam`) → `reviewer` → `done`
 
-3) Quick run patterns
-- ใช้ `run-agent.sh` หรือสคริปต์เล็ก ๆ เพื่อรันลำดับ agent สำหรับ TASKs ใหม่ ๆ (ไม่ต้องพึ่งไฟล์เสริม)
+ถ้า task ถูก block (`phase/state: blocked`, `ready: false`) อย่ารัน agent ถัดไปจนกว่า upstream task จะ `done`
 
-Run default agents (`dev-2` then `reviewer`) for TASK-028:
+---
 
-  ./ai-dev-office/run-agent.sh TASK-028 dev-2
-  ./ai-dev-office/run-agent.sh TASK-028 reviewer
+## Runners
 
-Run specific agents for TASKs (ตัวอย่าง):
+| Runner | คำสั่ง | ใช้เมื่อ |
+|--------|--------|---------|
+| `codex` (default) | `./ai-dev-office/run-agent.sh TASK-NNN dev` | งาน autonomous / auto pipeline |
+| `cursor-agent` | `... dev cursor-agent` | รัน Cursor CLI Agent ใน terminal |
+| `cursor` | `... dev cursor` | สร้าง `.cursor-prompt.md` แล้วรัน interactive ใน IDE |
 
-  ./ai-dev-office/run-agent.sh TASK-029 dev-2
-  ./ai-dev-office/run-agent.sh TASK-029 reviewer
-  ./ai-dev-office/run-agent.sh TASK-031 dev-2
+ลำดับ fallback อัตโนมัติ: `codex` → `cursor-agent` → `cursor`
 
-4) VS Code tasks template for many TASKs
-- Add this snippet to `.vscode/tasks.json` and duplicate per TASK or generate programmatically. Example runs `dev-2` then `reviewer`.
+---
+
+## Manual Prompt Mode (IDE)
+
+- Runner `cursor` บันทึก prompt ที่ `runs/<TASK-ID>/.cursor-prompt.md`
+- เปิดใน Cursor แล้วบันทึกผลเป็น `runs/<TASK-ID>/<agent>-output.yaml`
+- Cursor rules: `.cursor/rules/ai-dev-office.mdc` · subagents: `.cursor/agents/ai-dev-office-*.md`
+- Role prompt หลัก: `agents/<role>.md`
+
+**Guardrails** (dependency guard, no `go.work`, shared-lib policy, Docker build rules) ทำงานอัตโนมัติเมื่อรันผ่าน `run-agent.sh` ก่อน `reviewer`, `devops`, และ `auto`
+
+ถ้ารัน IDE/CLI ตรง ๆ โดยไม่ผ่าน runner ให้เช็กเองก่อน push:
+
+```bash
+bash ai-dev-office/scripts/check-service-dependencies.sh
+```
+
+Env ที่เกี่ยวข้อง: `SHARED_LIB_POLICY` (`aligned`|`latest`|`pinned`), `GUARD_SHARED_LIB_VERSION`, `EXCLUDED_SERVICES`, `BUILD_TARGET`
+
+---
+
+## Auto Pipeline
+
+```bash
+./ai-dev-office/run-agent.sh TASK-NNN auto
+```
+
+- Sequential default: `pm` → `dev`/`dev-2` → `reviewer` → done
+- หยุดทันทีถ้า `status.yaml` เป็น `blocked`
+- **Parallel:** เมื่อ PM ตั้ง `assignment.parallel: true` และ subtasks มี `parallel_safe: true`, owned files ไม่ชนกัน, แยก lane `dev` + `dev-2` — auto จะรันพร้อมกันแล้วไป `reviewer`
+- Logs: `runs/<TASK-ID>/dev-parallel.log`, `dev-2-parallel.log`
+- อย่า parallel งานที่แตะ shared files (`go.mod`, `.proto`, generated proto, `shared-lib/**`) — ทำ sequential ก่อน
+
+---
+
+## Status & Operator Helpers
+
+```bash
+# สรุปสถานะ (read-only) — รองรับ TASK-NNN และ TASK-PKG-NNN
+./ai-dev-office/run-agent.sh status
+./ai-dev-office/run-agent.sh status TASK-NNN
+
+# ช่วยก่อน/หลัง workflow (ไม่แก้ runtime files)
+./ai-dev-office/run-agent.sh intake "Fix wallet callback failure"
+./ai-dev-office/run-agent.sh verify TASK-NNN
+./ai-dev-office/run-agent.sh cleanup
+```
+
+Skill guides: [docs/skills/office-intake.md](docs/skills/office-intake.md) · [office-verify.md](docs/skills/office-verify.md) · [office-cleanup.md](docs/skills/office-cleanup.md)
+
+---
+
+## Validation & Runtime
+
+```bash
+# หลังบันทึก status.yaml หรือ *-output.yaml ทุกครั้ง
+ruby ai-dev-office/validate-yaml.rb TASK-NNN
+```
+
+**Loop guard:** `status.yaml` ติดตาม `iteration` — เมื่อถึง `loop_guard.max_iterations` (default `8`) runner จะ route ไป `free-roam` และหยุด
+
+**ไฟล์สำคัญใน** `runs/<TASK-ID>/`:
+
+| ไฟล์ | หน้าที่ |
+|------|---------|
+| `task.md` | คำอธิบายงาน (markdown) |
+| `status.yaml` | phase/state, routing, dependency gate |
+| `pm-output.yaml` | แผน PM, assignment, metadata |
+| `<agent>-output.yaml` | handoff ของแต่ละ agent |
+| `meta.yaml` | event log (audit) |
+| `verification-evidence.md` | หลักฐาน build/test แบบ manual (optional) |
+| `.cursor-prompt.md` | prompt ที่ runner `cursor` สร้าง |
+
+Metadata งาน (id, title, short_name, parent, epic) อยู่ใน `pm-output.yaml` — ไม่ใช่ YAML ใน `task.md`
+
+---
+
+## Agents (สรุป)
+
+| Agent | หน้าที่ | ตัวอย่าง |
+|-------|---------|----------|
+| `pm` | สร้าง task, วางแผน, assign | `./ai-dev-office/run-agent.sh TASK-NNN pm` |
+| `dev` | implement งานโฟกัส | `... dev` |
+| `dev-2` | งานข้าม service / ซับซ้อน | `... dev-2` |
+| `reviewer` | review + build/test | `... reviewer` |
+| `debugger` | root-cause analysis | `... debugger` |
+| `devops` | infra, CI/CD, Docker | `... devops` |
+| `free-roam` | unblock / escalate | `... free-roam` |
+
+Legacy: `agents/planner.md`, `agents/tester.md` — อ้างอิง v1 เท่านั้น; v2 ใช้ `pm` และ `reviewer`
+
+---
+
+## SocratiCode (สั้น ๆ)
+
+- Source of truth = โค้ดใน repo · SocratiCode = navigation index เท่านั้น
+- **Cursor:** MCP `user-socraticode` ก่อน CLI (ดู `.cursor/rules/socraticode.mdc`)
+- **Codex:** MCP ก่อน แล้ว fallback `scripts/socraticode-tcp-wrapper.sh`
+- `projectPath`: ลอง `"d:\\llm"` ก่อน ถ้า fail ใช้ `"/Users/earth/Documents/GitHub"`
+
+รายละเอียด: [README.md § SocratiCode](README.md) · [AGENTS.md § Codebase Discovery](../AGENTS.md)
+
+---
+
+## VS Code Tasks (template)
 
 ```json
 {
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "ai: quickrun TASK-028",
+      "label": "ai: TASK-NNN dev-2 → reviewer",
       "type": "shell",
-      "command": "./ai-dev-office/run-agent.sh TASK-028 dev-2 && ./ai-dev-office/run-agent.sh TASK-028 reviewer",
-      "presentation": { "reveal": "always" }
-    },
-    {
-      "label": "ai: quickrun TASK-029",
-      "type": "shell",
-      "command": "./ai-dev-office/run-agent.sh TASK-029 dev-2 && ./ai-dev-office/run-agent.sh TASK-029 reviewer",
+      "command": "./ai-dev-office/run-agent.sh TASK-NNN dev-2 && ./ai-dev-office/run-agent.sh TASK-NNN reviewer",
       "presentation": { "reveal": "always" }
     }
   ]
 }
 ```
 
-5) Validation and iteration
-- หลังรัน agent แต่ละครั้ง ให้รัน:
+แทน `TASK-NNN` ด้วย task id จริง · duplicate per task ตามต้องการ
 
-  ruby ai-dev-office/validate-yaml.rb <TASK-ID>
+---
 
-Auto pipeline
-- ใช้ `auto` เพื่อให้ runner เดิน workflow ต่อเองจาก PM ไปจนถึง reviewer/done:
+## Scaffold (optional)
 
-  ./ai-dev-office/run-agent.sh TASK-028 auto
+```bash
+./ai-dev-office/run-agent.sh TASK-NNN scaffold dev
+./ai-dev-office/run-agent.sh TASK-NNN scaffold reviewer --force
+```
 
-- ค่า default ยังเป็น sequential: `pm` -> `dev`/`dev-2` -> `reviewer`.
-- ถ้า PM ตั้ง `assignment.parallel: true` และ subtasks มี `owned_files` ไม่ชนกัน, `auto` จะรัน `dev` และ `dev-2` พร้อมกัน แล้วรวมผลที่ `reviewer`.
-- Parallel logs จะถูกแยกไว้ที่ `runs/<TASK-ID>/dev-parallel.log` และ `runs/<TASK-ID>/dev-2-parallel.log`.
-- Shared files เช่น `go.mod`, `go.sum`, `.proto`, generated proto files, และ `shared-lib/**` ไม่ควรถูกแบ่งให้หลาย agent พร้อมกัน; ให้ทำส่วนนั้นแบบ sequential ก่อน.
-
-Status summary
-- ดูสถานะ task ทั้งหมดหรือ task เดียวแบบ read-only:
-
-  ./ai-dev-office/run-agent.sh status
-  ./ai-dev-office/run-agent.sh status TASK-028
-
-Operator helpers
-- ใช้ช่วยก่อน/หลัง workflow โดยไม่แก้ไฟล์ runtime:
-
-  ./ai-dev-office/run-agent.sh intake "Fix wallet callback failure"
-  ./ai-dev-office/run-agent.sh verify TASK-028
-  ./ai-dev-office/run-agent.sh cleanup
-
-6) Conventions / recommendations
-- ตั้งชื่อ `short_name` ให้สั้นและเป็น slug เพื่อให้แสดงใน `TASK_LABEL` (run-agent ใช้ `short_name` อัตโนมัติ)
-- บันทึก `pm-output.yaml` ถ้ามีข้อมูลการตั้งค่าเริ่มต้นของงาน
-- ถ้ารันแบบ interactive ใช้ runner `cursor` เพื่อแก้ไข prompt ใน Cursor แล้วบันทึก `-output.yaml`
-
-**Roles & Examples**
-
-สรุปบทบาทของแต่ละ agent และตัวอย่างคำสั่ง `run-agent.sh` เพื่อเรียกใช้:
-
-- `pm`: ระบุงาน สร้าง `pm-output.yaml` และมอบหมายงานให้ devs / กำหนดสเปคเริ่มต้น.
-  - Example: `./ai-dev-office/run-agent.sh TASK-028 pm`
-
-- `dev`: ผู้พัฒนาหลัก — ลงมือเขียนโค้ดหรือแก้ไขตามสเปค และส่ง `dev-output.yaml` เป็นผลลัพธ์.
-  - Example: `./ai-dev-office/run-agent.sh TASK-028 dev`
-
-- `dev-2`: ผู้พัฒนารอง / งานข้ามขอบเขต — เหมาะกับงานที่ต้องคนที่สองหรือการเปลี่ยนแปลงขนาดใหญ่.
-  - Example: `./ai-dev-office/run-agent.sh TASK-028 dev-2`
-
-- `reviewer`: ตรวจสอบผลงานจาก `dev`/`dev-2` — ให้ `review_verdict` และ `next_action` (approved/changes_requested/etc.).
-  - Example: `./ai-dev-office/run-agent.sh TASK-028 reviewer`
-
-- `debugger`: ช่วยไล่หาบั๊กและระบุสาเหตุหลัก, ให้คำแนะนำเชิงเทคนิคหรือ reproduction steps.
-  - Example: `./ai-dev-office/run-agent.sh TASK-028 debugger`
-
-- `devops`: จัดการปัญหาอินฟรา, CI/CD, deployment, และข้อผิดพลาดที่ต้องการสิทธิ์โครงสร้างพื้นฐาน.
-  - Example: `./ai-dev-office/run-agent.sh TASK-028 devops`
-
-- `free-roam`: การสำรวจ/escalation — รันเพื่อหาทางออกเมื่องานติดหรือมีความไม่ชัดเจนสูง.
-  - Example: `./ai-dev-office/run-agent.sh TASK-028 free-roam`
-
-Legacy role files:
-- `agents/tester.md` และ `agents/planner.md` ยังอยู่เพื่ออ้างอิงงานเก่า แต่ v2 runtime ใช้ `reviewer` สำหรับ review/test verification และใช้ `pm` สำหรับ planning.
-
-หมายเหตุ:
-- ชื่อไฟล์ output ต้องเป็น `runs/<TASK-ID>/<agent>-output.yaml` เพื่อให้ `run-agent.sh` และ `validate-yaml.rb` ทำงานร่วมกันได้
-- โฟลว์ตัวอย่างทั่วไป: `pm` → `dev`/`dev-2` → `reviewer` → (`debugger` | `devops` | `free-roam`) → `reviewer` → `done`
-
-ต้องการให้ผมสร้างไฟล์ `ai-dev-office/quickrun.sh` ใน repo เลยไหมครับ? ถ้าใช่ ผมจะเพิ่มสคริปต์และตั้งไว้ executable instruction ด้วย
+สร้าง starter `*-output.yaml` สำหรับกรอก manual
