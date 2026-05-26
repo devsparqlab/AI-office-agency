@@ -1,0 +1,7 @@
+# Nuxt profile for frontend projects.
+
+dependency_guard:
+  enabled: false
+
+context_provider:
+  mode: optional

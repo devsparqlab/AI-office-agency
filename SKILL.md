@@ -170,6 +170,8 @@ Use this when an older runtime file predates the current v2 output contract. The
 - `AGENTS.md` -- framework-wide rules for humans and AI agents
 - `office.config.example.yaml` -- portable config example with env placeholders
 - `templates/install-manifest.yaml` -- install boundary for bootstrap/sync
+- `profiles/` -- optional project-specific overlays
+- `templates/` -- reusable starter templates for target projects
 - `schemas/` -- validation schemas for status, structured task payloads, and agent handoff outputs
 - `runs/<task-id>/` -- task runtime data
 - `tasks/templates/new-task.yaml` -- task template (legacy, PM creates tasks now)

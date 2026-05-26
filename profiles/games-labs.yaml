@@ -1,0 +1,9 @@
+# Games Labs profile for the current Go/service workspace.
+# Keep shared-lib alignment, Games-Labs-Provider handling, and service-family assumptions in this overlay instead of the core framework.
+
+dependency_guard:
+  enabled: true
+  script: scripts/check-service-dependencies.sh
+
+context_provider:
+  mode: optional

@@ -1,0 +1,7 @@
+# Generic profile for non-Go projects.
+
+dependency_guard:
+  enabled: false
+
+context_provider:
+  mode: optional
