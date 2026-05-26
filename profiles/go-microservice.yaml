@@ -1,7 +1,7 @@
-# Go microservice profile for projects that use shared dependency alignment.
+# Go microservice profile for generic Go service projects.
 
 dependency_guard:
-  enabled: true
+  enabled: false
   script: scripts/check-service-dependencies.sh
 
 context_provider:
