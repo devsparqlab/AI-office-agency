@@ -1,4 +1,4 @@
-# Config Profile Merge Contract
+# Config/Profile Merge Contract
 
 This document defines how AI Dev Office loads and merges framework config, profile config, local overrides, environment variables, and CLI flags.
 
@@ -12,6 +12,17 @@ Later sources win over earlier ones:
 4. Environment variables
 5. CLI flags
 
+## Profile Selection
+
+A profile may be selected by CLI flag or environment variable:
+
+```bash
+./ai-dev-office/run-agent.sh --profile generic TASK-001 pm
+OFFICE_PROFILE=generic ./ai-dev-office/run-agent.sh TASK-001 pm
+```
+
+If no profile is selected, the framework should use the default config without applying a project profile.
+
 ## Merge Strategy
 
 - Maps: deep merge
@@ -21,12 +32,13 @@ Later sources win over earlier ones:
 
 ## Protected Fields
 
-These fields describe the framework contract and should not be overridden casually by profiles:
+These fields describe the framework contract and must not be overridden by normal profiles:
 
 - `office.version`
 - `state_model.source_of_truth`
 - `handoff_contract.state_files`
 - `agents[].id`
+- `runner_selector.config_dir`
 
 If a profile needs to change one of these fields, it is no longer acting like a portable overlay. Move the change into a new framework version or a separate target-project file.
 
@@ -43,7 +55,7 @@ Profiles may override behavior that is expected to vary by project:
 
 ## Local Files
 
-These files are local-only and should stay out of git:
+These files are local-only and must stay out of git:
 
 - `office.config.local.yaml`
 - `profiles/*.local.yaml`
