@@ -131,7 +131,7 @@ Default behavior is optional and recorded:
 
 Before answering a repository-specific question or planning code-impacting work:
 
-1. Run `codebase_status` with primary `projectPath: "d:\\llm"`; if the call fails (error, unavailable, unindexed, invalid path), retry with `projectPath: "/Users/earth/Documents/GitHub"`.
+1. Run `codebase_status` with primary `projectPath: "d:\\llm"` (remote on `192.168.1.140`); if the call fails, hangs, or is unusable, retry with `projectPath: "/Users/earth/Documents/GitHub"` (local Docker SocratiCode on this machine).
 2. Use SocratiCode to locate the relevant files, symbols, endpoints, configs, contracts, or related services.
 3. Read the actual repository files before making implementation claims, routing decisions, or review verdicts.
 4. Verify implementation details against source code, tests, and command output.
@@ -186,22 +186,26 @@ Session exposure note:
 
 #### Command routing and data source
 
-The `socraticode` wrapper currently mixes remote and local backends by design.
-This distinction matters when debugging odd results or wiring a different root.
+SocratiCode uses **two backends** in this workspace:
 
-- `context`, `codebase_status`: remote TCP provider over SSH. These commands
-  talk to the remote SocratiCode service and report provider availability /
-  freshness.
-- `codebase_search`, `codebase_symbol`: remote read-only search against the
-  central index on `d:\llm`. These commands honor `--projectPath` and map the
-  canonical Windows root aliases (`d:\llm`, `D:/llm`) to the central machine.
-- `codebase_graph_query`, `codebase_graph_stats`, `codebase_graph_circular`:
-  remote read-only graph analysis against the central checkout on `d:\llm`.
-  These commands honor `--projectPath` and use the same canonical root mapping.
+| Backend | `projectPath` | Access | Infra |
+|---------|---------------|--------|-------|
+| Remote canonical | `d:\llm` | MCP via `socraticode-remote` (SSH → `192.168.1.140:4444`) or `socraticode-tcp-wrapper.sh` | Central Windows host |
+| Local Docker | `/Users/earth/Documents/GitHub` | MCP/CLI via `npx -y socraticode` on this Mac | Docker: Qdrant (`:16333`) + Ollama (`:11435`) |
+
+The `socraticode-tcp-wrapper.sh` routes **remote-backed** commands over SSH and falls back to **local Docker SocratiCode** (`npx -y socraticode` via `socraticode-local-mcp-client.js`) when remote is unreachable:
+
+- `context`, `codebase_status`: remote TCP first → local Docker MCP fallback
+- `codebase_search`, `codebase_symbol`: remote central index first → local Docker MCP fallback
+- `codebase_graph_*`: remote graph first → local `socraticode-graph-helper.js` fallback
+
+Set `SOCRATICODE_BACKEND=local` to skip remote entirely (Mac + local Docker only).
+
+For the **local Docker fallback**, use `npx -y socraticode` (or Cursor MCP configured to `npx -y socraticode`, not `socraticode-remote`) with `projectPath: "/Users/earth/Documents/GitHub"`. Do not treat this path as direct repo inspection — it is still SocratiCode indexed navigation.
 
 Environment overrides:
 
-- `SOCRATICODE_LOCAL_PROJECT`: default local root for search and symbol lookup.
+- `SOCRATICODE_LOCAL_PROJECT`: default local repo root for the Docker-indexed fallback (default: `/Users/earth/Documents/GitHub`).
 - `SOCRATICODE_GRAPH_ROOT`: default local root for graph commands.
 - `SOCRATICODE_REMOTE_HOST`, `SOCRATICODE_REMOTE_PORT`,
   `SOCRATICODE_REMOTE_PROJECT`, `SOCRATICODE_SSH_KEY`: remote TCP provider

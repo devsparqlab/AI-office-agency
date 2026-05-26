@@ -4,6 +4,7 @@ set -euo pipefail
 OFFICE_DIR="$(cd "$(dirname "$0")" && pwd)"
 AGENTS_DIR="$OFFICE_DIR/agents"
 RUNS_DIR="$OFFICE_DIR/runs"
+SOCRATICODE_WRAPPER="$OFFICE_DIR/scripts/socraticode-tcp-wrapper.sh"
 DEFAULT_LOOP_LIMIT=5
 
 usage() {
@@ -1098,7 +1099,9 @@ detect_context_provider() {
 
   case "$provider" in
     socraticode)
-      if command -v socraticode >/dev/null 2>&1; then
+      if [[ -x "$SOCRATICODE_WRAPPER" ]]; then
+        echo "socraticode"
+      elif command -v socraticode >/dev/null 2>&1; then
         echo "socraticode"
       else
         echo "none"
@@ -1212,7 +1215,11 @@ EOF
 
   output_file="$(mktemp)"
   error_file="$(mktemp)"
-  if socraticode context --role "$role" --task-file "$task_file" --status-file "$status_file" --pm-output "$pm_output_file" >"$output_file" 2>"$error_file"; then
+  local socraticode_cmd="${SOCRATICODE_WRAPPER}"
+  if [[ ! -x "$socraticode_cmd" ]]; then
+    socraticode_cmd="socraticode"
+  fi
+  if "$socraticode_cmd" context --role "$role" --task-file "$task_file" --status-file "$status_file" --pm-output "$pm_output_file" >"$output_file" 2>"$error_file"; then
     if [[ ! -s "$output_file" ]]; then
       context_status="fallback"
       CONTEXT_PROVIDER_STATUS="$context_status"

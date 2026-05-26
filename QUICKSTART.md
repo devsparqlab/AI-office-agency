@@ -145,7 +145,7 @@ Legacy: `agents/planner.md`, `agents/tester.md` — อ้างอิง v1 เ
 - Source of truth = โค้ดใน repo · SocratiCode = navigation index เท่านั้น
 - **Cursor:** MCP `user-socraticode` ก่อน CLI (ดู `.cursor/rules/socraticode.mdc`)
 - **Codex:** MCP ก่อน แล้ว fallback `scripts/socraticode-tcp-wrapper.sh`
-- `projectPath`: ลอง `"d:\\llm"` ก่อน ถ้า fail ใช้ `"/Users/earth/Documents/GitHub"`
+- `projectPath`: ลอง `"d:\\llm"` (remote) ก่อน ถ้า fail ใช้ `"/Users/earth/Documents/GitHub"` (local Docker SocratiCode บนเครื่องนี้ — Qdrant + Ollama ผ่าน `npx -y socraticode`)
 
 รายละเอียด: [README.md § SocratiCode](README.md) · [AGENTS.md § Codebase Discovery](../AGENTS.md)
 

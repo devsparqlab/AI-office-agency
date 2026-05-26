@@ -1,0 +1,157 @@
+task:
+  id: "TASK-066"
+  title: "Check-In Calendar Shared-Lib Contract"
+  short_name: "check-in-calendar-contract"
+  epic: "Check-In Calendar and Consecutive Bonus"
+  type: feature
+  priority: high
+  created_at: "2026-05-25"
+
+scope:
+  target_services:
+    - service: shared-lib
+      reason: >
+        Defines the cross-service Missions proto contract, gateway annotations,
+        generated protobuf/gateway code, and swagger artifacts required before
+        downstream implementation.
+    - service: Games-Labs-Missions
+      reason: >
+        Follow-up only. Missions must not implement local duplicate contracts
+        until shared-lib is published and bumped.
+    - service: api-gateway
+      reason: >
+        Follow-up only. Gateway docs/Postman examples should be synced after
+        Missions runtime behavior exists.
+  affected_files:
+    - path: "shared-lib/proto/missionspb/missions.proto"
+      action: modify
+      description: "Add typed check-in calendar, milestone, restore, and admin config messages plus RPC annotations."
+    - path: "shared-lib/proto/missionspb/missions.pb.go"
+      action: modify
+      description: "Regenerated protobuf Go artifact."
+    - path: "shared-lib/proto/missionspb/missions_grpc.pb.go"
+      action: modify
+      description: "Regenerated gRPC Go artifact."
+    - path: "shared-lib/proto/missionspb/missions.pb.gw.go"
+      action: modify
+      description: "Regenerated grpc-gateway Go artifact."
+    - path: "shared-lib/proto/missionspb/swagger.pb.go"
+      action: modify
+      description: "Regenerated swagger helper artifact."
+    - path: "shared-lib/proto/missionspb/missions.swagger.json"
+      action: modify
+      description: "Regenerated swagger JSON with new Mobile and Backoffice paths."
+
+description: |
+  Add the shared-lib Missions API contract for Mobile's Monthly Check-In Calendar
+  and Consecutive Check-In Bonus backend. The contract must provide typed payloads
+  for per-day calendar status/reward, D3/D7/D15/D31 milestone status/reward,
+  restore quote/restore result, and Backoffice campaign/reward/restore config.
+
+  This task intentionally stops at shared-lib. Per AGENTS.md, downstream service
+  implementation must wait until the user publishes and bumps
+  github.com/SparqLab/shared-lib. Games-Labs-Missions must not add local duplicate
+  request/response types for this contract.
+
+acceptance_criteria:
+  - criterion: "shared-lib/proto/missionspb/missions.proto defines typed request/response messages for check-in calendar, day reward/status, consecutive milestone status, milestone claim, restore quote, restore response, and admin check-in config."
+  - criterion: "gRPC-Gateway annotations expose Mobile endpoints for calendar read, milestone claim, restore quote, and restore action."
+  - criterion: "gRPC-Gateway annotations expose Backoffice endpoints for check-in config read/update."
+  - criterion: "Generated shared-lib Missions protobuf, gRPC, gateway, swagger helper, and swagger JSON artifacts are updated from proto generation."
+  - criterion: "Generated swagger includes the new Mobile and Backoffice paths."
+  - criterion: "go test ./... passes in shared-lib, or the exact environment limitation is documented."
+  - criterion: "Dev output explicitly records that downstream Games-Labs-Missions work is blocked until shared-lib is published and bumped."
+
+plan:
+  approach: |
+    Keep the first executable task scoped to shared-lib. Add additive typed
+    contract messages and RPCs where possible so current Struct-backed methods
+    remain compatible. Regenerate all Missions proto artifacts and verify the
+    shared-lib module. Do not touch Games-Labs-Missions runtime code in this task.
+  subtasks:
+    - order: 1
+      id: "missions-proto-contract"
+      description: >
+        Add typed reward, calendar, milestone, restore, and admin config messages
+        plus MissionsService RPC declarations with grpc-gateway annotations.
+      agent: dev-2
+      owned_files:
+        - "shared-lib/proto/missionspb/missions.proto"
+      parallel_safe: false
+    - order: 2
+      id: "missions-proto-generation"
+      description: >
+        Regenerate protobuf, gRPC, gateway, swagger helper, and swagger JSON
+        artifacts from the updated Missions proto.
+      agent: dev-2
+      owned_files:
+        - "shared-lib/proto/missionspb/missions.pb.go"
+        - "shared-lib/proto/missionspb/missions_grpc.pb.go"
+        - "shared-lib/proto/missionspb/missions.pb.gw.go"
+        - "shared-lib/proto/missionspb/swagger.pb.go"
+        - "shared-lib/proto/missionspb/missions.swagger.json"
+      parallel_safe: false
+    - order: 3
+      id: "shared-lib-verification"
+      description: >
+        Run shared-lib verification and record the publish/bump blocker for
+        downstream Missions implementation.
+      agent: dev-2
+      owned_files:
+        - "ai-dev-office/runs/TASK-066/dev-2-output.yaml"
+      parallel_safe: false
+  risks:
+    - risk: "Changing existing Struct-backed RPCs could break current Missions or gateway consumers."
+      mitigation: "Prefer additive typed methods for new APIs and preserve existing method compatibility."
+    - risk: "Downstream service work starts before the shared-lib dependency is available."
+      mitigation: "Keep downstream implementation out of scope and require user publish/bump before TASK-067."
+    - risk: "Mobile status names drift from the requested contract."
+      mitigation: "Define day, milestone, and campaign statuses using the exact requested values."
+    - risk: "Generated gateway or swagger artifacts become stale."
+      mitigation: "Regenerate artifacts and verify new paths exist in missions.swagger.json."
+  estimated_complexity: medium
+
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: >
+    The work is cross-service contract design with generated artifacts and
+    downstream dependency sequencing, so dev-2 should own it sequentially.
+
+summary: |
+  TASK-066 opens the Monthly Check-In Calendar and Consecutive Bonus backend by
+  defining the shared-lib Missions contract first. The task covers typed proto
+  messages, Mobile and Backoffice gateway annotations, generated artifacts, and
+  shared-lib verification. It explicitly stops before Games-Labs-Missions changes
+  until the user publishes and bumps shared-lib.
+
+artifacts:
+  - path: runs/TASK-066/task.md
+    action: created
+  - path: runs/TASK-066/status.yaml
+    action: created
+  - path: runs/TASK-066/pm-output.yaml
+    action: created
+
+next_action:
+  agent: dev-2
+  reason: "Implement the shared-lib contract, regenerate artifacts, run shared-lib verification, then stop for publish/bump before downstream work."
+
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "codebase_status projectPath=d:\\llm"
+      - "MonthlyChallenge UserStreak RestoreStreak MissionConfig check-in calendar missions.proto"
+    relevant_symbols:
+      - "shared-lib/proto/missionspb/missions.proto"
+      - "Games-Labs-Missions/internal/models/models.go"
+      - "Games-Labs-Missions/internal/services/mission_service.go"
+      - "Games-Labs-Missions/internal/routes/apiv1.go"
+      - "docs/superpowers/plans/2026-05-25-check-in-calendar-consecutive-bonus.md"
+    notes: "Session MCP was not exposed; CLI status routed to local Docker SocratiCode for /Users/earth/Documents/GitHub, then scope was verified against source files on disk."
+
+blockers: []

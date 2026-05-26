@@ -6,7 +6,7 @@ REMOTE_SSH_KEY="${SOCRATICODE_SSH_KEY:-$HOME/.ssh/id_ed25519}"
 REMOTE_PORT="${SOCRATICODE_REMOTE_PORT:-4444}"
 REMOTE_PROJECT="${SOCRATICODE_REMOTE_PROJECT:-/app}"
 REMOTE_CANONICAL_PROJECT="${SOCRATICODE_REMOTE_CANONICAL_PROJECT:-D:\\llm}"
-LOCAL_PROJECT_ROOT="${SOCRATICODE_LOCAL_PROJECT:-/Users/earth/Documents/GitHub}"
+LOCAL_PROJECT_ROOT="${SOCRATICODE_LOCAL_PROJECT:-/Users/earth/Documents/GitHub}"  # local Docker SocratiCode index root (not remote SSH)
 GRAPH_PROJECT_ROOT="${SOCRATICODE_GRAPH_ROOT:-$LOCAL_PROJECT_ROOT}"
 SCRIPT_SOURCE="${BASH_SOURCE[0]}"
 while [[ -h "$SCRIPT_SOURCE" ]]; do
@@ -15,6 +15,9 @@ while [[ -h "$SCRIPT_SOURCE" ]]; do
   [[ "$SCRIPT_SOURCE" != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+LOCAL_MCP_CLIENT="$SCRIPT_DIR/socraticode-local-mcp-client.js"
+SSH_CONNECT_TIMEOUT="${SOCRATICODE_SSH_TIMEOUT:-8}"
+REMOTE_BACKEND="${SOCRATICODE_BACKEND:-auto}" # auto | remote | local
 
 usage() {
   cat <<'EOF'
@@ -32,8 +35,13 @@ Environment:
   SOCRATICODE_REMOTE_PORT
   SOCRATICODE_REMOTE_PROJECT
   SOCRATICODE_SSH_KEY
+  SOCRATICODE_SSH_TIMEOUT
   SOCRATICODE_LOCAL_PROJECT
   SOCRATICODE_GRAPH_ROOT
+  SOCRATICODE_BACKEND          auto | remote | local (default: auto)
+  SOCRATICODE_LOCAL_COMMAND    default: npx
+  SOCRATICODE_LOCAL_ARGS       default: -y socraticode
+  SOCRATICODE_NPM_CACHE        default: ~/.npm (avoids broken sandbox npx cache)
 EOF
 }
 
@@ -58,6 +66,15 @@ for (let i = 0; i < pairs.length; i += 2) {
 }
 process.stdout.write(JSON.stringify({ method, params }));
 NODE
+}
+
+ssh_remote() {
+  ssh \
+    -o "ConnectTimeout=$SSH_CONNECT_TIMEOUT" \
+    -o BatchMode=yes \
+    -i "$REMOTE_SSH_KEY" \
+    -T "$REMOTE_HOST" \
+    "$@"
 }
 
 remote_request() {
@@ -89,15 +106,103 @@ PS
 )
 
   encoded="$(printf '%s' "$ps_script" | iconv -t UTF-16LE | base64 | tr -d '\n')"
-  output="$(ssh -i "$REMOTE_SSH_KEY" -T "$REMOTE_HOST" powershell -NoProfile -EncodedCommand "$encoded" 2>&1)" || {
-    if printf '%s' "$output" | grep -qi "Operation not permitted\|connect to host .* port 22"; then
-      print_json_error "$method" "SSH to the central SocratiCode host is blocked in this environment. Use an approved network session or the MCP socraticode tool."
-      return 0
+  output="$(ssh_remote powershell -NoProfile -EncodedCommand "$encoded" 2>&1)" || {
+    if printf '%s' "$output" | grep -qi "Operation not permitted\|connect to host .* port 22\|Connection timed out\|Operation timed out"; then
+      return 1
     fi
     printf '%s\n' "$output" >&2
     return 1
   }
   printf '%s\n' "$output"
+}
+
+remote_backend_enabled() {
+  [[ "$REMOTE_BACKEND" != "local" ]]
+}
+
+local_backend_enabled() {
+  [[ "$REMOTE_BACKEND" != "remote" ]]
+}
+
+json_is_success() {
+  local payload="$1"
+  printf '%s' "$payload" | grep -q '"type"[[:space:]]*:[[:space:]]*"success"'
+}
+
+local_docker_mcp() {
+  node "$LOCAL_MCP_CLIENT" "$@"
+}
+
+local_docker_probe() {
+  local payload
+  payload="$(local_docker_mcp codebase_status --projectPath "$LOCAL_PROJECT_ROOT" 2>/dev/null || true)"
+  json_is_success "$payload"
+}
+
+format_local_status_json() {
+  local project_path="$1"
+  local payload
+  payload="$(local_docker_mcp codebase_status --projectPath "$project_path")"
+  SOCRATICODE_PAYLOAD="$payload" SOCRATICODE_PROJECT_PATH="$project_path" node <<'NODE'
+const input = JSON.parse(process.env.SOCRATICODE_PAYLOAD || "{}");
+const projectPath = process.env.SOCRATICODE_PROJECT_PATH || "";
+if (input.type !== "success") {
+  process.stdout.write(JSON.stringify(input));
+  process.exit(0);
+}
+const text = String(input.text || "").trim();
+const active = /Status:\s*green/i.test(text);
+process.stdout.write(JSON.stringify({
+  type: "success",
+  method: "codebase_status",
+  backend: "local-docker",
+  projectPath,
+  message: text,
+  status: active ? "active" : "unknown",
+}));
+NODE
+}
+
+format_local_tool_json() {
+  local method="$1"
+  local project_path="$2"
+  shift 2
+  local payload
+  payload="$(local_docker_mcp "$method" --projectPath "$project_path" "$@")"
+  SOCRATICODE_METHOD="$method" \
+  SOCRATICODE_PAYLOAD="$payload" \
+  SOCRATICODE_PROJECT_PATH="$project_path" \
+  node <<'NODE'
+const input = JSON.parse(process.env.SOCRATICODE_PAYLOAD || "{}");
+const method = process.env.SOCRATICODE_METHOD || "unknown";
+const projectPath = process.env.SOCRATICODE_PROJECT_PATH || "";
+if (input.type !== "success") {
+  process.stdout.write(JSON.stringify(input));
+  process.exit(0);
+}
+const text = String(input.text || "").trim();
+process.stdout.write(JSON.stringify({
+  type: "success",
+  method,
+  backend: "local-docker",
+  projectPath,
+  message: text,
+  raw_text: text,
+}));
+NODE
+}
+
+run_local_graph() {
+  local subcmd="$1"
+  local project_path="$2"
+  local file="${3:-}"
+  local root
+  root="$(resolve_local_project_root "$project_path" 2>/dev/null || printf '%s' "$LOCAL_PROJECT_ROOT")"
+  if [[ -n "$file" ]]; then
+    node "$SCRIPT_DIR/socraticode-graph-helper.js" "$subcmd" --file "$file" --projectPath "$root"
+  else
+    node "$SCRIPT_DIR/socraticode-graph-helper.js" "$subcmd" --projectPath "$root"
+  fi
 }
 
 remote_probe() {
@@ -165,10 +270,9 @@ PS
 )
 
   encoded="$(printf '%s' "$ps_script" | iconv -t UTF-16LE | base64 | tr -d '\n')"
-  output="$(ssh -i "$REMOTE_SSH_KEY" -T "$REMOTE_HOST" powershell -NoProfile -EncodedCommand "$encoded" 2>&1)" || {
-    if printf '%s' "$output" | grep -qi "Operation not permitted\|connect to host .* port 22"; then
-      print_json_error "socraticode" "SSH to the central SocratiCode host is blocked in this environment. Use an approved network session or the MCP socraticode tool."
-      return 0
+  output="$(ssh_remote powershell -NoProfile -EncodedCommand "$encoded" 2>&1)" || {
+    if printf '%s' "$output" | grep -qi "Operation not permitted\|connect to host .* port 22\|Connection timed out\|Operation timed out"; then
+      return 1
     fi
     printf '%s\n' "$output" >&2
     return 1
@@ -420,13 +524,21 @@ print_context() {
   local freshness="unknown"
   local confidence="low"
   local status="unavailable"
-  local note="Remote SocratiCode TCP server was unreachable."
+  local backend="none"
+  local note="Remote and local Docker SocratiCode were unreachable."
 
-  if remote_probe; then
+  if remote_backend_enabled && remote_probe; then
+    backend="remote"
     freshness="current"
     confidence="medium"
     status="used"
-    note="Remote SocratiCode TCP server responded to codebase_status."
+    note="Remote SocratiCode TCP server responded to codebase_status on d:\\llm."
+  elif local_backend_enabled && local_docker_probe; then
+    backend="local-docker"
+    freshness="current"
+    confidence="medium"
+    status="used"
+    note="Local Docker SocratiCode responded to codebase_status for ${LOCAL_PROJECT_ROOT}."
   fi
 
   if [[ -f "$task_file" ]]; then
@@ -437,6 +549,8 @@ print_context() {
 freshness: $freshness
 confidence: $confidence
 status: $status
+backend: $backend
+project_path: $LOCAL_PROJECT_ROOT
 role: ${role:-unknown}
 task_title: ${task_title:-unknown}
 task_file: ${task_file:-unknown}
@@ -449,7 +563,21 @@ EOF
 }
 
 print_status() {
-  remote_request codebase_status
+  local output=""
+  if remote_backend_enabled; then
+    output="$(remote_request codebase_status 2>/dev/null || true)"
+    if json_is_success "$output"; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+  fi
+
+  if local_backend_enabled; then
+    format_local_status_json "$LOCAL_PROJECT_ROOT"
+    return 0
+  fi
+
+  print_json_error "codebase_status" "Remote and local Docker SocratiCode are unavailable."
 }
 
 print_json_error() {
@@ -556,7 +684,27 @@ print_search() {
     ps_command+=" --limit $(ps_quote "$limit")"
   fi
   ps_command+=" --projectPath $(ps_quote "$resolved_root")"
-  remote_node_request "$ps_command"
+  if remote_backend_enabled; then
+    local output=""
+    output="$(remote_node_request "$ps_command" 2>/dev/null || true)"
+    if json_is_success "$output"; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+  fi
+
+  if local_backend_enabled; then
+    local local_root
+    local_root="$(resolve_local_project_root "$project_path" 2>/dev/null || printf '%s' "$LOCAL_PROJECT_ROOT")"
+    local extra_args=(--query "$query")
+    [[ -n "$limit" ]] && extra_args+=(--limit "$limit")
+    [[ -n "$file_filter" ]] && extra_args+=(--fileFilter "$file_filter")
+    [[ -n "$language_filter" ]] && extra_args+=(--languageFilter "$language_filter")
+    format_local_tool_json "codebase_search" "$local_root" "${extra_args[@]}"
+    return 0
+  fi
+
+  print_json_error "codebase_search" "Remote and local Docker SocratiCode are unavailable."
 }
 
 print_symbol() {
@@ -607,7 +755,26 @@ print_symbol() {
     ps_command+=" --limit $(ps_quote "$limit")"
   fi
   ps_command+=" --projectPath $(ps_quote "$resolved_root")"
-  remote_node_request "$ps_command"
+  if remote_backend_enabled; then
+    local output=""
+    output="$(remote_node_request "$ps_command" 2>/dev/null || true)"
+    if json_is_success "$output"; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+  fi
+
+  if local_backend_enabled; then
+    local local_root
+    local_root="$(resolve_local_project_root "$project_path" 2>/dev/null || printf '%s' "$LOCAL_PROJECT_ROOT")"
+    local extra_args=(--name "$name")
+    [[ -n "$file" ]] && extra_args+=(--file "$file")
+    [[ -n "$limit" ]] && extra_args+=(--limit "$limit")
+    format_local_tool_json "codebase_symbol" "$local_root" "${extra_args[@]}"
+    return 0
+  fi
+
+  print_json_error "codebase_symbol" "Remote and local Docker SocratiCode are unavailable."
 }
 
 print_graph_query() {
@@ -635,7 +802,21 @@ print_graph_query() {
   done
 
   local ps_command="Set-Location $(ps_quote "$REMOTE_CANONICAL_PROJECT"); node $(ps_quote "$REMOTE_CANONICAL_PROJECT\\ai-dev-office\\scripts\\socraticode-graph-helper.js") codebase_graph_query --file $(ps_quote "$(normalize_remote_path "$file")") --projectPath $(ps_quote "$(normalize_remote_path "$project_path")")"
-  remote_node_request "$ps_command"
+  if remote_backend_enabled; then
+    local output=""
+    output="$(remote_node_request "$ps_command" 2>/dev/null || true)"
+    if json_is_success "$output"; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+  fi
+
+  if local_backend_enabled; then
+    run_local_graph codebase_graph_query "$project_path" "$file"
+    return 0
+  fi
+
+  print_json_error "codebase_graph_query" "Remote and local graph analysis are unavailable."
 }
 
 print_graph_stats() {
@@ -658,7 +839,21 @@ print_graph_stats() {
   done
 
   local ps_command="Set-Location $(ps_quote "$REMOTE_CANONICAL_PROJECT"); node $(ps_quote "$REMOTE_CANONICAL_PROJECT\\ai-dev-office\\scripts\\socraticode-graph-helper.js") codebase_graph_stats --projectPath $(ps_quote "$(normalize_remote_path "$project_path")")"
-  remote_node_request "$ps_command"
+  if remote_backend_enabled; then
+    local output=""
+    output="$(remote_node_request "$ps_command" 2>/dev/null || true)"
+    if json_is_success "$output"; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+  fi
+
+  if local_backend_enabled; then
+    run_local_graph codebase_graph_stats "$project_path"
+    return 0
+  fi
+
+  print_json_error "codebase_graph_stats" "Remote and local graph analysis are unavailable."
 }
 
 print_graph_circular() {
@@ -681,7 +876,21 @@ print_graph_circular() {
   done
 
   local ps_command="Set-Location $(ps_quote "$REMOTE_CANONICAL_PROJECT"); node $(ps_quote "$REMOTE_CANONICAL_PROJECT\\ai-dev-office\\scripts\\socraticode-graph-helper.js") codebase_graph_circular --projectPath $(ps_quote "$(normalize_remote_path "$project_path")")"
-  remote_node_request "$ps_command"
+  if remote_backend_enabled; then
+    local output=""
+    output="$(remote_node_request "$ps_command" 2>/dev/null || true)"
+    if json_is_success "$output"; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+  fi
+
+  if local_backend_enabled; then
+    run_local_graph codebase_graph_circular "$project_path"
+    return 0
+  fi
+
+  print_json_error "codebase_graph_circular" "Remote and local graph analysis are unavailable."
 }
 
 cmd="${1:-context}"
