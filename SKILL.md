@@ -75,6 +75,15 @@ The AI Dev Office must not loop indefinitely between implementation and review s
 
 ## How to Use
 
+Optional project profile overlays (`profiles/*.yaml`) merge into `office.config.yaml` at runtime:
+
+```bash
+./ai-dev-office/run-agent.sh --profile games-labs TASK-NNN reviewer
+OFFICE_PROFILE=generic ./ai-dev-office/run-agent.sh TASK-NNN pm
+```
+
+Merge order and protected fields: `docs/config-profile-merge-contract.md`.
+
 ### Create a new task (via PM)
 
 ```bash
@@ -164,7 +173,10 @@ Use this when an older runtime file predates the current v2 output contract. The
 
 - `office.config.yaml` -- agent registry and runner config
 - `workflows/hybrid-default.yaml` -- orchestration rules
-- `run-agent.sh` -- CLI runner script
+- `run-agent.sh` -- CLI runner script (supports `--profile` / `OFFICE_PROFILE`)
+- `scripts/resolve-office-config.rb` -- merges office config, profile, local overrides, and env
+- `scripts/bootstrap-project.sh` -- install a minimal Codex/Cursor-ready setup into a target project
+- `scripts/sync-to-project.sh` -- refresh installed framework files in a target project
 - `validate-yaml.rb` -- runtime validator for status and agent output YAML
 - `migrate-legacy-runtime.rb` -- helper to upgrade selected legacy runtime YAML files
 - `AGENTS.md` -- framework-wide rules for humans and AI agents

@@ -12,10 +12,14 @@ installable:
     - runners/**
     - workflows/**
     - schemas/**
+    - scripts/bootstrap-project.sh
+    - scripts/sync-to-project.sh
+    - scripts/resolve-office-config.rb
   optional:
     - docs/skills/**
     - profiles/**
     - templates/**
+    - scripts/check-service-dependencies.sh
     - .cursor/rules/**
     - .cursor/agents/**
 

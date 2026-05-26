@@ -5,16 +5,50 @@ OFFICE_DIR="$(cd "$(dirname "$0")" && pwd)"
 AGENTS_DIR="$OFFICE_DIR/agents"
 RUNS_DIR="$OFFICE_DIR/runs"
 SOCRATICODE_WRAPPER="$OFFICE_DIR/scripts/socraticode-tcp-wrapper.sh"
+CONFIG_RESOLVER="$OFFICE_DIR/scripts/resolve-office-config.rb"
 DEFAULT_LOOP_LIMIT=5
+OFFICE_PROFILE="${OFFICE_PROFILE:-}"
+
+parse_global_args() {
+  REMAINING_ARGS=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --profile)
+        OFFICE_PROFILE="${2:-}"
+        shift 2
+        ;;
+      --profile=*)
+        OFFICE_PROFILE="${1#--profile=}"
+        shift
+        ;;
+      *)
+        REMAINING_ARGS+=("$1")
+        shift
+        ;;
+    esac
+  done
+}
+
+run_agent_invocation() {
+  local extra=()
+  if [[ -n "${OFFICE_PROFILE:-}" ]]; then
+    extra=(--profile "$OFFICE_PROFILE")
+  fi
+  "$0" "${extra[@]}" "$@"
+}
+
+export OFFICE_PROFILE
+parse_global_args "$@"
+set -- "${REMAINING_ARGS[@]}"
 
 usage() {
   cat <<EOF
-Usage: ./run-agent.sh <TASK_ID> <AGENT> [RUNNER]
-       ./run-agent.sh <TASK_ID> scaffold <dev|dev-2|reviewer> [--force]
-       ./run-agent.sh status [TASK_ID]
-       ./run-agent.sh intake "<request>"
-       ./run-agent.sh verify <TASK_ID>
-       ./run-agent.sh cleanup
+Usage: ./run-agent.sh [--profile <name>] <TASK_ID> <AGENT> [RUNNER]
+       ./run-agent.sh [--profile <name>] <TASK_ID> scaffold <dev|dev-2|reviewer> [--force]
+       ./run-agent.sh [--profile <name>] status [TASK_ID]
+       ./run-agent.sh [--profile <name>] intake "<request>"
+       ./run-agent.sh [--profile <name>] verify <TASK_ID>
+       ./run-agent.sh [--profile <name>] cleanup
 
   TASK_ID   Task identifier (e.g. TASK-003)
   AGENT     Agent role: pm | dev | dev-2 | reviewer | debugger | devops | free-roam
@@ -762,23 +796,7 @@ RUBY
 }
 
 resolve_loop_limit() {
-  local config_file="$OFFICE_DIR/office.config.yaml"
-
-  ruby - "$config_file" "$DEFAULT_LOOP_LIMIT" <<'RUBY'
-require "yaml"
-require "date"
-
-config_path, fallback = ARGV
-limit = fallback.to_i
-
-if File.exist?(config_path)
-  data = YAML.safe_load(File.read(config_path), permitted_classes: [Date, Time], aliases: true) || {}
-  configured = data.dig("loop_guard", "max_iterations")
-  limit = configured.to_i if configured
-end
-
-puts limit
-RUBY
+  ruby "$CONFIG_RESOLVER" get "$OFFICE_DIR" loop_guard.max_iterations "$DEFAULT_LOOP_LIMIT"
 }
 
 LOOP_LIMIT="$(resolve_loop_limit)"
@@ -786,53 +804,13 @@ LOOP_LIMIT="$(resolve_loop_limit)"
 config_value() {
   local key_path="$1"
   local fallback="${2:-}"
-  local config_file="$OFFICE_DIR/office.config.yaml"
-
-  ruby - "$config_file" "$key_path" "$fallback" <<'RUBY'
-require "yaml"
-require "date"
-
-config_path, key_path, fallback = ARGV
-value = nil
-
-if File.exist?(config_path)
-  data = YAML.safe_load(File.read(config_path), permitted_classes: [Date, Time], aliases: true) || {}
-  value = key_path.split(".").reduce(data) do |memo, key|
-    memo.is_a?(Hash) ? memo[key] : nil
-  end
-end
-
-if value.nil? || (value.respond_to?(:empty?) && value.empty?)
-  puts fallback
-else
-  puts value
-end
-RUBY
+  ruby "$CONFIG_RESOLVER" get "$OFFICE_DIR" "$key_path" "$fallback"
 }
 
 config_list_values() {
   local key_path="$1"
   local fallback="${2:-}"
-  local config_file="$OFFICE_DIR/office.config.yaml"
-
-  ruby - "$config_file" "$key_path" "$fallback" <<'RUBY'
-require "yaml"
-require "date"
-
-config_path, key_path, fallback = ARGV
-value = nil
-
-if File.exist?(config_path)
-  data = YAML.safe_load(File.read(config_path), permitted_classes: [Date, Time], aliases: true) || {}
-  value = key_path.split(".").reduce(data) do |memo, key|
-    memo.is_a?(Hash) ? memo[key] : nil
-  end
-end
-
-values = Array(value).map(&:to_s).reject(&:empty?)
-values = fallback.to_s.split(/[,\s]+/).reject(&:empty?) if values.empty?
-puts values
-RUBY
+  ruby "$CONFIG_RESOLVER" list "$OFFICE_DIR" "$key_path" "$fallback"
 }
 
 config_bool() {
@@ -994,28 +972,7 @@ run_runner_with_fallback() {
 config_list_contains() {
   local key_path="$1"
   local expected="$2"
-  local config_file="$OFFICE_DIR/office.config.yaml"
-
-  ruby - "$config_file" "$key_path" "$expected" <<'RUBY'
-require "yaml"
-require "date"
-
-config_path, key_path, expected = ARGV
-value = nil
-
-if File.exist?(config_path)
-  data = YAML.safe_load(File.read(config_path), permitted_classes: [Date, Time], aliases: true) || {}
-  value = key_path.split(".").reduce(data) do |memo, key|
-    memo.is_a?(Hash) ? memo[key] : nil
-  end
-end
-
-if Array(value).map(&:to_s).include?(expected)
-  puts "true"
-else
-  puts "false"
-end
-RUBY
+  ruby "$CONFIG_RESOLVER" contains "$OFFICE_DIR" "$key_path" "$expected"
 }
 
 yaml_file_text() {
@@ -1719,7 +1676,7 @@ run_parallel_dev_agents() {
         delay="$(parallel_delay_seconds)"
         sleep "$delay"
       fi
-      AI_DEV_OFFICE_PARALLEL_AUTO=true AI_DEV_OFFICE_PARALLEL_AUTO_SKIP_STATUS=true "$0" "$TASK_ID" "$agent" "$RUNNER"
+      AI_DEV_OFFICE_PARALLEL_AUTO=true AI_DEV_OFFICE_PARALLEL_AUTO_SKIP_STATUS=true run_agent_invocation "$TASK_ID" "$agent" "$RUNNER"
     ) >"$log_file" 2>&1 &
 
     pids+=("$!")
@@ -1904,7 +1861,7 @@ if [[ "$AGENT" == "auto" ]]; then
   while [[ -n "$STEP" ]]; do
     echo ""
     echo ">>> Running $STEP ..."
-    "$0" "$TASK_ID" "$STEP" "$RUNNER"
+    run_agent_invocation "$TASK_ID" "$STEP" "$RUNNER"
     STEP_OUTPUT="$TASK_DIR/${STEP}-output.yaml"
     NEXT="$(next_agent_from_output "$STEP" "$STEP_OUTPUT")"
 
