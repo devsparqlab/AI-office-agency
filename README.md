@@ -2,7 +2,11 @@
 
 A multi-agent orchestration framework that simulates a real dev team of 7 AI agents working together -- PM, Dev, Dev-2, Reviewer, Debugger, DevOps, and Free Roam -- with automatic task handoff.
 
-All contributors and AI agents must follow the baseline rules in `../AGENTS.md`.
+All contributors and AI agents must follow the framework rules in `AGENTS.md`. When this framework is installed into a target project, that project must provide its own `AGENTS.md` for project-specific work.
+
+## Framework Contract
+
+This repository is the portable AI Dev Office framework. Portable defaults live in `AGENTS.md`, `office.config.example.yaml`, `templates/install-manifest.yaml`, `runners/`, `agents/`, `schemas/`, and `workflows/`. Machine-specific values belong in ignored local config such as `office.config.local.yaml`, `profiles/*.local.yaml`, or environment variables.
 
 Additional enforcement for AI Dev Office runners:
 
@@ -117,7 +121,7 @@ Default behavior is optional and recorded:
   results into YAML handoffs.
 - **Cursor sessions:** use MCP server `user-socraticode` first (see `.cursor/rules/socraticode.mdc`). Start with `codebase_status` and `codebase_list_projects`; use `codebase_search`, `codebase_symbol`, `codebase_symbols`, `codebase_health`, `codebase_graph_query`, `codebase_graph_circular`, `codebase_impact`, and `codebase_flow` as needed.
 - **Codex sessions:** use SocratiCode MCP as the primary query path when exposed; otherwise fall back to the CLI wrapper before manual repo inspection.
-- Shared discovery policy and tool routing summary: `../AGENTS.md` (Codebase Discovery Policy).
+- Shared discovery policy and tool routing summary: `AGENTS.md` (Codebase Discovery Policy).
 
 #### Capability layers and exposure gaps
 
@@ -131,7 +135,7 @@ Default behavior is optional and recorded:
 
 Before answering a repository-specific question or planning code-impacting work:
 
-1. Run `codebase_status` with primary `projectPath: "d:\\llm"` (remote on `192.168.1.140`); if the call fails, hangs, or is unusable, retry with `projectPath: "/Users/earth/Documents/GitHub"` (local Docker SocratiCode on this machine).
+1. Run `codebase_status` with the configured primary project path from local config or the `SOCRATICODE_PRIMARY_PROJECT` env var; if the call fails, hangs, or is unusable, retry with the configured fallback path from `office.config.local.yaml`, `profiles/*.local.yaml`, or `SOCRATICODE_FALLBACK_PROJECT`.
 2. Use SocratiCode to locate the relevant files, symbols, endpoints, configs, contracts, or related services.
 3. Read the actual repository files before making implementation claims, routing decisions, or review verdicts.
 4. Verify implementation details against source code, tests, and command output.
@@ -190,8 +194,8 @@ SocratiCode uses **two backends** in this workspace:
 
 | Backend | `projectPath` | Access | Infra |
 |---------|---------------|--------|-------|
-| Remote canonical | `d:\llm` | MCP via `socraticode-remote` (SSH → `192.168.1.140:4444`) or `socraticode-tcp-wrapper.sh` | Central Windows host |
-| Local Docker | `/Users/earth/Documents/GitHub` | MCP/CLI via `npx -y socraticode` on this Mac | Docker: Qdrant (`:16333`) + Ollama (`:11435`) |
+| Remote canonical | `SOCRATICODE_PRIMARY_PROJECT` | MCP via `socraticode-remote` (SSH → configured host) or `socraticode-tcp-wrapper.sh` | Remote SocratiCode host |
+| Local Docker | `SOCRATICODE_FALLBACK_PROJECT` | MCP/CLI via `npx -y socraticode` on this Mac | Docker: Qdrant (`:16333`) + Ollama (`:11435`) |
 
 The `socraticode-tcp-wrapper.sh` routes **remote-backed** commands over SSH and falls back to **local Docker SocratiCode** (`npx -y socraticode` via `socraticode-local-mcp-client.js`) when remote is unreachable:
 
@@ -201,11 +205,11 @@ The `socraticode-tcp-wrapper.sh` routes **remote-backed** commands over SSH and 
 
 Set `SOCRATICODE_BACKEND=local` to skip remote entirely (Mac + local Docker only).
 
-For the **local Docker fallback**, use `npx -y socraticode` (or Cursor MCP configured to `npx -y socraticode`, not `socraticode-remote`) with `projectPath: "/Users/earth/Documents/GitHub"`. Do not treat this path as direct repo inspection — it is still SocratiCode indexed navigation.
+For the **local Docker fallback**, use `npx -y socraticode` (or Cursor MCP configured to `npx -y socraticode`, not `socraticode-remote`) with the configured fallback project path. Do not treat this path as direct repo inspection — it is still SocratiCode indexed navigation.
 
 Environment overrides:
 
-- `SOCRATICODE_LOCAL_PROJECT`: default local repo root for the Docker-indexed fallback (default: `/Users/earth/Documents/GitHub`).
+- `SOCRATICODE_LOCAL_PROJECT`: default local repo root for the Docker-indexed fallback.
 - `SOCRATICODE_GRAPH_ROOT`: default local root for graph commands.
 - `SOCRATICODE_REMOTE_HOST`, `SOCRATICODE_REMOTE_PORT`,
   `SOCRATICODE_REMOTE_PROJECT`, `SOCRATICODE_SSH_KEY`: remote TCP provider
@@ -231,7 +235,7 @@ Environment overrides:
   "type": "success",
   "method": "codebase_search",
   "query": "MockAuthService",
-  "projectPath": "/Users/earth/Documents/GitHub/api-gateway",
+  "projectPath": "${SOCRATICODE_PRIMARY_PROJECT}/api-gateway",
   "count": 2,
   "results": [
     { "file": "services/auth_service.go", "line": 81, "snippet": "type MockAuthService struct {" }
@@ -247,7 +251,7 @@ central checkout:
   "type": "success",
   "method": "codebase_symbol",
   "name": "ValidateToken",
-  "projectPath": "/Users/earth/Documents/GitHub/api-gateway",
+  "projectPath": "${SOCRATICODE_PRIMARY_PROJECT}/api-gateway",
   "definition": {
     "file": "services/auth_service.go",
     "line": 39,
@@ -294,7 +298,7 @@ central checkout:
 {
   "type": "success",
   "method": "codebase_graph_stats",
-  "projectPath": "/Users/earth/Documents/GitHub",
+  "projectPath": "${SOCRATICODE_FALLBACK_PROJECT}",
   "fileCount": 402,
   "packageCount": 178,
   "localEdgeCount": 489,
@@ -311,7 +315,7 @@ central checkout:
 {
   "type": "success",
   "method": "codebase_graph_circular",
-  "projectPath": "/Users/earth/Documents/GitHub",
+  "projectPath": "${SOCRATICODE_FALLBACK_PROJECT}",
   "cycleCount": 0,
   "cycles": []
 }
@@ -460,7 +464,7 @@ Free Roam can reroute to any agent or send back to PM to re-split.
 
 ## Baseline Rules
 
-The source of truth for repo-wide rules is `../AGENTS.md`. In particular, every runner and agent must follow:
+The source of truth for repo-wide rules is `AGENTS.md`. In particular, every runner and agent must follow:
 
 - Service architecture rules: internal sync via `gRPC`, external access through `api-gateway`, async messaging via `RabbitMQ`
 - Isolation rules: no cross-service database access and no shared mutable state outside APIs or events

@@ -167,7 +167,9 @@ Use this when an older runtime file predates the current v2 output contract. The
 - `run-agent.sh` -- CLI runner script
 - `validate-yaml.rb` -- runtime validator for status and agent output YAML
 - `migrate-legacy-runtime.rb` -- helper to upgrade selected legacy runtime YAML files
-- `../AGENTS.md` -- baseline repo-wide rules for humans and AI agents
+- `AGENTS.md` -- framework-wide rules for humans and AI agents
+- `office.config.example.yaml` -- portable config example with env placeholders
+- `templates/install-manifest.yaml` -- install boundary for bootstrap/sync
 - `schemas/` -- validation schemas for status, structured task payloads, and agent handoff outputs
 - `runs/<task-id>/` -- task runtime data
 - `tasks/templates/new-task.yaml` -- task template (legacy, PM creates tasks now)

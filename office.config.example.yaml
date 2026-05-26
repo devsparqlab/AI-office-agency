@@ -1,0 +1,116 @@
+office:
+  name: AI Dev Office
+  version: "2.0"
+
+agents:
+  - id: pm
+    prompt: agents/pm.md
+    description: Creates tasks, plans work, and assigns work to Dev or Dev-2
+  - id: dev
+    prompt: agents/dev.md
+    description: Focused implementation for scoped work
+  - id: dev-2
+    prompt: agents/dev-2.md
+    description: Senior implementation for complex or cross-cutting work
+  - id: reviewer
+    prompt: agents/reviewer.md
+    description: Reviews code quality and verifies builds and tests
+  - id: debugger
+    prompt: agents/debugger.md
+    description: Investigates failures and applies minimal scoped fixes
+  - id: devops
+    prompt: agents/devops.md
+    description: Handles Docker, CI/CD, deployment, and infra concerns
+  - id: free-roam
+    prompt: agents/free-roam.md
+    description: Handles ambiguity, escalation, and stuck workflows
+
+default_workflow: workflows/hybrid-default.yaml
+
+runner_selector:
+  priority:
+    - codex
+    - cursor-agent
+    - cursor
+  config_dir: runners/
+  auto_switch: true
+  trigger_patterns:
+    - insufficient_quota
+    - quota exceeded
+    - rate limit
+    - unauthorized
+    - invalid api key
+    - token expired
+  retry_before_switch: 2
+  log_switch_reason: true
+
+handoff_contract:
+  required_fields:
+    - summary
+    - artifacts
+    - next_action
+    - blockers
+  state_files:
+    task: task.md
+    status: status.yaml
+    meta: meta.yaml
+
+state_model:
+  source_of_truth: status.yaml
+  audit_log: meta.yaml
+  phase_state_must_match: true
+  phases:
+    - pending
+    - blocked
+    - assigned
+    - assigned_parallel
+    - review
+    - in_review
+    - debugging
+    - debugging_complete
+    - devops_needed
+    - devops_complete
+    - escalated
+    - free_roam_complete
+    - done
+    - aborted
+  reviewer_queue_phase: in_review
+
+dependency_policy:
+  machine_readable_fields:
+    blocked_on: status.yaml
+    waiting_for: status.yaml
+    ready: status.yaml
+  blocked_dispatch_guard: true
+  enforce_current_agent_route: true
+  auto_reconcile_before_dispatch: true
+  unblock_when_upstream_phase: done
+  on_unblock:
+    clear_waiting_for: true
+    set_ready: true
+    route_from_assignment_primary: true
+
+dependency_guard:
+  enabled: false
+  script: scripts/check-service-dependencies.sh
+
+context_provider:
+  enabled: true
+  provider: socraticode
+  mode: optional
+  policy: recorded
+  fallback: repo_search
+  project_paths:
+    primary: "${SOCRATICODE_PRIMARY_PROJECT}"
+    fallback: "${SOCRATICODE_FALLBACK_PROJECT}"
+  roles:
+    - pm
+    - dev
+    - dev-2
+    - reviewer
+    - debugger
+    - free-roam
+
+loop_guard:
+  max_iterations: 8
+  escalate_to: free-roam

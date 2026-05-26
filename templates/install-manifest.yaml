@@ -1,0 +1,39 @@
+package:
+  name: ai-dev-office
+  version: "2.0"
+
+installable:
+  core:
+    - AGENTS.md
+    - SKILL.md
+    - README.md
+    - office.config.example.yaml
+    - agents/**
+    - runners/**
+    - workflows/**
+    - schemas/**
+    - scripts/bootstrap-project.sh
+    - scripts/sync-to-project.sh
+  optional:
+    - docs/skills/**
+    - profiles/**
+    - templates/**
+    - .cursor/rules/**
+    - .cursor/agents/**
+
+exclude:
+  runtime:
+    - runs/**
+    - tasks/**/status.yaml
+    - "**/*-output.yaml"
+    - "**/*.log"
+    - "**/.cursor-prompt.md"
+  local:
+    - office.config.local.yaml
+    - profiles/*.local.yaml
+    - .env
+    - .env.*
+    - .socraticode.local.yaml
+  history:
+    - runs/**/meta.yaml
+    - runs/**/verification-evidence.md
