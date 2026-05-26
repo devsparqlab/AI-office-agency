@@ -26,6 +26,8 @@ go.work.sum
 
 # env file
 .env
+.env.*
+!.env.example
 office.config.local.yaml
 profiles/*.local.yaml
 .socraticode.local.yaml

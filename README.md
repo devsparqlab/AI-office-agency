@@ -8,6 +8,8 @@ All contributors and AI agents must follow the framework rules in `AGENTS.md`. W
 
 This repository is the portable AI Dev Office framework. Portable defaults live in `AGENTS.md`, `office.config.example.yaml`, `templates/install-manifest.yaml`, `runners/`, `agents/`, `schemas/`, and `workflows/`. Machine-specific values belong in ignored local config such as `office.config.local.yaml`, `profiles/*.local.yaml`, or environment variables.
 
+The config merge contract is documented in `docs/config-profile-merge-contract.md`.
+
 Additional enforcement for AI Dev Office runners:
 
 - `handler message` must live only in `shared-lib`.
