@@ -25,11 +25,12 @@ changes:
       - .env.example
       - README.md
     details:
-      - Aligned the example environment with cluster defaults:
-        `WALLET_API_URL=games-labs-wallet-service:50054`,
-        `PROVIDER_API_URL=84.247.150.206:50051`,
-        `USER_API_URL=games-labs-user-service:50055`,
-        `MISSIONS_API_URL=games-labs-missions-service:50056`.
+      - >-
+        Aligned the example environment with cluster defaults:
+        WALLET_API_URL=games-labs-wallet-service:50054,
+        PROVIDER_API_URL=84.247.150.206:50051,
+        USER_API_URL=games-labs-user-service:50055,
+        MISSIONS_API_URL=games-labs-missions-service:50056.
       - Documented the runtime wiring contract in the README so the env
         requirement is visible to operators and reviewers.
   - service: review
