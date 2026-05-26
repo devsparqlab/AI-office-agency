@@ -15,7 +15,7 @@ assignment:
   parallel: false
 handoff:
   from: reviewer
-  to: debugger
+  to: done
   artifact: runs/TASK-067/reviewer-output.yaml
 history:
 - phase: created -> blocked
