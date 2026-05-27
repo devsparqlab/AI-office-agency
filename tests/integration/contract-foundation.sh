@@ -6,9 +6,15 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 PORTABLE_FILES=(
   AGENTS.md
   SKILL.md
+  README.md
   office.config.example.yaml
   templates/install-manifest.yaml
   docs/config-profile-merge-contract.md
+  docs/getting-started.md
+  docs/codex.md
+  docs/cursor.md
+  docs/cursor-templates.md
+  docs/socraticode.md
   templates/project-AGENTS.md
   templates/project-office.config.yaml
 )
@@ -19,6 +25,7 @@ FORBIDDEN_PATTERNS=(
   'd:\\llm'
   'Games-Labs-'
   'github.com/SparqLab/shared-lib'
+  'handler message'
 )
 
 GITIGNORE_REQUIRED=(
@@ -92,15 +99,36 @@ local_excludes = Array(data.dig("exclude", "local")).map(&:to_s)
 
 required_core = %w[
   AGENTS.md
+  README.md
+  SKILL.md
   office.config.example.yaml
   agents/**
   runners/**
   workflows/**
   schemas/**
+  docs/config-profile-merge-contract.md
+  docs/getting-started.md
+  docs/codex.md
+  docs/cursor.md
+  docs/cursor-templates.md
+  docs/socraticode.md
 ]
 
 required_core.each do |entry|
   abort "[FAIL] install manifest missing core entry: #{entry}" unless core.include?(entry)
+end
+
+generic_docs = %w[
+  docs/getting-started.md
+  docs/codex.md
+  docs/cursor.md
+  docs/cursor-templates.md
+  docs/socraticode.md
+  docs/config-profile-merge-contract.md
+]
+
+generic_docs.each do |entry|
+  abort "[FAIL] install manifest should not list core doc as optional: #{entry}" if optional.include?(entry)
 end
 
 %w[runs/** **/*-output.yaml **/*.log].each do |entry|
@@ -151,5 +179,20 @@ abort "[FAIL] example config missing agent ids: #{missing.join(', ')}" unless mi
 
 puts "[OK] example config portable defaults verified"
 RUBY
+
+echo "== Scenario 8: generic doc links referenced from README exist =="
+for rel in \
+  docs/getting-started.md \
+  docs/codex.md \
+  docs/cursor.md \
+  docs/cursor-templates.md \
+  docs/socraticode.md \
+  profiles/README.md \
+  profiles/games-labs.md
+do
+  assert_file "$ROOT_DIR/$rel" "README-linked doc"
+done
+
+assert_not_contains "$ROOT_DIR/README.md" 'handler message' "generic README must not contain shared-lib handler policy"
 
 echo "[PASS] framework contract foundation scenarios passed"

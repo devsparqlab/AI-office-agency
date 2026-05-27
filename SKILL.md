@@ -10,184 +10,53 @@ description: >-
 
 # AI Dev Office
 
-Multi-agent framework with 7 agents: PM, Dev, Dev-2, Reviewer, Debugger, DevOps, Free Roam.
+Seven agents (PM, Dev, Dev-2, Reviewer, Debugger, DevOps, Free Roam) with YAML handoffs under `ai-dev-office/runs/<task-id>/`.
 
-## Office Location
+This file is only the entrypoint. Before acting on runner, profile, Cursor, or SocratiCode behavior, follow the linked guide for that topic.
 
-All office files are in `ai-dev-office/` at the workspace root.
+Must-read runtime anchors:
+- Role prompts in `agents/*.md` are authoritative.
+- Task state in `runs/<task-id>/status.yaml` is the runtime source of truth.
+- Use linked docs before changing runner, profile, Cursor, or SocratiCode behavior.
 
-**Cursor:** Use `.cursor/rules/ai-dev-office.mdc` (always-on) plus optional `.cursor/rules/ai-dev-office-<role>.mdc`; subagents in `.cursor/agents/ai-dev-office-<role>.md` when using Cursor Agent subagents. Full role text stays in `agents/*.md`.
+## Docs (read these first)
 
-## Team (v2.0)
+| Guide | When |
+|-------|------|
+| [docs/getting-started.md](docs/getting-started.md) | First task, auto, status, validate |
+| [docs/codex.md](docs/codex.md) | Codex CLI (default runner) |
+| [docs/cursor.md](docs/cursor.md) | Cursor IDE or cursor-agent |
+| [docs/cursor-templates.md](docs/cursor-templates.md) | `.cursor/rules` / `.cursor/agents` |
+| [docs/socraticode.md](docs/socraticode.md) | Indexed discovery (env-based paths) |
+| [profiles/README.md](profiles/README.md) | `--profile` selection |
+| [AGENTS.md](AGENTS.md) | Framework portability rules |
 
-| Agent | File | Job |
-|-------|------|-----|
-| PM | `agents/pm.md` | Creates tasks, plans work, assigns to Dev/Dev-2 |
-| Dev | `agents/dev.md` | Focused implementation |
-| Dev-2 | `agents/dev-2.md` | Senior Dev for complex/cross-cutting work |
-| Reviewer | `agents/reviewer.md` | Code review + build/test verification |
-| Debugger | `agents/debugger.md` | Root cause analysis and fixes |
-| DevOps | `agents/devops.md` | Docker, CI/CD, deployment, infra |
-| Free Roam | `agents/free-roam.md` | Incident commander, unblocks pipeline |
-
-## Agent Permissions
-
-Each agent has a strict operating scope. Do not act outside your assigned role unless the task explicitly scopes that work.
-
-| Agent | Allowed | Not Allowed |
-|-------|---------|-------------|
-| PM | Create tasks, define scope, plan subtasks, assign agents | Writing production code, infra changes, or direct implementation |
-| Dev | Modify scoped application code, tests, and contract-related files in assigned scope | Infra-only changes, broad architecture changes, or out-of-scope cross-service edits |
-| Dev-2 | Handle complex or cross-service code within explicit task scope | Ignoring scope boundaries or changing architecture without justification |
-| Reviewer | Review artifacts, run build/tests, enforce rules, approve or reject | Modifying code directly |
-| Debugger | Investigate failures and apply minimal scoped fixes | Broad refactors, speculative redesigns, or unrelated cleanup |
-| DevOps | Modify Docker, CI/CD, deployment, environment, and build tooling | Changing business logic unless explicitly included in task scope |
-| Free Roam | Split, reroute, unblock, or apply targeted fixes when needed | Repeating the same failed loop or bypassing baseline rules in `AGENTS.md` |
-
-### Permission Rules
-
-- `AGENTS.md` is the baseline source of truth for repo-wide rules.
-- Agents must work only within the services and files explicitly listed in task scope.
-- Cross-service changes require explicit scope in `task.md` or PM assignment.
-- If a task requires work outside the current agent's role, route to the correct agent instead of improvising.
-- When in doubt, escalate to `free-roam` rather than violating role boundaries.
-
-## Flow
-
-```
-User Request -> PM -> Dev/Dev-2 -> Reviewer -> Done
-                                     |    |
-                                (reject) (infra)
-                                     |    |
-                                 Debugger DevOps
-```
-
-## Retry And Loop Control
-
-The AI Dev Office must not loop indefinitely between implementation and review stages.
-
-- Every task is subject to `loop_guard.max_iterations`.
-- Default loop limit is `5` iterations per task.
-- Repeated cycles such as `Reviewer -> Debugger -> Dev -> Reviewer` must not continue indefinitely.
-- When the loop limit is exceeded, escalate to `free-roam` with the blocker `Loop guard triggered: exceeded max_iterations`.
-- If Reviewer and Debugger produce conflicting conclusions across consecutive iterations, escalate to `free-roam` instead of continuing the same loop.
-- Agents must read `status.yaml` before acting and respect the current iteration count.
-
-## How to Use
-
-Optional project profile overlays (`profiles/*.yaml`) merge into `office.config.yaml` at runtime:
-
-```bash
-./ai-dev-office/run-agent.sh --profile games-labs TASK-NNN reviewer
-OFFICE_PROFILE=generic ./ai-dev-office/run-agent.sh TASK-NNN pm
-```
-
-Merge order and protected fields: `docs/config-profile-merge-contract.md`.
-
-### Create a new task (via PM)
+## Minimal commands
 
 ```bash
 ./ai-dev-office/run-agent.sh TASK-NNN pm
-```
-
-PM creates `task.md`, `status.yaml`, plans subtasks, and assigns to Dev/Dev-2.
-
-### Run an agent manually
-
-```bash
-./ai-dev-office/run-agent.sh TASK-NNN dev          # run Dev
-./ai-dev-office/run-agent.sh TASK-NNN dev-2        # run Dev-2
-./ai-dev-office/run-agent.sh TASK-NNN reviewer     # run Reviewer
-./ai-dev-office/run-agent.sh TASK-NNN devops       # run DevOps
-```
-
-### Run full pipeline automatically
-
-```bash
+./ai-dev-office/run-agent.sh TASK-NNN dev
 ./ai-dev-office/run-agent.sh TASK-NNN auto
-```
-
-### Switch runner
-
-```bash
-./ai-dev-office/run-agent.sh TASK-NNN dev codex         # Codex CLI
-./ai-dev-office/run-agent.sh TASK-NNN dev cursor-agent  # Cursor CLI Agent
-./ai-dev-office/run-agent.sh TASK-NNN dev cursor        # Cursor IDE prompt
-```
-
-### In Cursor
-
-When working in Cursor, read the agent prompt file directly and follow its contract:
-
-1. Read `ai-dev-office/agents/<agent>.md` for role and output format
-2. Read `ai-dev-office/runs/<task-id>/task.md` for task details
-3. Read `ai-dev-office/runs/<task-id>/status.yaml` for current state
-4. Produce output following the agent's Output Contract
-5. Save output to `ai-dev-office/runs/<task-id>/<agent>-output.yaml`
-
-### Check task status
-
-Read `ai-dev-office/runs/<task-id>/status.yaml` to see current phase, iteration, and history.
-For a concise read-only CLI summary, run:
-
-```bash
-./ai-dev-office/run-agent.sh status
 ./ai-dev-office/run-agent.sh status TASK-NNN
-```
-
-### Operator helpers
-
-Use these read-only helpers before or after normal agent runs:
-
-```bash
-./ai-dev-office/run-agent.sh intake "Fix wallet callback failure"
-./ai-dev-office/run-agent.sh verify TASK-NNN
-./ai-dev-office/run-agent.sh cleanup
-```
-
-- `intake` previews a next task id, task type, priority, scope hints, unknowns, and PM command.
-- `verify` recommends validation/build/test commands from task scope and artifacts.
-- `cleanup` reports validation failures, resolved blocked dependencies, missing dependencies, and route mismatches.
-
-### Validate runtime files
-
-Run:
-
-```bash
 ruby ai-dev-office/validate-yaml.rb TASK-NNN
 ```
 
-Use this after saving `status.yaml` or any `<agent>-output.yaml` file to catch malformed YAML, missing required fields, invalid `next_action.agent` values, or task state drift.
+Profile example: `./ai-dev-office/run-agent.sh --profile generic TASK-NNN reviewer`
 
-### Migrate legacy runtime files
+## Cursor session
 
-Run:
+1. Read `agents/<role>.md` for Output Contract
+2. Read `runs/<task-id>/task.md` and `status.yaml`
+3. Save `runs/<task-id>/<role>-output.yaml`
+4. Run `validate-yaml.rb`
 
-```bash
-ruby ai-dev-office/migrate-legacy-runtime.rb ai-dev-office/runs/TASK-011/reviewer-output.yaml
-```
+Rules/subagents: [docs/cursor-templates.md](docs/cursor-templates.md). Role text stays in `agents/*.md`.
 
-Use this when an older runtime file predates the current v2 output contract. The helper currently upgrades legacy `reviewer-output.yaml` files into the structured reviewer format expected by the validator. You can also pass a task directory such as `TASK-011`. Add `--write` to overwrite supported files after review.
+## Key paths
 
-## Key Files
+- `run-agent.sh` — CLI entry (supports `--profile` / `OFFICE_PROFILE`)
+- `agents/*.md` — role prompts (authoritative)
+- `office.config.example.yaml` — portable config template
+- `validate-yaml.rb` — runtime YAML validator
 
-- `office.config.yaml` -- agent registry and runner config
-- `workflows/hybrid-default.yaml` -- orchestration rules
-- `run-agent.sh` -- CLI runner script (supports `--profile` / `OFFICE_PROFILE`)
-- `scripts/resolve-office-config.rb` -- merges office config, profile, local overrides, and env
-- `scripts/bootstrap-project.sh` -- install a minimal Codex/Cursor-ready setup into a target project
-- `scripts/sync-to-project.sh` -- refresh installed framework files in a target project
-- `validate-yaml.rb` -- runtime validator for status and agent output YAML
-- `migrate-legacy-runtime.rb` -- helper to upgrade selected legacy runtime YAML files
-- `AGENTS.md` -- framework-wide rules for humans and AI agents
-- `office.config.example.yaml` -- portable config example with env placeholders
-- `templates/install-manifest.yaml` -- install boundary for bootstrap/sync
-- `profiles/` -- optional project-specific overlays
-- `templates/` -- reusable starter templates for target projects
-- `schemas/` -- validation schemas for status, structured task payloads, and agent handoff outputs
-- `runs/<task-id>/` -- task runtime data
-- `tasks/templates/new-task.yaml` -- task template (legacy, PM creates tasks now)
-
-## Handoff Contract
-
-Every agent output must include: `summary`, `artifacts`, `next_action`, `blockers`.
+Integration tests: [README.md](README.md#integration-tests).

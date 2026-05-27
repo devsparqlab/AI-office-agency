@@ -68,6 +68,11 @@ CORE_PATHS=(
   README.md
   office.config.example.yaml
   docs/config-profile-merge-contract.md
+  docs/getting-started.md
+  docs/codex.md
+  docs/cursor.md
+  docs/cursor-templates.md
+  docs/socraticode.md
   agents
   runners
   workflows

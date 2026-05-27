@@ -15,6 +15,12 @@ installable:
     - scripts/bootstrap-project.sh
     - scripts/sync-to-project.sh
     - scripts/resolve-office-config.rb
+    - docs/config-profile-merge-contract.md
+    - docs/getting-started.md
+    - docs/codex.md
+    - docs/cursor.md
+    - docs/cursor-templates.md
+    - docs/socraticode.md
   optional:
     - docs/skills/**
     - profiles/**

@@ -1,17 +1,22 @@
 # Profiles
 
-Profiles are optional overlays for the portable AI Dev Office framework.
+Optional overlays merge into `office.config.yaml` at runtime. See `docs/config-profile-merge-contract.md`.
 
-Use the config/profile merge contract in `docs/config-profile-merge-contract.md` to select a profile and layer it on top of `office.config.yaml`.
+```bash
+./ai-dev-office/run-agent.sh --profile generic TASK-001 pm
+OFFICE_PROFILE=games-labs ./ai-dev-office/run-agent.sh TASK-001 reviewer
+```
 
-## Included Profiles
+## Included profiles
 
-- `generic.yaml`: default profile for non-Go projects
-- `go-microservice.yaml`: Go projects that use shared dependency alignment
-- `games-labs.yaml`: current Games Labs workspace overlay
-- `frontend-nextjs.yaml`: Next.js frontend projects
-- `frontend-nuxt.yaml`: Nuxt frontend projects
+| Profile | Use when |
+|---------|----------|
+| [generic.yaml](generic.yaml) | Non-Go or neutral projects; dependency guard off |
+| [go-microservice.yaml](go-microservice.yaml) | Go services without monorepo guard scripts |
+| [games-labs.yaml](games-labs.yaml) | Games Lab Go monorepo — see [games-labs.md](games-labs.md) |
+| [frontend-nextjs.yaml](frontend-nextjs.yaml) | Next.js frontend |
+| [frontend-nuxt.yaml](frontend-nuxt.yaml) | Nuxt frontend |
 
-## Practical Rule
+Start with `generic` unless a more specific overlay is clearly needed.
 
-Start with `generic.yaml` unless the target project has a clear reason to use a more specific overlay.
+Local overrides: `profiles/<name>.local.yaml` (gitignored).
