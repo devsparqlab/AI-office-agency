@@ -19,6 +19,7 @@ Target projects are expected to provide their own `AGENTS.md` for project-specif
 - Put local overrides in ignored files such as `office.config.local.yaml`, `profiles/*.local.yaml`, `.env`, `.env.*`, and `.socraticode.local.yaml`.
 - Treat `office.config.example.yaml` as the portable starting point. It should use placeholders and profile-driven defaults rather than workspace-specific values.
 - Use `templates/install-manifest.yaml` as the contract for what can be installed into a target project by default.
+- Verify portable contract assumptions with `tests/integration/contract-foundation.sh` before changing framework docs or example config.
 - Do not copy runtime artifacts, logs, generated handoff outputs, or old task history unless a workflow explicitly asks for them.
 
 ## Framework boundaries

@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+
+PORTABLE_FILES=(
+  AGENTS.md
+  SKILL.md
+  office.config.example.yaml
+  templates/install-manifest.yaml
+  docs/config-profile-merge-contract.md
+  templates/project-AGENTS.md
+  templates/project-office.config.yaml
+)
+
+FORBIDDEN_PATTERNS=(
+  '../AGENTS.md'
+  '/Users/earth'
+  'd:\\llm'
+  'Games-Labs-'
+  'github.com/SparqLab/shared-lib'
+)
+
+GITIGNORE_REQUIRED=(
+  'office.config.local.yaml'
+  'profiles/*.local.yaml'
+  '.env'
+  '.socraticode.local.yaml'
+)
+
+assert_file() {
+  local path="$1"
+  local message="$2"
+  if [[ ! -f "$path" ]]; then
+    echo "[FAIL] $message: missing file $path"
+    exit 1
+  fi
+}
+
+assert_contains() {
+  local path="$1"
+  local expected="$2"
+  local message="$3"
+  if ! grep -Fq -- "$expected" "$path"; then
+    echo "[FAIL] $message: expected '$expected' in $path"
+    exit 1
+  fi
+}
+
+assert_not_contains() {
+  local path="$1"
+  local forbidden="$2"
+  local message="$3"
+  if grep -Fq -- "$forbidden" "$path"; then
+    echo "[FAIL] $message: forbidden pattern '$forbidden' found in $path"
+    exit 1
+  fi
+}
+
+echo "== Scenario 1: required framework contract files exist =="
+for rel in "${PORTABLE_FILES[@]}"; do
+  assert_file "$ROOT_DIR/$rel" "framework contract file"
+done
+
+echo "== Scenario 2: portable contract files avoid machine/project-specific assumptions =="
+for rel in "${PORTABLE_FILES[@]}"; do
+  for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+    assert_not_contains "$ROOT_DIR/$rel" "$pattern" "portable contract scan ($rel)"
+  done
+done
+
+echo "== Scenario 3: SKILL references in-repo AGENTS.md =="
+assert_contains "$ROOT_DIR/SKILL.md" 'AGENTS.md' "SKILL should reference AGENTS.md"
+assert_not_contains "$ROOT_DIR/SKILL.md" '../AGENTS.md' "SKILL must not depend on parent AGENTS.md"
+
+echo "== Scenario 4: .gitignore excludes local config =="
+for pattern in "${GITIGNORE_REQUIRED[@]}"; do
+  assert_contains "$ROOT_DIR/.gitignore" "$pattern" ".gitignore local config coverage"
+done
+
+echo "== Scenario 5: install manifest defines install and exclude boundaries =="
+ruby - "$ROOT_DIR/templates/install-manifest.yaml" <<'RUBY'
+require "yaml"
+
+path = ARGV[0]
+data = YAML.safe_load(File.read(path), aliases: true) || {}
+
+core = Array(data.dig("installable", "core")).map(&:to_s)
+optional = Array(data.dig("installable", "optional")).map(&:to_s)
+runtime_excludes = Array(data.dig("exclude", "runtime")).map(&:to_s)
+local_excludes = Array(data.dig("exclude", "local")).map(&:to_s)
+
+required_core = %w[
+  AGENTS.md
+  office.config.example.yaml
+  agents/**
+  runners/**
+  workflows/**
+  schemas/**
+]
+
+required_core.each do |entry|
+  abort "[FAIL] install manifest missing core entry: #{entry}" unless core.include?(entry)
+end
+
+%w[runs/** **/*-output.yaml **/*.log].each do |entry|
+  abort "[FAIL] install manifest missing runtime exclude: #{entry}" unless runtime_excludes.include?(entry)
+end
+
+%w[office.config.local.yaml profiles/*.local.yaml .env].each do |entry|
+  abort "[FAIL] install manifest missing local exclude: #{entry}" unless local_excludes.include?(entry)
+end
+
+abort "[FAIL] install manifest should keep profiles optional" unless optional.any? { |entry| entry.include?("profiles") }
+abort "[FAIL] install manifest should keep templates optional" unless optional.any? { |entry| entry.include?("templates") }
+
+puts "[OK] install manifest contract boundaries verified"
+RUBY
+
+echo "== Scenario 6: merge contract documents protected fields =="
+for field in \
+  'office.version' \
+  'state_model.source_of_truth' \
+  'handoff_contract.state_files' \
+  'agents[].id' \
+  'runner_selector.config_dir'
+do
+  assert_contains "$ROOT_DIR/docs/config-profile-merge-contract.md" "$field" "protected field documentation"
+done
+
+echo "== Scenario 7: example config uses env placeholders, not hardcoded paths =="
+assert_contains "$ROOT_DIR/office.config.example.yaml" '${SOCRATICODE_PRIMARY_PROJECT}' "example config primary project placeholder"
+assert_contains "$ROOT_DIR/office.config.example.yaml" '${SOCRATICODE_FALLBACK_PROJECT}' "example config fallback project placeholder"
+assert_not_contains "$ROOT_DIR/office.config.example.yaml" '/Users/' "example config must not hardcode user paths"
+ruby - "$ROOT_DIR/office.config.example.yaml" <<'RUBY'
+require "yaml"
+
+path = ARGV[0]
+data = YAML.safe_load(File.read(path), aliases: true) || {}
+
+enabled = data.dig("dependency_guard", "enabled")
+abort "[FAIL] example config should default dependency_guard.enabled to false" unless enabled == false
+
+abort "[FAIL] example config must define handoff_contract.state_files" unless data.dig("handoff_contract", "state_files").is_a?(Hash)
+abort "[FAIL] example config must define state_model.source_of_truth" unless data.dig("state_model", "source_of_truth") == "status.yaml"
+
+agent_ids = Array(data["agents"]).map { |entry| entry["id"].to_s }
+required = %w[pm dev dev-2 reviewer debugger devops free-roam]
+missing = required - agent_ids
+abort "[FAIL] example config missing agent ids: #{missing.join(', ')}" unless missing.empty?
+
+puts "[OK] example config portable defaults verified"
+RUBY
+
+echo "[PASS] framework contract foundation scenarios passed"

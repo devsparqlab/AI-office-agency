@@ -351,6 +351,7 @@ instead of falling back silently:
 
 ```bash
 # Individual scenarios
+ai-dev-office/tests/integration/contract-foundation.sh
 ai-dev-office/tests/integration/dependency-policy.sh
 ai-dev-office/tests/integration/dependency-guard.sh
 ai-dev-office/tests/integration/auto-parallel.sh
@@ -364,6 +365,7 @@ ai-dev-office/tests/integration/profile-merge.sh
 
 | Script | What it checks |
 |--------|----------------|
+| `contract-foundation.sh` | Portable framework contract files, protected fields, install manifest boundaries |
 | `dependency-policy.sh` | Blocked dispatch guard, automatic unblock, Dev-to-Reviewer handoff |
 | `dependency-guard.sh` | `check-service-dependencies.sh` integration with runner |
 | `auto-parallel.sh` | PM parallel plan validation and auto-mode concurrent dev lanes |
