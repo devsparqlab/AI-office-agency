@@ -165,6 +165,8 @@ Use this when an older runtime file predates the current v2 output contract. The
 - `office.config.yaml` -- agent registry and runner config
 - `workflows/hybrid-default.yaml` -- orchestration rules
 - `run-agent.sh` -- CLI runner script
+- `scripts/bootstrap-project.sh` -- install a minimal Codex/Cursor-ready setup into a target project
+- `scripts/sync-to-project.sh` -- refresh installed framework files in a target project
 - `validate-yaml.rb` -- runtime validator for status and agent output YAML
 - `migrate-legacy-runtime.rb` -- helper to upgrade selected legacy runtime YAML files
 - `AGENTS.md` -- framework-wide rules for humans and AI agents

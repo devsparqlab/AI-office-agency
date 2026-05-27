@@ -12,10 +12,13 @@ installable:
     - runners/**
     - workflows/**
     - schemas/**
+    - scripts/bootstrap-project.sh
+    - scripts/sync-to-project.sh
   optional:
     - docs/skills/**
     - profiles/**
     - templates/**
+    - scripts/check-service-dependencies.sh
     - .cursor/rules/**
     - .cursor/agents/**
 

@@ -96,6 +96,19 @@ These helpers are non-mutating in v2: `intake` previews a PM-ready task,
 inconsistent runtime artifacts without changing them. Skill guides:
 `docs/skills/office-intake.md`, `docs/skills/office-verify.md`, `docs/skills/office-cleanup.md`.
 
+### Bootstrap a target project
+
+```bash
+./ai-dev-office/scripts/bootstrap-project.sh --target ../target-project --profile generic
+./ai-dev-office/scripts/sync-to-project.sh --target ../target-project --profile games-labs
+```
+
+`bootstrap-project.sh` creates starter project files such as `AGENTS.md`,
+`office.config.yaml`, `.agents/skills/`, `.cursor/rules/`, `.cursor/agents/`,
+and starter docs. `sync-to-project.sh` refreshes the installed framework files.
+Both commands follow `templates/install-manifest.yaml` and do not copy runtime
+task history, logs, or local machine config by default.
+
 ### SocratiCode context provider
 
 `run-agent.sh` can inject a local SocratiCode context section into each role
