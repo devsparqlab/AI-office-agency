@@ -1,0 +1,100 @@
+task:
+  id: "TASK-074"
+  title: "Sigma Gameplay Turnover Settlement Validation"
+  short_name: "sigma-turnover-validation"
+  parent: "TASK-069"
+  epic: "Quest Daily Turnover / Provider Gameplay Settlement"
+  type: bugfix
+  priority: medium
+  created_at: "2026-06-01"
+scope:
+  target_services:
+    - service: Games-Labs-Provider
+      reason: "Sigma owns end-round provider callbacks and current tx.Debit turnover mapping."
+    - service: Games-Labs-Game
+      reason: "Receives SettleRound; no code change expected."
+    - service: ai-dev-office
+      reason: "Tracks provider-specific verification evidence."
+  affected_files:
+    - path: "Games-Labs-Provider/internal/core/services/sigma/service.go"
+      action: modify
+      description: "Validate real wallet-success end-round SettleRound hooks."
+    - path: "Games-Labs-Provider/internal/core/services/sigma/turnover.go"
+      action: modify
+      description: "Validate debit/stake amount mapping and units."
+    - path: "Games-Labs-Provider/internal/core/services/sigma/turnover_test.go"
+      action: modify
+      description: "Cover end-round and zero/non-settlement behavior."
+    - path: "Games-Labs-Provider/README.md"
+      action: modify
+      description: "Document Sigma turnover source and E2E status."
+    - path: "ai-dev-office/runs/TASK-074/verification-evidence.md"
+      action: create
+      description: "Record Sigma SQL/log checklist or deferral reason."
+description: "Validate Sigma turnover as a focused provider lane and explicitly state whether Sigma is E2E-ready or deferred because wallet behavior is stubbed."
+acceptance_criteria:
+  - criterion: "Sigma calls Game SettleRound only on real wallet-success end-round paths."
+  - criterion: "settled_amount uses authoritative stake/debit amount with documented unit semantics."
+  - criterion: "Cancel/reverse paths do not create forward turnover and any reverse gap is documented."
+  - criterion: "Tests cover debit amount, zero debit, end-round gate, and non-settlement paths."
+  - criterion: "README/evidence clearly states whether Sigma is E2E verified or intentionally deferred."
+plan:
+  approach: "Reuse TASK-070 evidence format, inspect Sigma wallet path, and either validate live turnover or document a deferral with tests around existing hooks."
+  subtasks:
+    - order: 1
+      id: "sigma-wallet-path-check"
+      description: "Confirm whether Sigma wallet path is real or stubbed."
+      agent: dev-2
+      owned_files:
+        - "ai-dev-office/runs/TASK-074/verification-evidence.md"
+      parallel_safe: false
+    - order: 2
+      id: "sigma-tests-code"
+      description: "Add/tighten tests and minimal code for end-round turnover."
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Provider/internal/core/services/sigma/service.go"
+        - "Games-Labs-Provider/internal/core/services/sigma/turnover.go"
+        - "Games-Labs-Provider/internal/core/services/sigma/turnover_test.go"
+      parallel_safe: false
+    - order: 3
+      id: "sigma-docs"
+      description: "Update README and evidence."
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Provider/README.md"
+        - "ai-dev-office/runs/TASK-074/verification-evidence.md"
+      parallel_safe: false
+  risks:
+    - risk: "Sigma wallet path may not be production-real."
+      mitigation: "Do not claim E2E readiness without runtime evidence."
+  estimated_complexity: medium
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "Provider-specific validation should run after IDG pattern is proven."
+summary: "TASK-074 isolates Sigma turnover verification and E2E readiness decision."
+artifacts:
+  - path: runs/TASK-074/task.md
+    action: created
+  - path: runs/TASK-074/status.yaml
+    action: created
+  - path: runs/TASK-074/pm-output.yaml
+    action: created
+next_action:
+  agent: dev-2
+  reason: "Blocked until TASK-070 is complete."
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "Sigma SettleRound tx.Debit isEndRound wallet path"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/sigma/service.go"
+      - "Games-Labs-Provider/internal/core/services/sigma/turnover.go"
+    notes: "Current code maps tx.Debit but wallet E2E readiness needs confirmation."
+blockers:
+  - "TASK-070 should land first so evidence/checklist format is reused."

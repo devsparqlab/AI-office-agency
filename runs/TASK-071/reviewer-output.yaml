@@ -1,0 +1,47 @@
+summary: |
+  Approved. 1UP gameplay turnover now has focused validation around the existing `bets/result` settlement flow: forward `SettleRound` is asserted only after wallet debit/win operations succeed, turnover uses request `bet` first with cached bet fallback, wallet failures skip settlement, and refund remains intentionally forward-settlement-free.
+
+  I fixed one evidence SQL issue during review so the `round_lifecycles` checklist matches the actual Game schema (`round_id`, `game_id`, `game_type`, `settled_amount`; no `provider_code` column). Local Provider verification passed after that correction.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    In `Games-Labs-Provider`:
+    - `go test -count=1 ./internal/core/services/oneup ./internal/handlers/providerhdl`
+    - `go test ./...`
+    - `git diff --check`
+artifacts:
+  - path: Games-Labs-Provider/internal/core/services/oneup/callback.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/oneup/turnover.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/oneup/turnover_test.go
+    issues: []
+  - path: Games-Labs-Provider/internal/handlers/providerhdl/oneup_callback_test.go
+    issues: []
+  - path: Games-Labs-Provider/README.md
+    issues: []
+  - path: ai-dev-office/runs/TASK-071/verification-evidence.md
+    issues: []
+next_action:
+  agent: done
+  reason: Acceptance criteria are satisfied and local Provider verification passed.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "TASK-071 1UP OneUpBetResult oneup turnover SettleRound req.Bet refund skip Games-Labs-Provider"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/oneup/callback.go"
+      - "Games-Labs-Provider/internal/core/services/oneup/turnover.go"
+      - "Games-Labs-Provider/internal/handlers/providerhdl/oneup_callback_test.go"
+      - "Games-Labs-Game/migrations/007_round_lifecycles_table.sql"
+    notes: SocratiCode was used for discovery; final verdict is based on current source files, schema files, and fresh local test results.
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

@@ -1,0 +1,32 @@
+---
+task_id: TASK-072
+phase: done
+state: done
+current_agent: reviewer
+iteration: 0
+assigned_to: done
+created_at: '2026-06-01'
+updated_at: '2026-06-01'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-072/reviewer-output.yaml
+history:
+- phase: created -> blocked
+  agent: pm
+  reason: VP turnover validation should reuse the IDG provider-specific verification pattern after TASK-070 lands.
+- phase: blocked -> assigned
+  agent: codex
+  reason: TASK-070 and TASK-071 closed with staging validation; VP can now reuse the settled provider verification pattern.
+- phase: assigned -> review
+  agent: dev-2
+  reason: VP betnsettle turnover now has focused service coverage, updated docs/evidence, and passing Provider tests.
+- phase: review -> done
+  agent: reviewer
+  reason: Re-verified VP package tests, Provider-wide tests, docs/evidence, and approved TASK-072.

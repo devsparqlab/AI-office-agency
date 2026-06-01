@@ -1,0 +1,43 @@
+---
+task_id: TASK-070
+phase: done
+state: done
+current_agent: reviewer
+iteration: 2
+assigned_to: done
+created_at: '2026-06-01'
+updated_at: '2026-06-01'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: debugger
+  to: done
+  artifact: runs/TASK-070/reviewer-output.yaml
+history:
+- phase: created -> assigned
+  agent: pm
+  reason: Opened first provider-specific turnover repair task for IDG bet-debit SettleRound
+    and cancel reversal semantics.
+- phase: assigned -> review
+  agent: dev-2
+  reason: Bet-debit SettleRound implemented; cancel reverse documented as staging
+    blocker pending Game ReverseRound gRPC.
+- phase: review -> debugging
+  agent: reviewer
+  reason: Provider tests passed, but the README verification checklist still references
+    removed idg:win settlement logs instead of the new idg:bet path.
+- phase: debugging -> review
+  agent: debugger
+  reason: Updated Provider README verification checklist to reference idg:bet SettleRound
+    logs and recorded debugger output.
+- phase: review -> in_review
+  agent: debugger
+  reason: The scoped blocker was fixed; reviewer should re-check the README acceptance
+    item and existing passing Provider tests.
+- phase: in_review -> done
+  agent: reviewer
+  reason: Re-verified the README fix, Provider tests, and workspace dependency guard; approved TASK-070.

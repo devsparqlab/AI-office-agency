@@ -1,0 +1,51 @@
+summary: |
+  Validated Sigma as a provider-specific turnover lane without overstating E2E
+  readiness. The service now exposes a small `trySettleRoundHook` seam so
+  focused tests can assert that Game `SettleRound` only fires on
+  `DebitAndCredit`/`Credit` when `isEndRound=true`, and on `ArcadeSettle`,
+  while `Cancel` stays wallet-only.
+
+  Tightened Sigma coverage across the service and turnover mapper. Tests now
+  cover debit-to-turnover mapping, zero-debit omission, `roundId` primary with
+  `txId` fallback, end-round gating, `ArcadeSettle` forwarding, and
+  `Cancel` no-settlement behavior.
+
+  Updated the Provider README and TASK-074 verification evidence to state the
+  crucial runtime caveat clearly: Sigma's `walletOp` path in the current
+  service is still a stub returning balance `0`, so this task is a local hook
+  validation plus explicit E2E deferral, not a staging sign-off.
+
+  Verification:
+  - `go test ./internal/core/services/sigma ./internal/handlers/sigmahdl`
+  - `go test ./...`
+  - `git diff --check`
+artifacts:
+  - path: Games-Labs-Provider/internal/core/services/sigma/service.go
+    action: modified
+  - path: Games-Labs-Provider/internal/core/services/sigma/service_test.go
+    action: created
+  - path: Games-Labs-Provider/internal/core/services/sigma/turnover_test.go
+    action: modified
+  - path: Games-Labs-Provider/README.md
+    action: modified
+  - path: ai-dev-office/runs/TASK-074/verification-evidence.md
+    action: created
+  - path: ai-dev-office/runs/TASK-074/dev-2-output.yaml
+    action: created
+next_action:
+  agent: reviewer
+  reason: Sigma local turnover validation is complete and needs final approval as a documented E2E deferral.
+context_sources:
+  github:
+    branch: "main"
+    pr: ""
+  socraticode:
+    status: unavailable
+    queries:
+      - "Sigma SettleRound tx.Debit isEndRound wallet path"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/sigma/service.go"
+      - "Games-Labs-Provider/internal/core/services/sigma/turnover.go"
+      - "ai-dev-office/runs/TASK-074/task.md"
+    notes: "Session did not expose SocratiCode tools, so scope and validation were verified directly against source and fresh local tests."
+blockers: []

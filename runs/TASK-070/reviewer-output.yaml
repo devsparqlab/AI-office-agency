@@ -1,0 +1,53 @@
+summary: |
+  Approved. `TASK-070` now fully meets its scoped acceptance criteria: IDG turnover is produced from `IDGBet` after successful wallet debit, `IDGWin` no longer double-settles, the cancel reverse gap remains explicitly documented as a staging blocker, and the Provider README verification checklist now points operators at the correct `idg:bet` log path.
+
+  I rechecked the README fix on disk, reran the focused IDG tests and the full `Games-Labs-Provider` test suite, and also resolved the workspace dependency-guard failure by aligning `shared-lib` across the guarded services to `v0.0.0-20260529041137-2f2ab061be47`. The dependency guard now passes again.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    In `Games-Labs-Provider`:
+    - `go test ./internal/core/services/idg ./internal/handlers/idghdl`
+    - `go test ./...`
+    - `git diff --check`
+
+    Workspace dependency guard:
+    - `GOPRIVATE="github.com/SparqLab/*" GONOSUMDB="github.com/SparqLab/*" ./ai-dev-office/scripts/check-service-dependencies.sh`
+    - Passed after aligning guarded repos to `github.com/SparqLab/shared-lib v0.0.0-20260529041137-2f2ab061be47`
+artifacts:
+  - path: Games-Labs-Provider/internal/core/services/idg/callback.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/idg/turnover.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/idg/callback_test.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/idg/turnover_test.go
+    issues: []
+  - path: Games-Labs-Provider/README.md
+    issues: []
+  - path: ai-dev-office/runs/TASK-070/verification-evidence.md
+    issues: []
+next_action:
+  agent: done
+  reason: Acceptance criteria are satisfied, local verification passed, and the dependency guard is green again.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "TASK-070 IDG SettleRound IntegratorBet IntegratorCancel idgBetSettledAmount ReverseRound Games-Labs-Provider"
+      - "TASK-070 IDG README verification table idg:win idg:bet SettleRound"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/idg/callback.go"
+      - "Games-Labs-Provider/internal/core/services/idg/turnover.go"
+      - "Games-Labs-Provider/internal/adapters/gameadt/settle_round.go"
+      - "shared-lib/proto/gamepb/game.proto"
+      - "Games-Labs-Provider/README.md"
+    notes: SocratiCode was used for discovery and impact checks; final approval is based on current source files on disk plus fresh test and dependency-guard results.
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

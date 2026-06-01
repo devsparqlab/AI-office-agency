@@ -1,0 +1,50 @@
+summary: |
+  Validated and tightened the 1UP gameplay turnover path without changing the
+  external callback contract. `BetResult` already gated Game settlement after
+  wallet debit/win and balance lookup; I added the same test seam used by the
+  TASK-070 IDG lane so tests can assert the `TrySettleRound` call directly.
+
+  Added focused tests for request `bet` as the authoritative turnover source,
+  Redis cached bet fallback, zero/no-source handling, wallet debit failure skip,
+  win credit failure skip, and refund no forward `SettleRound`. Handler tests now
+  also lock wallet-failure error mapping and refund endpoint delegation.
+
+  README and verification evidence now include 1UP-specific log grep patterns,
+  wallet SQL, Game `round_lifecycles` SQL, and Missions `turnover.settled`
+  downstream checks. Refund remains intentionally forward-settlement-free; there
+  is no reverse Game contract implemented for 1UP in this task.
+
+  Verification:
+  - `go test ./internal/core/services/oneup ./internal/handlers/providerhdl -count=1`
+  - `go test ./...`
+artifacts:
+  - path: Games-Labs-Provider/internal/core/services/oneup/callback.go
+    action: modified
+  - path: Games-Labs-Provider/internal/core/services/oneup/turnover_test.go
+    action: modified
+  - path: Games-Labs-Provider/internal/handlers/providerhdl/oneup_callback_test.go
+    action: modified
+  - path: Games-Labs-Provider/README.md
+    action: modified
+  - path: ai-dev-office/runs/TASK-071/verification-evidence.md
+    action: created
+  - path: ai-dev-office/runs/TASK-071/dev-2-output.yaml
+    action: created
+next_action:
+  agent: reviewer
+  reason: 1UP turnover validation is covered by focused tests, Provider-wide tests pass, and runtime evidence checklist is recorded.
+context_sources:
+  github:
+    branch: "main"
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "TASK-071 1UP bets/result SettleRound turnover callback req.Bet Redis fallback refund skip"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/oneup/callback.go"
+      - "Games-Labs-Provider/internal/core/services/oneup/turnover.go"
+      - "Games-Labs-Provider/internal/adapters/gameadt/settle_round.go"
+      - "ai-dev-office/runs/TASK-070/verification-evidence.md"
+    notes: "Remote d:\\llm index was available; all implementation details were verified against local source."
+blockers: []

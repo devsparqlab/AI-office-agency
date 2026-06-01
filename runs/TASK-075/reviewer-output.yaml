@@ -1,0 +1,51 @@
+summary: |
+  Approved. AFB remains the reference payout-time gameplay turnover lane:
+  forward `SettleRound` is asserted only after payout wallet transactions
+  succeed, turnover uses payout `valid_turnover` first with transaction
+  `valid_turnover` and debit-magnitude fallbacks, and the docs now clearly warn
+  that bet-only wallet rows do not advance Daily turnover before payout.
+
+  I rechecked the new AFB service seam, turnover fallback tests, README QA
+  guidance, and task evidence on disk. Local Provider verification passed,
+  including the focused AFB package tests, the full `Games-Labs-Provider`
+  suite, and `git diff --check`.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    In `Games-Labs-Provider`:
+    - `go test ./internal/core/services/afb`
+    - `go test ./...`
+    - `git diff --check`
+artifacts:
+  - path: Games-Labs-Provider/internal/core/services/afb/service.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/afb/service_test.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/afb/turnover_test.go
+    issues: []
+  - path: Games-Labs-Provider/README.md
+    issues: []
+  - path: ai-dev-office/runs/TASK-075/verification-evidence.md
+    issues: []
+next_action:
+  agent: done
+  reason: Acceptance criteria are satisfied and local Provider verification passed.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "TASK-075 AFB payout valid_turnover debit fallback SettleRound Games-Labs-Provider"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/afb/service.go"
+      - "Games-Labs-Provider/internal/core/models/providers/afb/afb.go"
+      - "ai-dev-office/runs/TASK-075/verification-evidence.md"
+    notes: SocratiCode was used for discovery; final approval is based on current source files and fresh local verification.
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

@@ -1,0 +1,32 @@
+---
+task_id: TASK-075
+phase: done
+state: done
+current_agent: reviewer
+iteration: 0
+assigned_to: done
+created_at: '2026-06-01'
+updated_at: '2026-06-01'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-075/reviewer-output.yaml
+history:
+- phase: created -> blocked
+  agent: pm
+  reason: AFB turnover validation should reuse the IDG provider-specific verification pattern after TASK-070 lands.
+- phase: blocked -> assigned
+  agent: codex
+  reason: TASK-070 through TASK-073 established the provider verification pattern; AFB is ready for implementation.
+- phase: assigned -> review
+  agent: dev-2
+  reason: AFB payout turnover now has focused service coverage, updated docs/evidence, and passing Provider tests.
+- phase: review -> done
+  agent: reviewer
+  reason: Re-verified AFB package tests, Provider-wide tests, docs/evidence, and approved TASK-075.

@@ -1,0 +1,34 @@
+summary: |
+  Root cause was a stale README evidence table row left behind from the pre-TASK-070 IDG win-time settlement flow. The implementation and grep command had already moved to the `idg:bet` bet-debit path, but the checklist still told operators to look for `[idg:win]` SettleRound outcomes.
+
+  Updated `Games-Labs-Provider/README.md` so the IDG verification table now documents `[idg:bet] game SettleRound ... err=` and `[idg:bet] skip SettleRound: GAME_API_URL not configured`, matching the current `IntegratorBet` call to `TrySettleRound` and the shared `TrySettleRound` log format. Verified the stale `idg:win` README text is gone and the README diff has no whitespace errors.
+diagnosis:
+  root_cause: "Provider README verification checklist retained stale `[idg:win]` log examples after TASK-070 moved IDG SettleRound production to `IDGBet`."
+  affected_files:
+    - path: "Games-Labs-Provider/README.md"
+      lines: "74-75"
+  confidence: high
+artifacts:
+  - path: "Games-Labs-Provider/README.md"
+    action: modified
+    description: "Updated IDG verification evidence rows from win-time `[idg:win]` logs to bet-debit `[idg:bet]` SettleRound logs."
+  - path: "ai-dev-office/runs/TASK-070/debugger-output.yaml"
+    action: modified
+    description: "Recorded debugger diagnosis, fix, verification, and next handoff."
+next_action:
+  agent: reviewer
+  reason: "The scoped blocker was fixed; reviewer should re-check the README acceptance item and existing passing Provider tests."
+context_sources:
+  github:
+    branch: "main"
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "TASK-070 IDG README verification table idg:win idg:bet SettleRound"
+    relevant_symbols:
+      - "Games-Labs-Provider/README.md"
+      - "Games-Labs-Provider/internal/core/services/idg/callback.go"
+      - "Games-Labs-Provider/internal/adapters/gameadt/settle_round.go"
+    notes: "Primary `d:\\llm` status was green but actively indexing; search was used for navigation and source files on disk were the final evidence."
+blockers: []
