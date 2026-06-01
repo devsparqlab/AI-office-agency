@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './styles/globals.css';
-import { 
+import type { 
   RunSummary, 
   RunDetail, 
   DashboardStats, 
-  HealthStatus 
+  HealthStatus,
+  DashboardSseEvent
 } from '../../shared/types';
 import ReactMarkdown from 'react-markdown';
 import { Activity, Terminal, LayoutDashboard, Search, Filter, AlertCircle, CheckCircle2, Clock, PlayCircle, Loader2 } from 'lucide-react';
@@ -18,16 +19,18 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [logContent, setLogContent] = useState<string | null>(null);
+  const selectedRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchInitialData();
-    setupSSE();
+    return setupSSE();
   }, []);
 
   useEffect(() => {
     if (selectedRunId) {
       fetchRunDetail(selectedRunId);
     }
+    selectedRunIdRef.current = selectedRunId;
   }, [selectedRunId]);
 
   const fetchInitialData = async () => {
@@ -75,14 +78,15 @@ const App: React.FC = () => {
 
   const setupSSE = () => {
     const eventSource = new EventSource('/api/events');
-    eventSource.onmessage = (event) => {
-      const update = JSON.parse(event.data);
+    const onRunsChanged = (event: MessageEvent<string>) => {
+      const update = JSON.parse(event.data) as DashboardSseEvent;
       console.log('Update received:', update);
       fetchInitialData(); // Refresh on any change
-      if (selectedRunId) {
-        fetchRunDetail(selectedRunId);
+      if (selectedRunIdRef.current) {
+        fetchRunDetail(selectedRunIdRef.current);
       }
     };
+    eventSource.addEventListener('runs.changed', onRunsChanged);
     return () => eventSource.close();
   };
 

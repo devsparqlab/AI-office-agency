@@ -2,14 +2,50 @@ import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
 import { config } from '../config';
-import { 
+import type { 
   RunSummary, 
   RunDetail, 
   RunStatus, 
   AgentName, 
   RunArtifact, 
   AgentTimelineEvent 
-} from '../../shared/types';
+} from '@shared/types';
+
+const RUN_STATUS_PRIORITY: Record<RunStatus, number> = {
+  running: 0,
+  blocked: 1,
+  waiting_review: 2,
+  failed: 3,
+  queued: 4,
+  unknown: 5,
+  completed: 6,
+  cancelled: 7,
+};
+
+function taskIdNumber(taskId: string): number | null {
+  const match = taskId.match(/^TASK-(\d+)$/);
+  if (!match) return null;
+  return parseInt(match[1], 10);
+}
+
+export function sortRunsByPriority(runs: RunSummary[]): RunSummary[] {
+  return [...runs].sort((a: RunSummary, b: RunSummary) => {
+    const priorityDiff = RUN_STATUS_PRIORITY[a.status] - RUN_STATUS_PRIORITY[b.status];
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const numA = taskIdNumber(a.id);
+    const numB = taskIdNumber(b.id);
+    if (numA !== null && numB !== null && numA !== numB) {
+      return numB - numA;
+    }
+
+    if (a.updatedAt !== b.updatedAt) {
+      return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+    }
+
+    return b.id.localeCompare(a.id);
+  });
+}
 
 export class RunScanner {
   async listRuns(): Promise<RunSummary[]> {
@@ -30,11 +66,7 @@ export class RunScanner {
         })
       );
 
-      return summaries.sort((a, b) => {
-        const dateA = a.updatedAt || '';
-        const dateB = b.updatedAt || '';
-        return dateB.localeCompare(dateA);
-      });
+      return sortRunsByPriority(summaries);
     } catch (err) {
       console.error('Error listing runs:', err);
       return [];
@@ -93,7 +125,7 @@ export class RunScanner {
       });
 
       // Try to find output markdown
-      const outputFiles = detail.artifacts.filter(a => a.name.endsWith('-output.md'));
+      const outputFiles = detail.artifacts.filter((a: RunArtifact) => a.name.endsWith('-output.md'));
       if (outputFiles.length > 0) {
         detail.outputMarkdown = await fs.readFile(path.join(runPath, outputFiles[0].name), 'utf8');
       }

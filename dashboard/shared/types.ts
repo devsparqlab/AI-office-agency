@@ -68,8 +68,41 @@ export interface DashboardStats {
 export interface HealthStatus {
   ok: boolean;
   aiOfficeRoot: string;
+  timestamp: string;
   runsDirExists: boolean;
   logsDirExists: boolean;
   watcherActive: boolean;
+  paths: {
+    runsDir: string;
+    logsDir: string;
+  };
+  config: {
+    port: number;
+    sseHeartbeatMs: number;
+    logTailLines: number;
+  };
+  watcher: {
+    active: boolean;
+    debounceMs: number;
+  };
   error?: string;
+}
+
+export type WatcherEventType = "add" | "change" | "unlink";
+
+export interface WatcherUpdate {
+  type: "runs.changed";
+  events: WatcherEventType[];
+  paths: string[];
+  timestamp: string;
+}
+
+export type DashboardSseEvent = WatcherUpdate;
+
+export interface LogTailResponse {
+  content: string;
+  size: number;
+  bytesRead: number;
+  truncated: boolean;
+  strategy: "full-read-tail" | "reverse-chunk-tail";
 }

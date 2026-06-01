@@ -11,6 +11,7 @@ export interface DashboardConfig {
   logsDir: string;
   port: number;
   sseHeartbeatMs: number;
+  watcherDebounceMs: number;
   logTailLines: number;
 }
 
@@ -20,5 +21,6 @@ export const config: DashboardConfig = {
   logsDir: path.join(AI_OFFICE_ROOT, 'logs'),
   port: parseInt(process.env.DASHBOARD_PORT || '4310', 10),
   sseHeartbeatMs: parseInt(process.env.SSE_HEARTBEAT_MS || '15000', 10),
+  watcherDebounceMs: parseInt(process.env.WATCHER_DEBOUNCE_MS || '500', 10),
   logTailLines: parseInt(process.env.LOG_TAIL_LINES || '500', 10),
 };
