@@ -1,0 +1,70 @@
+summary: |
+  Root cause for Quest Collect turnover stuck at zero: gameplay wallet callbacks never reached Game SettleRound
+  (only AFB did), so round_lifecycles and turnover.settled never reached Missions. Missions TURNOVER_AMOUNT
+  already maps only turnover.settled — mapping spend.settled would be wrong.
+
+  Free Roam applied the producer fix: shared gameadt.TrySettleRound, wired 1UP/VP/IDG/GGSoft/Sigma settlement
+  hooks with positive SettledAmount mappers, refactored AFB to the helper, and made Games-Labs-Game fail fast
+  when RABBITMQ_URL is missing so player.activity events cannot silently drop.
+
+decision:
+  action: fix
+  details: |
+    Implemented TASK-069 producer path end-to-end in Provider + Game startup guard. No Missions changes.
+    Reviewer should verify staging: wallet callback → round_lifecycles row → RabbitMQ turnover.settled →
+    quest/overview progress for daily-turnover-6000.
+
+artifacts:
+  - path: Games-Labs-Provider/internal/adapters/gameadt/settle_round.go
+    action: modified
+    description: Added TrySettleRound fire-and-forget helper.
+  - path: Games-Labs-Provider/internal/core/services/providers/afb.go
+    action: modified
+    description: Refactored payout settlement to TrySettleRound.
+  - path: Games-Labs-Provider/internal/handlers/providerhdl/oneup_callback.go
+    action: modified
+    description: SettleRound after OneUpBetResult wallet success.
+  - path: Games-Labs-Provider/internal/handlers/vphdl/vp_seamless.go
+    action: modified
+    description: SettleRound after betnsettle wallet success.
+  - path: Games-Labs-Provider/internal/handlers/idghdl/idg_callback.go
+    action: modified
+    description: Wager stake cache at bet; SettleRound on win.
+  - path: Games-Labs-Provider/internal/core/services/providers/ggsoft.go
+    action: modified
+    description: SettleRound on type 4 end_round after wallet success.
+  - path: Games-Labs-Provider/internal/core/services/providers/sigma.go
+    action: modified
+    description: SettleRound on end-round Sigma callbacks (wallet still stubbed).
+  - path: Games-Labs-Provider/cmd/main.go
+    action: modified
+    description: Injected gameClient into all seamless handlers/services.
+  - path: Games-Labs-Game/cmd/main.go
+    action: modified
+    description: Require RABBITMQ_URL and publisher init at startup.
+  - path: ai-dev-office/runs/TASK-069/task.md
+    action: modified
+    description: Clarified no spend.settled→turnover mapping; Game RABBITMQ mandatory.
+
+next_action:
+  agent: reviewer
+  reason: Build/tests pass locally; staging E2E should confirm turnover.settled → Missions quest progress.
+
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "SettleRound turnover.settled gameplay settlement"
+      - "spend.settled TURNOVER_AMOUNT quest collect"
+    relevant_symbols:
+      - Games-Labs-Missions/internal/services/mission_service.go
+      - Games-Labs-Game/internal/core/services/gamesvc/service.go
+      - Games-Labs-Provider/internal/core/services/providers/afb.go
+    notes: Verified Missions maps TURNOVER_AMOUNT only from turnover.settled; implemented Provider+Game producer fixes.
+
+blockers:
+  - Sigma wallet remains stubbed — SettleRound hook is wired but real-wallet E2E for Sigma still blocked until wallet ops are live.
+  - Staging must set GAME_API_URL on Provider and RABBITMQ_URL on Game (k3s secret already present for Game).
