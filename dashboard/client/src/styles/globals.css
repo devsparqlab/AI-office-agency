@@ -1,0 +1,149 @@
+:root {
+  --bg-color: #0d1117;
+  --sidebar-bg: #161b22;
+  --card-bg: #21262d;
+  --text-primary: #c9d1d9;
+  --text-secondary: #8b949e;
+  --accent-color: #58a6ff;
+  --border-color: #30363d;
+  --status-success: #238636;
+  --status-error: #da3633;
+  --status-warning: #d29922;
+  --status-running: #1f6feb;
+  --status-queued: #8b949e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 320px;
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.run-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.run-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.run-item:hover {
+  background-color: var(--card-bg);
+}
+
+.run-item.active {
+  background-color: var(--border-color);
+  border-left: 4px solid var(--accent-color);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-completed { background-color: var(--status-success); color: white; }
+.status-failed { background-color: var(--status-error); color: white; }
+.status-running { background-color: var(--status-running); color: white; }
+.status-blocked { background-color: var(--status-warning); color: white; }
+.status-queued { background-color: var(--status-queued); color: white; }
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.card-title {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.card-value {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.log-terminal {
+  background-color: black;
+  color: #00ff00;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 13px;
+  padding: 16px;
+  border-radius: 6px;
+  height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.timeline {
+  position: relative;
+  margin-top: 20px;
+  padding-left: 30px;
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 20px;
+}
+
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--border-color);
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -24px;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--accent-color);
+}
