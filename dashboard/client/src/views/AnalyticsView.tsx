@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Clock, BarChart3, Activity, Loader2, Terminal } from 'lucide-react';
 import type { 
+  AnalyticsResponse,
   AnalyticsSummary, 
   AnalyticsTrends, 
   AnalyticsFailures, 
@@ -10,6 +11,28 @@ import type {
 } from '../../../shared/types';
 
 export function AnalyticsView() {
+  // Reuse /api/analytics for initial load of summary, trends, and topFailureReasons.
+  // Keep agents and long-running as separate requests to avoid widening the response contract.
+  const [overview, setOverview] = useState<AnalyticsResponse | null>(null);
+  const [overviewReady, setOverviewReady] = useState(false);
+
+  const fetchOverview = () => {
+    setOverviewReady(false);
+    fetchJson<AnalyticsResponse>('/api/analytics')
+      .then(setOverview)
+      .catch((err) => {
+        console.error('Error loading analytics overview:', err);
+        setOverview(null);
+      })
+      .finally(() => setOverviewReady(true));
+  };
+
+  useEffect(() => {
+    fetchOverview();
+  }, []);
+
+  useDashboardRefresh(fetchOverview);
+
   return (
     <div>
       <h1 style={{ marginBottom: '24px' }}>Analytics</h1>
@@ -25,18 +48,31 @@ export function AnalyticsView() {
         Window: last 7 days. Current analytics queries accept `days=7`, `14`, or `30`; UI controls can come later.
       </div>
       
-      <WorkflowHealthPanel />
+      <WorkflowHealthPanel initialData={overview?.summary} overviewReady={overviewReady} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
-        <TopFailuresPanel />
+        <TopFailuresPanel
+          initialData={overview ? {
+            generatedAt: overview.generatedAt,
+            topFailureReasons: overview.topFailureReasons,
+          } : null}
+          overviewReady={overviewReady}
+        />
         <LongRunningPanel />
       </div>
 
-      <DailyTrendsPanel />
+      <DailyTrendsPanel
+        initialData={overview ? {
+          generatedAt: overview.generatedAt,
+          windowDays: overview.windowDays,
+          trends: overview.trends,
+        } : null}
+        overviewReady={overviewReady}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         <AgentActivityPanel />
-        <StatusDistributionPanel />
+        <StatusDistributionPanel initialData={overview?.summary} overviewReady={overviewReady} />
       </div>
     </div>
   );
@@ -58,9 +94,15 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json();
 }
 
-function WorkflowHealthPanel() {
-  const [data, setData] = useState<AnalyticsSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+function WorkflowHealthPanel({
+  initialData,
+  overviewReady,
+}: {
+  initialData?: AnalyticsSummary | null;
+  overviewReady: boolean;
+}) {
+  const [data, setData] = useState<AnalyticsSummary | null>(initialData ?? null);
+  const [loading, setLoading] = useState(!overviewReady);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = () => {
@@ -74,10 +116,20 @@ AnalyticsSummary>('/api/analytics/summary')
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!overviewReady) {
+      setLoading(true);
+      return;
+    }
 
-  useDashboardRefresh(fetchData);
+    if (initialData) {
+      setData(initialData);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    fetchData();
+  }, [initialData, overviewReady]);
 
   if (loading && !data) return <div className="card" style={{ marginBottom: '24px', height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 className="animate-spin" /></div>;
   if (error) return <div className="card" style={{ marginBottom: '24px', border: '1px solid var(--status-error)' }}>
@@ -121,9 +173,15 @@ AnalyticsSummary>('/api/analytics/summary')
   );
 }
 
-function TopFailuresPanel() {
-  const [data, setData] = useState<AnalyticsFailures | null>(null);
-  const [loading, setLoading] = useState(true);
+function TopFailuresPanel({
+  initialData,
+  overviewReady,
+}: {
+  initialData?: AnalyticsFailures | null;
+  overviewReady: boolean;
+}) {
+  const [data, setData] = useState<AnalyticsFailures | null>(initialData ?? null);
+  const [loading, setLoading] = useState(!overviewReady);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = () => {
@@ -136,10 +194,20 @@ function TopFailuresPanel() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!overviewReady) {
+      setLoading(true);
+      return;
+    }
 
-  useDashboardRefresh(fetchData);
+    if (initialData) {
+      setData(initialData);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    fetchData();
+  }, [initialData, overviewReady]);
 
   if (loading && !data) return <div className="card" style={{ height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 className="animate-spin" /></div>;
   if (error) return <div className="card" style={{ height: '250px', border: '1px solid var(--status-error)' }}>
@@ -234,9 +302,15 @@ function LongRunningPanel() {
   );
 }
 
-function DailyTrendsPanel() {
-  const [data, setData] = useState<AnalyticsTrends | null>(null);
-  const [loading, setLoading] = useState(true);
+function DailyTrendsPanel({
+  initialData,
+  overviewReady,
+}: {
+  initialData?: AnalyticsTrends | null;
+  overviewReady: boolean;
+}) {
+  const [data, setData] = useState<AnalyticsTrends | null>(initialData ?? null);
+  const [loading, setLoading] = useState(!overviewReady);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = () => {
@@ -249,10 +323,20 @@ function DailyTrendsPanel() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!overviewReady) {
+      setLoading(true);
+      return;
+    }
 
-  useDashboardRefresh(fetchData);
+    if (initialData) {
+      setData(initialData);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    fetchData();
+  }, [initialData, overviewReady]);
 
   if (loading && !data) return <div className="card" style={{ marginBottom: '24px', height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 className="animate-spin" /></div>;
   if (error) return <div className="card" style={{ marginBottom: '24px', border: '1px solid var(--status-error)' }}>
@@ -365,9 +449,15 @@ function AgentActivityPanel() {
   );
 }
 
-function StatusDistributionPanel() {
-  const [data, setData] = useState<AnalyticsSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+function StatusDistributionPanel({
+  initialData,
+  overviewReady,
+}: {
+  initialData?: AnalyticsSummary | null;
+  overviewReady: boolean;
+}) {
+  const [data, setData] = useState<AnalyticsSummary | null>(initialData ?? null);
+  const [loading, setLoading] = useState(!overviewReady);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = () => {
@@ -380,10 +470,20 @@ function StatusDistributionPanel() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!overviewReady) {
+      setLoading(true);
+      return;
+    }
 
-  useDashboardRefresh(fetchData);
+    if (initialData) {
+      setData(initialData);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    fetchData();
+  }, [initialData, overviewReady]);
 
   if (loading && !data) return <div className="card" style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 className="animate-spin" /></div>;
   if (error) return <div className="card" style={{ height: '300px', border: '1px solid var(--status-error)' }}>

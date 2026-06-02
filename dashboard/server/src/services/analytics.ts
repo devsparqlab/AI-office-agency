@@ -21,6 +21,8 @@ export interface BuildAnalyticsOptions {
 }
 
 const STALE_RUNNING_THRESHOLD_SEC = 3600; // 1 hour
+const HEALTH_OK_THRESHOLD = 90;
+const HEALTH_WARNING_THRESHOLD = 70;
 
 export class AnalyticsService {
   constructor(private readonly scanner: RunScanner = globalScanner) {}
@@ -107,7 +109,8 @@ export function buildSummary(runs: RunSummary[], options: BuildAnalyticsOptions 
   const stalePenalty = Math.round(staleRate * 25);
   
   const score = Math.max(0, Math.min(100, 100 - failurePenalty - blockedPenalty - stalePenalty));
-  const status: AnalyticsHealthStatus = score >= 80 ? 'ok' : score >= 50 ? 'warning' : 'error';
+  const status: AnalyticsHealthStatus =
+    score >= HEALTH_OK_THRESHOLD ? 'ok' : score >= HEALTH_WARNING_THRESHOLD ? 'warning' : 'error';
 
   return {
     generatedAt: now.toISOString(),
