@@ -11,20 +11,24 @@ import type {
   RunSummary,
   RunsTrendPoint,
   AgentActivitySummary,
+  AgentName,
 } from '@shared/types';
-import { RunScanner, globalScanner } from './runScanner';
+import { RunScanner, globalScanner, normalizeFailureReason } from './runScanner';
 
 export interface BuildAnalyticsOptions {
   now?: string;
   windowDays?: number;
 }
 
+const STALE_RUNNING_THRESHOLD_SEC = 3600; // 1 hour
+
 export class AnalyticsService {
   constructor(private readonly scanner: RunScanner = globalScanner) {}
 
   async getSummary(options: BuildAnalyticsOptions = {}): Promise<AnalyticsSummary> {
     const runs = await this.scanner.listRuns();
-    return buildSummary(runs, options);
+    const filtered = filterRunsByWindow(runs, options);
+    return buildSummary(filtered, options);
   }
 
   async getTrends(options: BuildAnalyticsOptions = {}): Promise<AnalyticsTrends> {
@@ -32,14 +36,16 @@ export class AnalyticsService {
     return buildTrends(runs, options);
   }
 
-  async getFailures(): Promise<AnalyticsFailures> {
+  async getFailures(options: BuildAnalyticsOptions = {}): Promise<AnalyticsFailures> {
     const runs = await this.scanner.listRuns();
-    return buildFailures(runs);
+    const filtered = filterRunsByWindow(runs, options);
+    return buildFailures(filtered);
   }
 
-  async getAgents(): Promise<AnalyticsAgents> {
+  async getAgents(options: BuildAnalyticsOptions = {}): Promise<AnalyticsAgents> {
     const runs = await this.scanner.listRuns();
-    return buildAgents(runs);
+    const filtered = filterRunsByWindow(runs, options);
+    return buildAgents(filtered);
   }
 
   async getLongRunning(): Promise<AnalyticsLongRunning> {
@@ -50,41 +56,29 @@ export class AnalyticsService {
   async getAnalytics(options: BuildAnalyticsOptions = {}): Promise<AnalyticsResponse> {
     const runs = await this.scanner.listRuns();
     const now = options.now ?? new Date().toISOString();
+    const filtered = filterRunsByWindow(runs, options);
+    
     return {
       generatedAt: now,
       windowDays: options.windowDays ?? 7,
-      summary: buildSummary(runs, options),
+      summary: buildSummary(filtered, options),
       trends: buildTrends(runs, options).trends,
-      topFailureReasons: buildFailures(runs).topFailureReasons,
+      topFailureReasons: buildFailures(filtered).topFailureReasons,
     };
   }
 }
 
-export function normalizeFailureReason(reason?: string): string {
-  const normalized = reason?.trim().toLowerCase();
-  return normalized ? normalized : 'unknown';
-}
-
-export function buildAnalytics(
-  runs: RunSummary[],
-  _details: RunDetail[],
-  options: BuildAnalyticsOptions = {},
-): AnalyticsResponse {
-  const windowDays = Number.isFinite(options.windowDays) ? Math.max(1, Math.floor(options.windowDays as number)) : 7;
-  const parsedNow = options.now ? new Date(options.now) : new Date();
-  const now = Number.isNaN(parsedNow.getTime()) ? new Date() : parsedNow;
+function filterRunsByWindow(runs: RunSummary[], options: BuildAnalyticsOptions): RunSummary[] {
+  if (!options.windowDays) return runs;
   
-  const summary = buildSummary(runs, options);
-  const trends = buildTrends(runs, options);
-  const failures = buildFailures(runs);
-
-  return {
-    generatedAt: now.toISOString(),
-    windowDays,
-    summary,
-    trends: trends.trends,
-    topFailureReasons: failures.topFailureReasons,
-  };
+  const now = options.now ? new Date(options.now) : new Date();
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate() - options.windowDays);
+  
+  return runs.filter(run => {
+    const date = new Date(run.startedAt || run.updatedAt || 0);
+    return date >= cutoff;
+  });
 }
 
 export function buildSummary(runs: RunSummary[], options: BuildAnalyticsOptions = {}): AnalyticsSummary {
@@ -95,17 +89,24 @@ export function buildSummary(runs: RunSummary[], options: BuildAnalyticsOptions 
   const blockedRuns = runs.filter((run) => run.status === 'blocked').length;
   const runningRuns = runs.filter((run) => run.status === 'running').length;
   
+  const staleRunningRuns = runs.filter(run => 
+    run.status === 'running' && 
+    (run.durationSeconds || 0) > STALE_RUNNING_THRESHOLD_SEC
+  ).length;
+
   const successRate = totalRuns > 0 ? completedRuns / totalRuns : 0;
   const failureRate = totalRuns > 0 ? failedRuns / totalRuns : 0;
   const blockedRate = totalRuns > 0 ? blockedRuns / totalRuns : 0;
-  const runningRate = totalRuns > 0 ? runningRuns / totalRuns : 0;
-
-  // Health Score Logic
+  
+  // Health Score Logic (Refined)
   const failurePenalty = Math.round(failureRate * 45);
   const blockedPenalty = Math.round(blockedRate * 30);
-  const runningPenalty = Math.round(runningRate * 15);
   
-  const score = Math.max(0, Math.min(100, 100 - failurePenalty - blockedPenalty - runningPenalty));
+  // Stale Running Penalty
+  const staleRate = totalRuns > 0 ? staleRunningRuns / totalRuns : 0;
+  const stalePenalty = Math.round(staleRate * 25);
+  
+  const score = Math.max(0, Math.min(100, 100 - failurePenalty - blockedPenalty - stalePenalty));
   const status: AnalyticsHealthStatus = score >= 80 ? 'ok' : score >= 50 ? 'warning' : 'error';
 
   return {
@@ -124,7 +125,7 @@ export function buildSummary(runs: RunSummary[], options: BuildAnalyticsOptions 
       factors: [
         { label: 'failure-rate', impact: -failurePenalty, value: failedRuns, detail: `${failedRuns} failed runs` },
         { label: 'blocked-rate', impact: -blockedPenalty, value: blockedRuns, detail: `${blockedRuns} blocked runs` },
-        { label: 'running-rate', impact: -runningPenalty, value: runningRuns, detail: `${runningRuns} running runs` },
+        { label: 'stale-running', impact: -stalePenalty, value: staleRunningRuns, detail: `${staleRunningRuns} tasks running > 1h` },
       ]
     }
   };
@@ -194,9 +195,32 @@ export function buildFailures(runs: RunSummary[]): AnalyticsFailures {
 }
 
 export function buildAgents(runs: RunSummary[]): AnalyticsAgents {
+  const agentMap = new Map<string, AgentActivitySummary>();
+  
+  for (const run of runs) {
+    const agentName = run.currentAgent || 'unknown';
+    const existing = agentMap.get(agentName);
+    
+    if (existing) {
+      existing.totalActions++;
+      if (run.status === 'completed') existing.successCount++;
+      if (run.status === 'blocked') existing.blockageCount++;
+    } else {
+      agentMap.set(agentName, {
+        agent: agentName as AgentName,
+        totalActions: 1,
+        successCount: run.status === 'completed' ? 1 : 0,
+        blockageCount: run.status === 'blocked' ? 1 : 0
+      });
+    }
+  }
+
+  const agentMetrics = Array.from(agentMap.values())
+    .sort((a, b) => b.totalActions - a.totalActions);
+
   return {
     generatedAt: new Date().toISOString(),
-    agentMetrics: []
+    agentMetrics
   };
 }
 
@@ -212,3 +236,5 @@ export function buildLongRunning(runs: RunSummary[]): AnalyticsLongRunning {
     tasks
   };
 }
+
+export { normalizeFailureReason };

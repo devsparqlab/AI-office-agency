@@ -4,7 +4,9 @@ import type {
   AnalyticsSummary, 
   AnalyticsTrends, 
   AnalyticsFailures, 
-  AnalyticsLongRunning
+  AnalyticsLongRunning,
+  AnalyticsAgents,
+  AgentActivitySummary
 } from '../../../shared/types';
 
 export function AnalyticsView() {
@@ -22,20 +24,8 @@ export function AnalyticsView() {
       <DailyTrendsPanel />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-        <div className="card">
-          <div className="card-title">Status Distribution</div>
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <BarChart3 size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-            <div>Coming next: Success/Failure breakdown by agent type</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-title">Agent Activity</div>
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <Activity size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-            <div>Coming next: Most active agents and task throughput</div>
-          </div>
-        </div>
+        <AgentActivityPanel />
+        <StatusDistributionPanel />
       </div>
     </div>
   );
@@ -301,6 +291,134 @@ function DailyTrendsPanel() {
       ) : (
         <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trend data available</div>
       )}
+    </div>
+  );
+}
+
+function AgentActivityPanel() {
+  const [data, setData] = useState<AnalyticsAgents | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = () => {
+    setLoading(true);
+    setError(null);
+    fetchJson<AnalyticsAgents>('/api/analytics/agents')
+      .then(setData)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useDashboardRefresh(fetchData);
+
+  if (loading && !data) return <div className="card" style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 className="animate-spin" /></div>;
+  if (error) return <div className="card" style={{ height: '300px', border: '1px solid var(--status-error)' }}>
+    <div className="card-title" style={{ color: 'var(--status-error)' }}>Error loading Agent Activity</div>
+    <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{error}</div>
+  </div>;
+
+  return (
+    <div className="card" style={{ opacity: loading ? 0.7 : 1 }}>
+      <div className="card-title">Agent Activity</div>
+      {data?.agentMetrics && data.agentMetrics.length > 0 ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                <th style={{ padding: '8px 0' }}>Agent</th>
+                <th style={{ padding: '8px 0', textAlign: 'center' }}>Actions</th>
+                <th style={{ padding: '8px 0', textAlign: 'center' }}>Success</th>
+                <th style={{ padding: '8px 0', textAlign: 'center' }}>Blocked</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.agentMetrics.map((m: AgentActivitySummary) => (
+                <tr key={m.agent} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '12px 0', fontWeight: 600, textTransform: 'uppercase' }}>{m.agent}</td>
+                  <td style={{ padding: '12px 0', textAlign: 'center' }}>{m.totalActions}</td>
+                  <td style={{ padding: '12px 0', textAlign: 'center', color: 'var(--status-success)' }}>{m.successCount}</td>
+                  <td style={{ padding: '12px 0', textAlign: 'center', color: 'var(--status-warning)' }}>{m.blockageCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No agent activity data</div>
+      )}
+    </div>
+  );
+}
+
+function StatusDistributionPanel() {
+  const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = () => {
+    setLoading(true);
+    setError(null);
+    fetchJson<AnalyticsSummary>('/api/analytics/summary')
+      .then(setData)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useDashboardRefresh(fetchData);
+
+  if (loading && !data) return <div className="card" style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 className="animate-spin" /></div>;
+  if (error) return <div className="card" style={{ height: '300px', border: '1px solid var(--status-error)' }}>
+    <div className="card-title" style={{ color: 'var(--status-error)' }}>Error loading Status Distribution</div>
+    <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{error}</div>
+  </div>;
+  if (!data) return null;
+
+  const segments = [
+    { label: 'Completed', count: data.completedRuns, color: 'var(--status-success)' },
+    { label: 'Failed', count: data.failedRuns, color: 'var(--status-error)' },
+    { label: 'Blocked', count: data.blockedRuns, color: 'var(--status-warning)' },
+    { label: 'Running', count: data.runningRuns, color: 'var(--accent-color)' },
+  ];
+  const total = Math.max(data.totalRuns, 1);
+
+  return (
+    <div className="card" style={{ opacity: loading ? 0.7 : 1 }}>
+      <div className="card-title">Status Distribution</div>
+      <div style={{ padding: '8px 0 20px' }}>
+        <BarChart3 size={24} style={{ marginBottom: '16px', opacity: 0.7 }} />
+        <div style={{ display: 'flex', height: '14px', borderRadius: '999px', overflow: 'hidden', backgroundColor: 'var(--bg-color)', border: '1px solid var(--border-color)', marginBottom: '18px' }}>
+          {segments.map((segment) => (
+            <div
+              key={segment.label}
+              title={`${segment.label}: ${segment.count}`}
+              style={{
+                width: `${(segment.count / total) * 100}%`,
+                minWidth: segment.count > 0 ? '8px' : 0,
+                backgroundColor: segment.color,
+              }}
+            />
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+          {segments.map((segment) => (
+            <div key={segment.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '999px', backgroundColor: segment.color }} />
+                <span>{segment.label}</span>
+              </div>
+              <strong>{segment.count}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

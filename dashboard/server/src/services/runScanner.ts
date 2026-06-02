@@ -47,17 +47,35 @@ export function sortRunsByPriority(runs: RunSummary[]): RunSummary[] {
   });
 }
 
+/**
+ * Normalizes failure reasons for consistent grouping.
+ * Logic: collapse whitespace, remove trailing punctuation, lowercase.
+ */
+export function normalizeFailureReason(reason?: string): string {
+  if (!reason) return 'unknown';
+  return reason
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')             // Collapse multiple spaces
+    .replace(/[.,!?;:]+$/, '')        // Remove trailing punctuation
+    .trim() || 'unknown';
+}
+
 export class RunScanner {
   private cache: RunSummary[] | null = null;
   private cacheTimestamp: number = 0;
   private pendingRequest: Promise<RunSummary[]> | null = null;
-  private readonly CACHE_TTL = 1000; // 1 second cache for concurrent requests
+  /**
+   * Short-lived coalescing window to prevent redundant filesystem scans
+   * when multiple frontend panels (Summary, Trends, etc.) request analytics simultaneously.
+   */
+  private readonly SCAN_COALESCE_MS = 1000;
 
   async listRuns(forceRefresh = false): Promise<RunSummary[]> {
     const now = Date.now();
     
-    // 1. Check TTL cache if not forcing refresh
-    if (!forceRefresh && this.cache && (now - this.cacheTimestamp < this.CACHE_TTL)) {
+    // 1. Check if we have a fresh result from a very recent scan
+    if (!forceRefresh && this.cache && (now - this.cacheTimestamp < this.SCAN_COALESCE_MS)) {
       return this.cache;
     }
 
@@ -186,13 +204,14 @@ export class RunScanner {
       (['completed', 'failed', 'cancelled'].includes(status) ? updatedAt : undefined);
 
     // Precedence: error_reason -> history[last].reason -> history[last].message -> "unknown"
-    let normalizedReason = "unknown";
+    let rawReason = "unknown";
     if (statusData.error_reason) {
-      normalizedReason = statusData.error_reason.trim().toLowerCase();
+      rawReason = statusData.error_reason;
     } else if (statusData.history && statusData.history.length > 0) {
       const lastHistory = statusData.history[statusData.history.length - 1];
-      normalizedReason = (lastHistory.reason || lastHistory.message || "unknown").trim().toLowerCase();
+      rawReason = lastHistory.reason || lastHistory.message || "unknown";
     }
+    const normalizedReason = normalizeFailureReason(rawReason);
 
     // Only calculated if startedAt and completedAt (or now for running) are valid.
     // Metric: now - startedAt for tasks where status === 'running'.

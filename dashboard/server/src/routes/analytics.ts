@@ -34,7 +34,8 @@ router.get('/trends', async (req, res) => {
 
 router.get('/failures', async (req, res) => {
   try {
-    res.json(await service.getFailures());
+    const windowDays = parseInt(req.query.days as string, 10) || 7;
+    res.json(await service.getFailures({ windowDays }));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch failure insights' });
   }
@@ -42,7 +43,8 @@ router.get('/failures', async (req, res) => {
 
 router.get('/agents', async (req, res) => {
   try {
-    res.json(await service.getAgents());
+    const windowDays = parseInt(req.query.days as string, 10) || 7;
+    res.json(await service.getAgents({ windowDays }));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch agent metrics' });
   }
