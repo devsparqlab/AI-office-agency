@@ -2,6 +2,12 @@
 
 Read-only monitoring dashboard for `ai-dev-office/runs`.
 
+## Views
+
+- `Monitor`: browse runs, inspect task details, review timeline, and tail direct log files inside a run directory
+- `Analytics`: read-only workflow metrics built from `runs/`, including health score, failure clusters, trends, long-running work, and agent activity
+- `Reports`: lightweight snapshot view built from the analytics overview endpoint for quick summary reading
+
 ## Structure
 
 - `server/`: Express + TypeScript API, file watcher, SSE
@@ -66,10 +72,19 @@ If `AI_OFFICE_ROOT` is not set, the server defaults to the current repository ro
 - Health status is filesystem and watcher based, not service dependency aware
 - Log viewing is limited to direct files inside each run directory
 - SSE refreshes run summaries and the currently selected log only
+- Analytics panels still fetch separate endpoints; there is no consolidated initial overview fetch for the Analytics page yet
+- Reports is currently a snapshot summary view, not a full markdown report generator
 
 ## Phase 2 Analytics
 
+- Supported analytics windows are `days=7`, `days=14`, or `days=30`
+- Invalid or unsupported `days` values fall back to `7`
 - `GET /api/analytics` returns read-only workflow metrics generated from `runs/`
+- `GET /api/analytics/summary` returns workflow health and status distribution for the selected window
+- `GET /api/analytics/trends` returns per-day trend buckets for the selected window
+- `GET /api/analytics/failures` returns normalized top failure reasons for the selected window
+- `GET /api/analytics/agents` returns per-agent activity totals for the selected window
+- `GET /api/analytics/long-running` returns current running tasks ranked by duration and does not use the `days` filter
 - There is no cache layer yet; each request recomputes analytics from filesystem data
 - The response is split into `summary`, `trends`, and `topFailureReasons` so the API can be broken into dedicated endpoints later if needed
 - Workflow health score is distinct from dashboard/server health

@@ -13,6 +13,17 @@ export function AnalyticsView() {
   return (
     <div>
       <h1 style={{ marginBottom: '24px' }}>Analytics</h1>
+      <div
+        className="card"
+        style={{
+          marginBottom: '24px',
+          padding: '12px 16px',
+          color: 'var(--text-secondary)',
+          fontSize: '13px',
+        }}
+      >
+        Window: last 7 days. Current analytics queries accept `days=7`, `14`, or `30`; UI controls can come later.
+      </div>
       
       <WorkflowHealthPanel />
 
