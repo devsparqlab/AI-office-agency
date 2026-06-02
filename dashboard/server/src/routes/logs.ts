@@ -5,6 +5,12 @@ import path from 'path';
 import type { LogTailResponse } from '@shared/types';
 
 const router = Router();
+const TASK_ID_PATTERN = /^TASK-[A-Za-z0-9_-]+$/;
+const LOG_FILE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+type ResolveRunLogPathResult =
+  | { ok: true; runDir: string; logPath: string }
+  | { ok: false; code: 400 | 404; error: string };
 
 export async function readLogTail(logPath: string, maxLines: number, chunkSize = 64 * 1024): Promise<LogTailResponse> {
   const stats = await fs.stat(logPath);
@@ -55,14 +61,58 @@ export async function readLogTail(logPath: string, maxLines: number, chunkSize =
   };
 }
 
+export function resolveRunLogPath(runsDir: string, taskId: string, logFile: string): ResolveRunLogPathResult {
+  if (!TASK_ID_PATTERN.test(taskId)) {
+    return { ok: false, code: 400, error: 'Invalid taskId' };
+  }
+
+  if (!LOG_FILE_PATTERN.test(logFile)) {
+    return { ok: false, code: 400, error: 'Invalid logFile' };
+  }
+
+  const runsRoot = path.resolve(runsDir);
+  const runDir = path.resolve(runsRoot, taskId);
+  const logPath = path.resolve(runDir, logFile);
+  const relativeRunDir = path.relative(runsRoot, runDir);
+  const relativeLogPath = path.relative(runDir, logPath);
+
+  if (
+    relativeRunDir.startsWith('..') ||
+    path.isAbsolute(relativeRunDir) ||
+    relativeLogPath.startsWith('..') ||
+    path.isAbsolute(relativeLogPath)
+  ) {
+    return { ok: false, code: 400, error: 'Resolved log path escapes the run directory' };
+  }
+
+  return { ok: true, runDir, logPath };
+}
+
 router.get('/:taskId/:logFile', async (req, res) => {
   const { taskId, logFile } = req.params;
-  const logPath = path.join(config.runsDir, taskId, logFile);
+  const resolved = resolveRunLogPath(config.runsDir, taskId, logFile);
+
+  if (!resolved.ok) {
+    res.status(resolved.code).json({ error: resolved.error });
+    return;
+  }
 
   try {
-    res.json(await readLogTail(logPath, config.logTailLines));
+    await fs.access(resolved.runDir);
   } catch (err) {
-    res.status(404).json({ error: 'Log not found' });
+    res.status(404).json({ error: 'Run not found' });
+    return;
+  }
+
+  try {
+    res.json(await readLogTail(resolved.logPath, config.logTailLines));
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      res.status(404).json({ error: 'Log not found' });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to read log file' });
   }
 });
 

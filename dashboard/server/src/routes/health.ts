@@ -20,9 +20,21 @@ export interface HealthStatusInput {
   error?: string;
 }
 
+function resolveHealthSeverity(input: HealthStatusInput): HealthStatus['status'] {
+  if (!input.runsDirExists || input.error) {
+    return 'error';
+  }
+  if (!input.logsDirExists || !input.watcherActive) {
+    return 'warning';
+  }
+  return 'ok';
+}
+
 export function buildHealthStatus(input: HealthStatusInput): HealthStatus {
+  const status = resolveHealthSeverity(input);
   return {
     ok: input.runsDirExists,
+    status,
     aiOfficeRoot: input.aiOfficeRoot,
     timestamp: new Date().toISOString(),
     runsDirExists: input.runsDirExists,

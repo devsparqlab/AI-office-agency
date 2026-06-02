@@ -14,12 +14,17 @@ const App: React.FC = () => {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
+  const [runDetailError, setRunDetailError] = useState<string | null>(null);
+  const [runDetailLoading, setRunDetailLoading] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedLogFile, setSelectedLogFile] = useState('');
   const [logContent, setLogContent] = useState<string | null>(null);
+  const [logError, setLogError] = useState<string | null>(null);
   const selectedRunIdRef = useRef<string | null>(null);
+  const selectedLogFileRef = useRef<string>('');
 
   useEffect(() => {
     fetchInitialData();
@@ -28,10 +33,18 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (selectedRunId) {
+      selectedLogFileRef.current = '';
+      setSelectedLogFile('');
+      setLogContent(null);
+      setLogError(null);
       fetchRunDetail(selectedRunId);
     }
     selectedRunIdRef.current = selectedRunId;
   }, [selectedRunId]);
+
+  useEffect(() => {
+    selectedLogFileRef.current = selectedLogFile;
+  }, [selectedLogFile]);
 
   const fetchInitialData = async () => {
     try {
@@ -44,6 +57,17 @@ const App: React.FC = () => {
       setHealth(healthData);
       setRuns(runsData);
       calculateStats(runsData);
+      if (
+        selectedRunIdRef.current &&
+        !runsData.some((run: RunSummary) => run.id === selectedRunIdRef.current)
+      ) {
+        setRunDetail(null);
+        setRunDetailError('Selected run not found.');
+        selectedLogFileRef.current = '';
+        setSelectedLogFile('');
+        setLogContent(null);
+        setLogError(null);
+      }
       setLoading(false);
     } catch (err) {
       console.error('Error fetching initial data:', err);
@@ -52,27 +76,59 @@ const App: React.FC = () => {
   };
 
   const fetchRunDetail = async (id: string) => {
+    setRunDetailLoading(true);
+    setRunDetailError(null);
     try {
       const res = await fetch(`/api/runs/${id}`);
+      if (!res.ok) {
+        setRunDetail(null);
+        setRunDetailError(res.status === 404 ? 'Selected run not found.' : 'Failed to load run details.');
+        return;
+      }
       const data = await res.json();
       setRunDetail(data);
-      setLogContent(null);
+      if (selectedLogFileRef.current) {
+        const hasSelectedLog = data.artifacts.some(
+          (artifact: { type: string; name: string }) =>
+            artifact.type === 'log' && artifact.name === selectedLogFileRef.current
+        );
+        if (!hasSelectedLog) {
+          selectedLogFileRef.current = '';
+          setSelectedLogFile('');
+          setLogContent(null);
+          setLogError('Log not found.');
+        }
+      }
     } catch (err) {
       console.error('Error fetching run detail:', err);
+      setRunDetail(null);
+      setRunDetailError('Failed to load run details.');
+    } finally {
+      setRunDetailLoading(false);
     }
   };
 
   const fetchLogContent = async (taskId: string, fileName: string) => {
     if (!fileName) {
       setLogContent(null);
+      setLogError(null);
       return;
     }
     try {
       const res = await fetch(`/api/logs/${taskId}/${fileName}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setLogContent(null);
+        setLogError(data?.error || 'Log not found');
+        return;
+      }
       const data = await res.json();
       setLogContent(data.content);
+      setLogError(null);
     } catch (err) {
       console.error('Error fetching log content:', err);
+      setLogContent(null);
+      setLogError('Failed to load log content.');
     }
   };
 
@@ -84,6 +140,9 @@ const App: React.FC = () => {
       fetchInitialData(); // Refresh on any change
       if (selectedRunIdRef.current) {
         fetchRunDetail(selectedRunIdRef.current);
+        if (selectedLogFileRef.current) {
+          fetchLogContent(selectedRunIdRef.current, selectedLogFileRef.current);
+        }
       }
     };
     eventSource.addEventListener('runs.changed', onRunsChanged);
@@ -105,6 +164,19 @@ const App: React.FC = () => {
     r.id.toLowerCase().includes(search.toLowerCase()) || 
     r.title.toLowerCase().includes(search.toLowerCase())
   );
+
+  const healthAccent =
+    health?.status === 'error'
+      ? 'var(--status-error)'
+      : health?.status === 'warning'
+        ? '#f59e0b'
+        : 'var(--status-success)';
+  const healthLabel =
+    health?.status === 'error'
+      ? 'Error'
+      : health?.status === 'warning'
+        ? 'Warning'
+        : 'Connected';
 
   return (
     <div className="app-container">
@@ -161,15 +233,34 @@ const App: React.FC = () => {
         </div>
         <div style={{ padding: '12px', borderTop: '1px solid var(--border-color)', fontSize: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: health?.ok ? 'var(--status-success)' : 'var(--status-error)' }}></div>
-            <span>Backend: {health?.ok ? 'Connected' : 'Disconnected'}</span>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: healthAccent }}></div>
+            <span>Backend: {healthLabel}</span>
           </div>
         </div>
       </div>
 
       <div className="main-content">
+        {health && health.status !== 'ok' && (
+          <div className="card" style={{ marginBottom: '24px', border: `1px solid ${healthAccent}` }}>
+            <div className="card-title" style={{ color: healthAccent }}>
+              <AlertCircle size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+              Dashboard health {health.status}
+            </div>
+            <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+              Runs directory: {health.runsDirExists ? 'available' : 'missing'} | Logs directory: {health.logsDirExists ? 'available' : 'missing'} | Watcher: {health.watcherActive ? 'active' : 'inactive'}
+            </div>
+          </div>
+        )}
         {selectedRunId ? (
-          runDetail ? (
+          runDetailLoading ? (
+            <div style={{ textAlign: 'center', marginTop: '100px' }}><Loader2 className="animate-spin" size={48} /></div>
+          ) : runDetailError ? (
+            <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              <AlertCircle size={40} style={{ marginBottom: '16px', color: 'var(--status-error)' }} />
+              <h3 style={{ marginBottom: '8px' }}>{runDetailError}</h3>
+              <p>Choose another run from the sidebar to continue.</p>
+            </div>
+          ) : runDetail ? (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
                 <div>
@@ -230,8 +321,13 @@ const App: React.FC = () => {
                     <div className="card" style={{ marginTop: '24px' }}>
                       <div className="card-title"><Terminal size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Live Logs</div>
                       <select 
+                        value={selectedLogFile}
                         style={{ marginBottom: '12px', padding: '4px', backgroundColor: 'var(--bg-color)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
-                        onChange={(e) => fetchLogContent(runDetail.id, e.target.value)}
+                        onChange={(e) => {
+                          const nextLogFile = e.target.value;
+                          setSelectedLogFile(nextLogFile);
+                          fetchLogContent(runDetail.id, nextLogFile);
+                        }}
                       >
                         <option value="">Select a log file...</option>
                         {runDetail.artifacts.filter(a => a.type === 'log').map(a => (
@@ -239,7 +335,7 @@ const App: React.FC = () => {
                         ))}
                       </select>
                       <div className="log-terminal" id="log-viewer">
-                        {logContent || 'Select a log file to view content'}
+                        {logError || logContent || 'Select a log file to view content'}
                       </div>
                     </div>
                   )}
@@ -268,7 +364,11 @@ const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', marginTop: '100px' }}><Loader2 className="animate-spin" size={48} /></div>
+            <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              <AlertCircle size={40} style={{ marginBottom: '16px', color: 'var(--status-error)' }} />
+              <h3 style={{ marginBottom: '8px' }}>Selected run not found.</h3>
+              <p>Choose another run from the sidebar to continue.</p>
+            </div>
           )
         ) : (
           <div>

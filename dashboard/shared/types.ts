@@ -67,6 +67,7 @@ export interface DashboardStats {
 
 export interface HealthStatus {
   ok: boolean;
+  status: "ok" | "warning" | "error";
   aiOfficeRoot: string;
   timestamp: string;
   runsDirExists: boolean;
