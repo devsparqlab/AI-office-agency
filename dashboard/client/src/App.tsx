@@ -470,6 +470,45 @@ const App: React.FC = () => {
                 </ul>
               </div>
             )}
+
+            {analytics && analytics.trends && analytics.trends.length > 0 && (
+              <div className="card" style={{ marginBottom: '24px' }}>
+                <div className="card-title">Daily Trends (Last {analytics.windowDays} Days)</div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-end', 
+                  height: '200px', 
+                  gap: '8px', 
+                  paddingTop: '20px',
+                  borderBottom: '1px solid var(--border-color)',
+                  marginBottom: '10px'
+                }}>
+                  {analytics.trends.map((point) => {
+                    const maxCount = Math.max(...analytics.trends.map(p => p.total), 1);
+                    const height = (point.total / maxCount) * 100;
+                    
+                    return (
+                      <div key={point.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                        <div style={{ width: '100%', position: 'relative', height: `${height}%`, display: 'flex', flexDirection: 'column-reverse', borderRadius: '4px 4px 0 0', overflow: 'hidden' }}>
+                          <div title={`Completed: ${point.completed}`} style={{ height: `${(point.completed / point.total) * 100 || 0}%`, backgroundColor: 'var(--status-success)' }}></div>
+                          <div title={`Failed: ${point.failed}`} style={{ height: `${(point.failed / point.total) * 100 || 0}%`, backgroundColor: 'var(--status-error)' }}></div>
+                          <div title={`Blocked: ${point.blocked}`} style={{ height: `${(point.blocked / point.total) * 100 || 0}%`, backgroundColor: 'var(--status-warning)' }}></div>
+                          <div title={`Other: ${point.total - point.completed - point.failed - point.blocked}`} style={{ flex: 1, backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}></div>
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '8px', transform: 'rotate(-45deg)', transformOrigin: 'top center', height: '20px', whiteSpace: 'nowrap' }}>
+                          {point.date.slice(5)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '20px' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '8px', height: '8px', backgroundColor: 'var(--status-success)' }}></div> Completed</div>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '8px', height: '8px', backgroundColor: 'var(--status-error)' }}></div> Failed</div>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '8px', height: '8px', backgroundColor: 'var(--status-warning)' }}></div> Blocked</div>
+                </div>
+              </div>
+            )}
             
             <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               <LayoutDashboard size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
