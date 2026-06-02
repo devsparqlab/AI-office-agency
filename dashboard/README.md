@@ -66,3 +66,10 @@ If `AI_OFFICE_ROOT` is not set, the server defaults to the current repository ro
 - Health status is filesystem and watcher based, not service dependency aware
 - Log viewing is limited to direct files inside each run directory
 - SSE refreshes run summaries and the currently selected log only
+
+## Phase 2 Analytics
+
+- `GET /api/analytics` returns read-only workflow metrics generated from `runs/`
+- There is no cache layer yet; each request recomputes analytics from filesystem data
+- The response is split into `summary`, `trends`, and `topFailureReasons` so the API can be broken into dedicated endpoints later if needed
+- Workflow health score is distinct from dashboard/server health

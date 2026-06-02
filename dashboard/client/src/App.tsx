@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './styles/globals.css';
 import type { 
+  AnalyticsResponse,
   RunSummary, 
   RunDetail, 
   DashboardStats, 
@@ -16,6 +17,7 @@ const App: React.FC = () => {
   const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
   const [runDetailLoading, setRunDetailLoading] = useState(false);
+  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,14 +50,17 @@ const App: React.FC = () => {
 
   const fetchInitialData = async () => {
     try {
-      const [healthRes, runsRes] = await Promise.all([
+      const [healthRes, runsRes, analyticsRes] = await Promise.all([
         fetch('/api/health'),
-        fetch('/api/runs')
+        fetch('/api/runs'),
+        fetch('/api/analytics'),
       ]);
       const healthData = await healthRes.json();
       const runsData = await runsRes.json();
+      const analyticsData = await analyticsRes.json();
       setHealth(healthData);
       setRuns(runsData);
+      setAnalytics(analyticsData);
       calculateStats(runsData);
       if (
         selectedRunIdRef.current &&
@@ -166,17 +171,31 @@ const App: React.FC = () => {
   );
 
   const healthAccent =
-    health?.status === 'error'
+    !health
       ? 'var(--status-error)'
-      : health?.status === 'warning'
-        ? '#f59e0b'
-        : 'var(--status-success)';
+      : health.status === 'error'
+        ? 'var(--status-error)'
+        : health.status === 'warning'
+          ? '#f59e0b'
+          : 'var(--status-success)';
   const healthLabel =
-    health?.status === 'error'
-      ? 'Error'
-      : health?.status === 'warning'
-        ? 'Warning'
-        : 'Connected';
+    !health
+      ? 'Offline'
+      : health.status === 'error'
+        ? 'Error'
+        : health.status === 'warning'
+          ? 'Warning'
+          : 'Connected';
+
+  const formatUptime = (seconds?: number) => {
+    if (seconds === undefined) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
 
   return (
     <div className="app-container">
@@ -231,15 +250,29 @@ const App: React.FC = () => {
             ))
           )}
         </div>
-        <div style={{ padding: '12px', borderTop: '1px solid var(--border-color)', fontSize: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ padding: '12px', borderTop: '1px solid var(--border-color)', fontSize: '11px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: healthAccent }}></div>
-            <span>Backend: {healthLabel}</span>
+            <span style={{ fontWeight: 600 }}>Backend: {healthLabel}</span>
           </div>
+          {health && (
+            <div style={{ color: 'var(--text-secondary)' }}>
+              <div>Uptime: {formatUptime(health.uptime)}</div>
+              <div>Runs: {health.totalRuns ?? 0} folders</div>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="main-content">
+        {!health && !loading && (
+          <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--status-error)', border: '1px solid var(--status-error)', marginBottom: '24px' }}>
+            <AlertCircle size={48} style={{ marginBottom: '16px' }} />
+            <h2 style={{ margin: '0 0 8px 0' }}>Backend Server Offline</h2>
+            <p>Cannot connect to the dashboard API. Please ensure the server is running on port 4310.</p>
+          </div>
+        )}
+
         {health && health.status !== 'ok' && (
           <div className="card" style={{ marginBottom: '24px', border: `1px solid ${healthAccent}` }}>
             <div className="card-title" style={{ color: healthAccent }}>
@@ -373,6 +406,34 @@ const App: React.FC = () => {
         ) : (
           <div>
             <h1 style={{ marginBottom: '24px' }}>Dashboard Overview</h1>
+            {analytics && (
+              <div className="summary-cards" style={{ marginBottom: '24px' }}>
+                <div className="card">
+                  <div className="card-title">Workflow Health</div>
+                  <div className="card-value" style={{ color: analytics.summary.healthScore.status === 'error' ? 'var(--status-error)' : analytics.summary.healthScore.status === 'warning' ? '#f59e0b' : 'var(--status-success)' }}>
+                    {analytics.summary.healthScore.score}
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-title">Analytics Success</div>
+                  <div className="card-value" style={{ color: 'var(--status-success)' }}>
+                    {(analytics.summary.successRate * 100).toFixed(1)}%
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-title">Analytics Failed</div>
+                  <div className="card-value" style={{ color: 'var(--status-error)' }}>
+                    {analytics.summary.failedRuns}
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-title">Top Failure</div>
+                  <div className="card-value" style={{ fontSize: '18px' }}>
+                    {analytics.topFailureReasons[0]?.reason || 'none'}
+                  </div>
+                </div>
+              </div>
+            )}
             {stats && (
               <div className="summary-cards">
                 <div className="card">
@@ -391,6 +452,22 @@ const App: React.FC = () => {
                   <div className="card-title">Failed</div>
                   <div className="card-value" style={{ color: 'var(--status-error)' }}>{stats.failed}</div>
                 </div>
+              </div>
+            )}
+
+            {analytics && analytics.topFailureReasons.length > 0 && (
+              <div className="card" style={{ marginBottom: '24px' }}>
+                <div className="card-title">Top Failure Reasons</div>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {analytics.topFailureReasons.slice(0, 5).map((failure) => (
+                    <li key={`${failure.reason}-${failure.latestSeenAt || 'none'}`} style={{ padding: '8px 0', borderBottom: '1px solid var(--border-color)', fontSize: '13px' }}>
+                      <div style={{ fontWeight: 500 }}>{failure.reason}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        Count: {failure.count}{failure.latestSeenAt ? ` | Latest: ${new Date(failure.latestSeenAt).toLocaleString()}` : ''}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
             

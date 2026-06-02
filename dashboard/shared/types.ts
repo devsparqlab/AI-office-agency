@@ -65,11 +65,62 @@ export interface DashboardStats {
   successRate: number;
 }
 
+export type AnalyticsHealthStatus = "ok" | "warning" | "error";
+
+export interface HealthScoreFactor {
+  label: string;
+  impact: number;
+  value: number;
+  detail: string;
+}
+
+export interface HealthScoreBreakdown {
+  score: number;
+  status: AnalyticsHealthStatus;
+  factors: HealthScoreFactor[];
+}
+
+export interface RunsTrendPoint {
+  date: string;
+  total: number;
+  completed: number;
+  failed: number;
+  blocked: number;
+}
+
+export interface FailureReasonStat {
+  reason: string;
+  count: number;
+  latestSeenAt?: string;
+}
+
+export interface AnalyticsSummary {
+  totalRuns: number;
+  completedRuns: number;
+  failedRuns: number;
+  blockedRuns: number;
+  runningRuns: number;
+  successRate: number;
+  failureRate: number;
+  blockedRate: number;
+  healthScore: HealthScoreBreakdown;
+}
+
+export interface AnalyticsResponse {
+  generatedAt: string;
+  windowDays: number;
+  summary: AnalyticsSummary;
+  trends: RunsTrendPoint[];
+  topFailureReasons: FailureReasonStat[];
+}
+
 export interface HealthStatus {
   ok: boolean;
   status: "ok" | "warning" | "error";
   aiOfficeRoot: string;
   timestamp: string;
+  uptime?: number;
+  totalRuns?: number;
   runsDirExists: boolean;
   logsDirExists: boolean;
   watcherActive: boolean;

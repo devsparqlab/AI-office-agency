@@ -5,6 +5,7 @@ import healthRoutes from './routes/health';
 import runRoutes from './routes/runs';
 import eventRoutes from './routes/events';
 import logRoutes from './routes/logs';
+import analyticsRoutes from './routes/analytics';
 import { globalWatcher } from './services/watcher';
 
 const app = express();
@@ -17,6 +18,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/runs', runRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/logs', logRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Start Watcher
 globalWatcher.start();

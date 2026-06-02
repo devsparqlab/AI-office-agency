@@ -17,6 +17,7 @@ export interface HealthStatusInput {
   logsDirExists: boolean;
   watcherActive: boolean;
   watcherDebounceMs?: number;
+  totalRuns?: number;
   error?: string;
 }
 
@@ -37,6 +38,8 @@ export function buildHealthStatus(input: HealthStatusInput): HealthStatus {
     status,
     aiOfficeRoot: input.aiOfficeRoot,
     timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    totalRuns: input.totalRuns,
     runsDirExists: input.runsDirExists,
     logsDirExists: input.logsDirExists,
     watcherActive: input.watcherActive,
@@ -60,10 +63,12 @@ export function buildHealthStatus(input: HealthStatusInput): HealthStatus {
 router.get('/', async (req, res) => {
   let runsDirExists = false;
   let logsDirExists = false;
+  let totalRuns = 0;
 
   try {
-    await fs.access(config.runsDir);
+    const entries = await fs.readdir(config.runsDir);
     runsDirExists = true;
+    totalRuns = entries.filter(e => e.startsWith('TASK')).length;
   } catch (e) {}
 
   try {
@@ -82,6 +87,7 @@ router.get('/', async (req, res) => {
     logsDirExists,
     watcherActive: globalWatcher.isActive(),
     watcherDebounceMs: globalWatcher.getDebounceMs(),
+    totalRuns,
   });
 
   res.json(status);
