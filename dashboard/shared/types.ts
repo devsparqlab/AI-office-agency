@@ -26,11 +26,22 @@ export interface RunSummary {
   currentStep?: string;
   startedAt?: string;
   updatedAt?: string;
+  /**
+   * Precedence: Explicit status.yaml completed_at -> terminal status updatedAt -> null
+   */
   completedAt?: string;
+  /**
+   * Only calculated if startedAt and completedAt (or now for running) are valid.
+   * If missing startedAt, this should be null/undefined.
+   */
   durationSeconds?: number;
   runPath: string;
   logPath?: string;
   errorReason?: string;
+  /**
+   * Precedence: error_reason -> history[last].reason -> history[last].message -> "unknown"
+   */
+  normalizedReason?: string;
 }
 
 export interface RunDetail extends RunSummary {
@@ -92,9 +103,18 @@ export interface FailureReasonStat {
   reason: string;
   count: number;
   latestSeenAt?: string;
+  affectedTasks: string[];
+}
+
+export interface AgentActivitySummary {
+  agent: AgentName;
+  totalActions: number;
+  successCount: number;
+  blockageCount: number;
 }
 
 export interface AnalyticsSummary {
+  generatedAt: string;
   totalRuns: number;
   completedRuns: number;
   failedRuns: number;
@@ -104,6 +124,27 @@ export interface AnalyticsSummary {
   failureRate: number;
   blockedRate: number;
   healthScore: HealthScoreBreakdown;
+}
+
+export interface AnalyticsTrends {
+  generatedAt: string;
+  windowDays: number;
+  trends: RunsTrendPoint[];
+}
+
+export interface AnalyticsFailures {
+  generatedAt: string;
+  topFailureReasons: FailureReasonStat[];
+}
+
+export interface AnalyticsAgents {
+  generatedAt: string;
+  agentMetrics: AgentActivitySummary[];
+}
+
+export interface AnalyticsLongRunning {
+  generatedAt: string;
+  tasks: RunSummary[];
 }
 
 export interface AnalyticsResponse {

@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './styles/globals.css';
 import type { 
-  AnalyticsResponse,
   RunSummary, 
   RunDetail, 
-  DashboardStats, 
   HealthStatus,
   DashboardSseEvent
 } from '../../shared/types';
@@ -21,7 +19,6 @@ const App: React.FC = () => {
   const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
   const [runDetailLoading, setRunDetailLoading] = useState(false);
-  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -53,17 +50,15 @@ const App: React.FC = () => {
 
   const fetchInitialData = async () => {
     try {
-      const [healthRes, runsRes, analyticsRes] = await Promise.all([
+      const [healthRes, runsRes] = await Promise.all([
         fetch('/api/health'),
         fetch('/api/runs'),
-        fetch('/api/analytics'),
       ]);
       const healthData = await healthRes.json();
       const runsData = await runsRes.json();
-      const analyticsData = await analyticsRes.json();
       setHealth(healthData);
       setRuns(runsData);
-      setAnalytics(analyticsData);
+      
       if (
         selectedRunIdRef.current &&
         !runsData.some((run: RunSummary) => run.id === selectedRunIdRef.current)
@@ -144,13 +139,21 @@ const App: React.FC = () => {
     const onRunsChanged = (event: MessageEvent<string>) => {
       const update = JSON.parse(event.data) as DashboardSseEvent;
       console.log('Update received:', update);
-      fetchInitialData(); // Refresh on any change
+      
+      // Coordinated refresh
+      fetchInitialData();
+      
       if (selectedRunIdRef.current) {
         fetchRunDetail(selectedRunIdRef.current);
         if (selectedLogFileRef.current) {
           fetchLogContent(selectedRunIdRef.current, selectedLogFileRef.current);
         }
       }
+
+      // Trigger Analytics refresh via a global event or similar
+      // For now, we can rely on the fact that AnalyticsView will likely re-mount
+      // or we can add a refresh counter if needed.
+      window.dispatchEvent(new CustomEvent('dashboard:refresh'));
     };
     eventSource.addEventListener('runs.changed', onRunsChanged);
     return () => eventSource.close();
@@ -304,7 +307,7 @@ const App: React.FC = () => {
         )}
 
         {activeSection === 'analytics' && (
-          <AnalyticsView analytics={analytics} runs={runs} />
+          <AnalyticsView />
         )}
 
         {activeSection === 'reports' && (

@@ -48,29 +48,56 @@ export function sortRunsByPriority(runs: RunSummary[]): RunSummary[] {
 }
 
 export class RunScanner {
-  async listRuns(): Promise<RunSummary[]> {
-    try {
-      const entries = await fs.readdir(config.runsDir, { withFileTypes: true });
-      const taskDirs = entries
-        .filter(entry => entry.isDirectory() && entry.name.startsWith('TASK'))
-        .map(entry => entry.name);
+  private cache: RunSummary[] | null = null;
+  private cacheTimestamp: number = 0;
+  private pendingRequest: Promise<RunSummary[]> | null = null;
+  private readonly CACHE_TTL = 1000; // 1 second cache for concurrent requests
 
-      const summaries = await Promise.all(
-        taskDirs.map(async taskId => {
-          try {
-            return await this.getRunSummary(taskId);
-          } catch (err) {
-            console.error(`Error scanning task ${taskId}:`, err);
-            return this.getFallbackSummary(taskId);
-          }
-        })
-      );
-
-      return sortRunsByPriority(summaries);
-    } catch (err) {
-      console.error('Error listing runs:', err);
-      return [];
+  async listRuns(forceRefresh = false): Promise<RunSummary[]> {
+    const now = Date.now();
+    
+    // 1. Check TTL cache if not forcing refresh
+    if (!forceRefresh && this.cache && (now - this.cacheTimestamp < this.CACHE_TTL)) {
+      return this.cache;
     }
+
+    // 2. Return existing in-flight promise to coalesce concurrent requests
+    if (this.pendingRequest) {
+      return this.pendingRequest;
+    }
+
+    // 3. Create new scan promise
+    this.pendingRequest = (async () => {
+      try {
+        const entries = await fs.readdir(config.runsDir, { withFileTypes: true });
+        const taskDirs = entries
+          .filter(entry => entry.isDirectory() && entry.name.startsWith('TASK'))
+          .map(entry => entry.name);
+
+        const summaries = await Promise.all(
+          taskDirs.map(async taskId => {
+            try {
+              return await this.getRunSummary(taskId);
+            } catch (err) {
+              console.error(`Error scanning task ${taskId}:`, err);
+              return this.getFallbackSummary(taskId);
+            }
+          })
+        );
+
+        const result = sortRunsByPriority(summaries);
+        this.cache = result;
+        this.cacheTimestamp = Date.now();
+        return result;
+      } catch (err) {
+        console.error('Error listing runs:', err);
+        return [];
+      } finally {
+        this.pendingRequest = null;
+      }
+    })();
+
+    return this.pendingRequest;
   }
 
   async getRunDetail(taskId: string): Promise<RunDetail | null> {
@@ -150,17 +177,48 @@ export class RunScanner {
     }
 
     const stats = await fs.stat(runPath);
+    const status = this.mapStatus(statusData.state || statusData.phase);
+    const updatedAt = statusData.updated_at || stats.mtime.toISOString();
+    const startedAt = statusData.created_at;
+
+    // Precedence: Explicit status.yaml completed_at -> terminal status updatedAt -> null
+    const completedAt = statusData.completed_at || 
+      (['completed', 'failed', 'cancelled'].includes(status) ? updatedAt : undefined);
+
+    // Precedence: error_reason -> history[last].reason -> history[last].message -> "unknown"
+    let normalizedReason = "unknown";
+    if (statusData.error_reason) {
+      normalizedReason = statusData.error_reason.trim().toLowerCase();
+    } else if (statusData.history && statusData.history.length > 0) {
+      const lastHistory = statusData.history[statusData.history.length - 1];
+      normalizedReason = (lastHistory.reason || lastHistory.message || "unknown").trim().toLowerCase();
+    }
+
+    // Only calculated if startedAt and completedAt (or now for running) are valid.
+    // Metric: now - startedAt for tasks where status === 'running'.
+    // If startedAt is missing, duration is unknown (DO NOT guess from updatedAt).
+    let durationSeconds: number | undefined;
+    if (startedAt) {
+      const start = new Date(startedAt).getTime();
+      const end = completedAt ? new Date(completedAt).getTime() : (status === 'running' ? Date.now() : NaN);
+      if (!isNaN(start) && !isNaN(end)) {
+        durationSeconds = Math.max(0, Math.floor((end - start) / 1000));
+      }
+    }
 
     return {
       id: taskId,
       title: statusData.task_label || taskId,
-      status: this.mapStatus(statusData.state || statusData.phase),
+      status,
       currentAgent: this.mapAgentName(statusData.current_agent),
       currentStep: statusData.phase,
-      updatedAt: statusData.updated_at || stats.mtime.toISOString(),
-      startedAt: statusData.created_at,
+      updatedAt,
+      startedAt,
+      completedAt,
+      durationSeconds,
       runPath: path.join('runs', taskId),
-      errorReason: statusData.error_reason
+      errorReason: statusData.error_reason,
+      normalizedReason
     };
   }
 
@@ -194,3 +252,5 @@ export class RunScanner {
     return 'unknown';
   }
 }
+
+export const globalScanner = new RunScanner();

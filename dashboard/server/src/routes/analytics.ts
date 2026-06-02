@@ -1,31 +1,59 @@
-import type { Request, Response } from 'express';
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { AnalyticsService } from '../services/analytics';
-import type { AnalyticsResponse } from '@shared/types';
 
-export interface AnalyticsRouteDeps {
-  getAnalytics: () => Promise<AnalyticsResponse>;
-}
+const router = Router();
+const service = new AnalyticsService();
 
-const defaultDeps: AnalyticsRouteDeps = {
-  getAnalytics: () => new AnalyticsService().getAnalytics(),
-};
+router.get('/', async (req, res) => {
+  try {
+    const windowDays = parseInt(req.query.days as string, 10) || 7;
+    res.json(await service.getAnalytics({ windowDays }));
+  } catch (error) {
+    console.error('Failed to fetch combined analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
 
-export function createAnalyticsHandler(deps: AnalyticsRouteDeps = defaultDeps) {
-  return async function analyticsHandler(_req: Request, res: Response) {
-    try {
-      res.json(await deps.getAnalytics());
-    } catch (error) {
-      console.error('Failed to build analytics:', error);
-      res.status(500).json({ error: 'Failed to build analytics' });
-    }
-  };
-}
+router.get('/summary', async (req, res) => {
+  try {
+    const windowDays = parseInt(req.query.days as string, 10) || 7;
+    res.json(await service.getSummary({ windowDays }));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch analytics summary' });
+  }
+});
 
-export function createAnalyticsRouter(deps: AnalyticsRouteDeps = defaultDeps) {
-  const router = Router();
-  router.get('/', createAnalyticsHandler(deps));
-  return router;
-}
+router.get('/trends', async (req, res) => {
+  try {
+    const windowDays = parseInt(req.query.days as string, 10) || 7;
+    res.json(await service.getTrends({ windowDays }));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch analytics trends' });
+  }
+});
 
-export default createAnalyticsRouter();
+router.get('/failures', async (req, res) => {
+  try {
+    res.json(await service.getFailures());
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch failure insights' });
+  }
+});
+
+router.get('/agents', async (req, res) => {
+  try {
+    res.json(await service.getAgents());
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch agent metrics' });
+  }
+});
+
+router.get('/long-running', async (req, res) => {
+  try {
+    res.json(await service.getLongRunning());
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch long-running tasks' });
+  }
+});
+
+export default router;
