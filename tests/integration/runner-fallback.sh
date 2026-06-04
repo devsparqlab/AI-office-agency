@@ -8,11 +8,13 @@ RUN_AGENT="$ROOT_DIR/run-agent.sh"
 SUFFIX="$(date +%s)$$"
 FALLBACK_TASK="TASK-${SUFFIX}F"
 CURSOR_TASK="TASK-${SUFFIX}C"
+NONTRIGGER_TASK="TASK-${SUFFIX}N"
+AUTO_FAIL_TASK="TASK-${SUFFIX}A"
 TEST_BIN_DIR="$(mktemp -d)"
 CALL_DIR="$(mktemp -d)"
 
 cleanup() {
-  rm -rf "$RUNS_DIR/$FALLBACK_TASK" "$RUNS_DIR/$CURSOR_TASK" "$TEST_BIN_DIR" "$CALL_DIR"
+  rm -rf "$RUNS_DIR/$FALLBACK_TASK" "$RUNS_DIR/$CURSOR_TASK" "$RUNS_DIR/$NONTRIGGER_TASK" "$RUNS_DIR/$AUTO_FAIL_TASK" "$TEST_BIN_DIR" "$CALL_DIR"
 }
 trap cleanup EXIT
 
@@ -131,7 +133,7 @@ RUNNER_FALLBACK_CALL_DIR="$CALL_DIR" PATH="$TEST_BIN_DIR:$PATH" "$RUN_AGENT" "$F
 
 assert_eq "3" "$(cat "$CALL_DIR/codex.count")" "codex should run initial attempt plus two retries"
 assert_contains "$CALL_DIR/cursor.args" "agent -p" "cursor-agent fallback should invoke cursor agent"
-assert_contains "$RUNS_DIR/$FALLBACK_TASK/meta.yaml" "event: runner_switch" "runner switch should be audited"
+assert_contains "$RUNS_DIR/$FALLBACK_TASK/meta.yaml" "type: runner_switch" "runner switch should be audited"
 assert_contains "$RUNS_DIR/$FALLBACK_TASK/meta.yaml" "from=codex to=cursor-agent" "switch audit should record from/to"
 assert_eq "in_review" "$(yaml_value "$RUNS_DIR/$FALLBACK_TASK/status.yaml" "phase")" "successful fallback should still sync status"
 
@@ -147,5 +149,66 @@ if [[ ! -f "$RUNS_DIR/$CURSOR_TASK/.cursor-prompt.md" ]]; then
   echo "[FAIL] cursor fallback should generate .cursor-prompt.md"
   exit 1
 fi
+
+echo "== Scenario 3: Non-trigger failure propagates exit code =="
+# Create a codex stub that fails with a non-trigger error (no quota/auth keywords)
+NONTRIGGER_BIN_DIR="$(mktemp -d)"
+cat > "$NONTRIGGER_BIN_DIR/codex" <<'SH'
+#!/usr/bin/env bash
+echo "FATAL: unexpected internal compiler error" >&2
+exit 1
+SH
+chmod +x "$NONTRIGGER_BIN_DIR/codex"
+
+write_ready_task "$NONTRIGGER_TASK"
+nontrigger_status=0
+PATH="$NONTRIGGER_BIN_DIR:$PATH" "$RUN_AGENT" "$NONTRIGGER_TASK" dev codex >/tmp/runner-nontrigger.log 2>&1 || nontrigger_status=$?
+
+if [[ "$nontrigger_status" -eq 0 ]]; then
+  echo "[FAIL] non-trigger runner failure should propagate non-zero exit code, got 0"
+  exit 1
+fi
+# Status should NOT have advanced (still assigned, not in_review)
+actual_phase="$(yaml_value "$RUNS_DIR/$NONTRIGGER_TASK/status.yaml" "phase")"
+assert_eq "assigned" "$actual_phase" "status should not advance after non-trigger failure"
+
+rm -rf "$NONTRIGGER_BIN_DIR"
+
+echo "== Scenario 4: Auto mode does not advance state machine on runner failure =="
+# Create a codex stub that fails with a non-trigger error for auto mode
+AUTO_FAIL_BIN_DIR="$(mktemp -d)"
+cat > "$AUTO_FAIL_BIN_DIR/codex" <<'SH'
+#!/usr/bin/env bash
+echo "FATAL: segfault in sandbox" >&2
+exit 1
+SH
+chmod +x "$AUTO_FAIL_BIN_DIR/codex"
+
+# Write a task that auto mode would start from pm
+mkdir -p "$RUNS_DIR/$AUTO_FAIL_TASK"
+cat > "$RUNS_DIR/$AUTO_FAIL_TASK/status.yaml" <<YAML
+task_id: $AUTO_FAIL_TASK
+phase: pending
+state: pending
+iteration: 0
+current_agent: pm
+ready: true
+created_at: "2026-05-13"
+updated_at: "2026-05-13"
+history: []
+YAML
+cat > "$RUNS_DIR/$AUTO_FAIL_TASK/task.md" <<'MD'
+Test task for auto-fail scenario.
+MD
+
+auto_status=0
+PATH="$AUTO_FAIL_BIN_DIR:$PATH" "$RUN_AGENT" "$AUTO_FAIL_TASK" auto codex >/tmp/runner-auto-fail.log 2>&1 || auto_status=$?
+
+if [[ "$auto_status" -eq 0 ]]; then
+  echo "[FAIL] auto mode should exit non-zero when runner fails, got 0"
+  exit 1
+fi
+
+rm -rf "$AUTO_FAIL_BIN_DIR"
 
 echo "[PASS] runner fallback integration scenarios passed"

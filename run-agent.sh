@@ -927,7 +927,10 @@ run_runner_with_fallback() {
   while true; do
     output_log="$(mktemp)"
 
-    if run_runner_once "$current_runner" "$output_log"; then
+    status=0
+    run_runner_once "$current_runner" "$output_log" || status=$?
+
+    if [[ "$status" -eq 0 ]]; then
       cat "$output_log"
       rm -f "$output_log"
       RUNNER="$current_runner"
@@ -939,7 +942,6 @@ run_runner_with_fallback() {
       return 0
     fi
 
-    status=$?
     cat "$output_log"
 
     if [[ "$auto_switch" != "true" ]] || ! matched_pattern="$(runner_failure_pattern "$output_log")"; then
