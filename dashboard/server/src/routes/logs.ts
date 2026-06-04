@@ -3,9 +3,9 @@ import { config } from '../config';
 import fs from 'fs/promises';
 import path from 'path';
 import type { LogTailResponse } from '@shared/types';
+import { TASK_ID_PATTERN, resolveRunDir } from '../pathSecurity';
 
 const router = Router();
-const TASK_ID_PATTERN = /^TASK-[A-Za-z0-9_-]+$/;
 const LOG_FILE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 type ResolveRunLogPathResult =
@@ -62,26 +62,20 @@ export async function readLogTail(logPath: string, maxLines: number, chunkSize =
 }
 
 export function resolveRunLogPath(runsDir: string, taskId: string, logFile: string): ResolveRunLogPathResult {
-  if (!TASK_ID_PATTERN.test(taskId)) {
-    return { ok: false, code: 400, error: 'Invalid taskId' };
+  const dirResult = resolveRunDir(runsDir, taskId);
+  if (!dirResult.ok) {
+    return dirResult;
   }
 
   if (!LOG_FILE_PATTERN.test(logFile)) {
     return { ok: false, code: 400, error: 'Invalid logFile' };
   }
 
-  const runsRoot = path.resolve(runsDir);
-  const runDir = path.resolve(runsRoot, taskId);
+  const { runDir } = dirResult;
   const logPath = path.resolve(runDir, logFile);
-  const relativeRunDir = path.relative(runsRoot, runDir);
   const relativeLogPath = path.relative(runDir, logPath);
 
-  if (
-    relativeRunDir.startsWith('..') ||
-    path.isAbsolute(relativeRunDir) ||
-    relativeLogPath.startsWith('..') ||
-    path.isAbsolute(relativeLogPath)
-  ) {
+  if (relativeLogPath.startsWith('..') || path.isAbsolute(relativeLogPath)) {
     return { ok: false, code: 400, error: 'Resolved log path escapes the run directory' };
   }
 

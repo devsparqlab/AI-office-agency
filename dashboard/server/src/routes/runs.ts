@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { RunScanner } from '../services/runScanner';
+import { resolveRunDir } from '../pathSecurity';
+import { config } from '../config';
 
 const router = Router();
 const scanner = new RunScanner();
@@ -10,6 +12,11 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/:id', async (req, res) => {
+  const dirResult = resolveRunDir(config.runsDir, req.params.id);
+  if (!dirResult.ok) {
+    return res.status(dirResult.code).json({ error: dirResult.error });
+  }
+
   const detail = await scanner.getRunDetail(req.params.id);
   if (!detail) {
     return res.status(404).json({ error: 'Run not found' });
