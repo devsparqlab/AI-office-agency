@@ -136,7 +136,7 @@ stages:
 
 escalation_rules:
   loop_detection:
-    max_iterations: 5
+    max_iterations: office.config.yaml -> loop_guard.max_iterations
     count_field: status.yaml -> iteration
     on_exceeded:
       next: free-roam

@@ -109,7 +109,8 @@ User Request -> PM -> Dev/Dev-2 -> Reviewer -> Done
 - `phase` and `state` should stay aligned; `in_review` is the reviewer queue after Dev handoff
 - `blocked` + `blocked_on` / `waiting_for` / `ready: false` gate dispatch
 - `current_agent` is enforced by `run-agent.sh`
-- `iteration` vs `loop_guard.max_iterations` (default 8) escalates to Free Roam
+- `iteration` vs `office.config.yaml -> loop_guard.max_iterations` (default 8) escalates to Free Roam
+- `runs/` is runtime state and should stay gitignored except for `runs/.gitkeep`
 
 ## Runbooks
 

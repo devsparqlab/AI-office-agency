@@ -6,7 +6,8 @@ AGENTS_DIR="$OFFICE_DIR/agents"
 RUNS_DIR="$OFFICE_DIR/runs"
 SOCRATICODE_WRAPPER="$OFFICE_DIR/scripts/socraticode-tcp-wrapper.sh"
 CONFIG_RESOLVER="$OFFICE_DIR/scripts/resolve-office-config.rb"
-DEFAULT_LOOP_LIMIT=5
+# Fallback only when no config value is available; keep aligned with portable defaults.
+DEFAULT_LOOP_LIMIT=8
 OFFICE_PROFILE="${OFFICE_PROFILE:-}"
 
 parse_global_args() {

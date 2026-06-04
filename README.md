@@ -84,7 +84,7 @@ ai-dev-office/
   templates/
   scripts/
   docs/
-  runs/<task-id>/           # Runtime task state (not installed to targets)
+  runs/<task-id>/           # Runtime task state (gitignored; not installed to targets)
 ```
 
-Legacy v1 agents `Planner` and `Tester` were replaced by PM and Reviewer/DevOps.
+Legacy v1 agent references live under `docs/legacy-v1/` for archive only. Active role prompts stay in `agents/`.

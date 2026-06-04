@@ -33,6 +33,7 @@ GITIGNORE_REQUIRED=(
   'profiles/*.local.yaml'
   '.env'
   '.socraticode.local.yaml'
+  'runs/*'
 )
 
 assert_file() {
@@ -194,5 +195,51 @@ do
 done
 
 assert_not_contains "$ROOT_DIR/README.md" 'handler message' "generic README must not contain shared-lib handler policy"
+
+echo "== Scenario 9: workflow loop guard references config as source of truth =="
+ruby - "$ROOT_DIR/workflows/hybrid-default.yaml" <<'RUBY'
+require "yaml"
+
+path = ARGV[0]
+data = YAML.safe_load(File.read(path), aliases: true) || {}
+loop_detection = data.dig("escalation_rules", "loop_detection") || {}
+
+max_iterations = loop_detection["max_iterations"]
+abort "[FAIL] workflow loop guard should not hardcode max_iterations" if max_iterations.is_a?(Numeric)
+abort "[FAIL] workflow loop guard should reference office.config.yaml -> loop_guard.max_iterations" unless max_iterations == "office.config.yaml -> loop_guard.max_iterations"
+
+puts "[OK] workflow loop guard references config"
+RUBY
+
+echo "== Scenario 10: runtime runs stay out of version control =="
+ruby - "$ROOT_DIR" <<'RUBY'
+root = ARGV[0]
+tracked = Dir.chdir(root) { `git ls-files runs`.lines.map(&:strip).reject(&:empty?) }
+allowed = ["runs/.gitkeep"]
+unexpected = tracked - allowed
+
+abort "[FAIL] tracked runtime files found under runs/: #{unexpected.join(', ')}" unless unexpected.empty?
+
+puts "[OK] only runs/.gitkeep is tracked"
+RUBY
+
+echo "== Scenario 11: legacy v1 agent docs are moved out of active agents/ =="
+for rel in \
+  agents/planner.md \
+  agents/tester.md
+do
+  if [[ -f "$ROOT_DIR/$rel" ]]; then
+    echo "[FAIL] legacy agent should not remain in active agents/: $rel"
+    exit 1
+  fi
+done
+
+for rel in \
+  docs/legacy-v1/planner.md \
+  docs/legacy-v1/tester.md \
+  docs/legacy-v1/README.md
+do
+  assert_file "$ROOT_DIR/$rel" "legacy docs archive"
+done
 
 echo "[PASS] framework contract foundation scenarios passed"
