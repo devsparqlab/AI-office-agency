@@ -601,7 +601,14 @@ meta["events"] << {
 }
 meta["updated_at"] = timestamp
 
-File.write(meta_path, YAML.dump(meta))
+tmp_path = "#{meta_path}.tmp.#{$$}"
+begin
+  File.write(tmp_path, YAML.dump(meta))
+  File.rename(tmp_path, meta_path)
+rescue => e
+  File.delete(tmp_path) if File.exist?(tmp_path)
+  raise e
+end
 RUBY
 }
 
@@ -800,7 +807,19 @@ resolve_loop_limit() {
   ruby "$CONFIG_RESOLVER" get "$OFFICE_DIR" loop_guard.max_iterations "$DEFAULT_LOOP_LIMIT"
 }
 
+resolve_free_roam_loop_limit() {
+  local configured
+  configured="$(ruby "$CONFIG_RESOLVER" get "$OFFICE_DIR" loop_guard.free_roam_max_iterations "" 2>/dev/null || true)"
+  if [[ "$configured" =~ ^[0-9]+$ && "$configured" -gt 0 ]]; then
+    echo "$configured"
+  else
+    # Default: 2× normal loop limit — free-roam is the last resort, give it more room
+    echo $(( $(resolve_loop_limit) * 2 ))
+  fi
+}
+
 LOOP_LIMIT="$(resolve_loop_limit)"
+FREE_ROAM_LOOP_LIMIT="$(resolve_free_roam_loop_limit)"
 
 config_value() {
   local key_path="$1"
@@ -1362,7 +1381,14 @@ if pending.empty?
     "reason" => "Dependencies resolved: #{blocked_on.join(', ')}"
   }
 
-  File.write(status_path, YAML.dump(status))
+  tmp_path = "#{status_path}.tmp.#{$$}"
+  begin
+    File.write(tmp_path, YAML.dump(status))
+    File.rename(tmp_path, status_path)
+  rescue => e
+    File.delete(tmp_path) if File.exist?(tmp_path)
+    raise e
+  end
   puts "Status unblocked: #{old_phase} -> #{new_phase}"
 else
   puts "Status remains blocked: waiting on #{pending.join(', ')}"
@@ -1517,7 +1543,14 @@ status["history"] << {
   "reason" => reason
 }
 
-File.write(status_path, YAML.dump(status))
+tmp_path = "#{status_path}.tmp.#{$$}"
+begin
+  File.write(tmp_path, YAML.dump(status))
+  File.rename(tmp_path, status_path)
+rescue => e
+  File.delete(tmp_path) if File.exist?(tmp_path)
+  raise e
+end
 puts "Status synced: #{old_phase} -> #{new_phase} (next: #{next_agent})"
 RUBY
 }
@@ -1752,7 +1785,14 @@ status["history"] << {
   "reason" => reason
 }
 
-File.write(status_path, YAML.dump(status))
+tmp_path = "#{status_path}.tmp.#{$$}"
+begin
+  File.write(tmp_path, YAML.dump(status))
+  File.rename(tmp_path, status_path)
+rescue => e
+  File.delete(tmp_path) if File.exist?(tmp_path)
+  raise e
+end
 puts "Status forced: #{old_phase} -> #{new_phase} (next: #{next_agent})"
 RUBY
 }
@@ -1850,12 +1890,19 @@ if [[ "$DEPENDENCY_GUARD_ENABLED" == "true" ]] && should_run_dependency_guard "$
   fi
 fi
 
-if [[ "$AGENT" != "pm" && "$AGENT" != "free-roam" && -f "$STATUS_FILE" && "$CURRENT_ITERATION" =~ ^[0-9]+$ && "$CURRENT_ITERATION" -ge "$LOOP_LIMIT" ]]; then
-  LOOP_REASON="Loop guard triggered: exceeded max_iterations (${CURRENT_ITERATION}/${LOOP_LIMIT}) while attempting ${AGENT}."
-  echo "Loop guard triggered for $TASK_LABEL at iteration $CURRENT_ITERATION. Routing to free-roam."
-  force_status_route "$TASK_ID" "$STATUS_FILE" "$TODAY" "free-roam" "escalated" "$AGENT" "$LOOP_REASON"
-  log_meta_event "$TASK_ID" "$META_FILE" "loop_guard" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} phase=${CURRENT_PHASE:-unknown} iteration=$CURRENT_ITERATION limit=$LOOP_LIMIT routed_to=free-roam"
-  exit 1
+if [[ "$AGENT" != "pm" && -f "$STATUS_FILE" && "$CURRENT_ITERATION" =~ ^[0-9]+$ ]]; then
+  if [[ "$AGENT" == "free-roam" && "$CURRENT_ITERATION" -ge "$FREE_ROAM_LOOP_LIMIT" ]]; then
+    LOOP_REASON="Free-roam loop guard triggered: exceeded free_roam_max_iterations (${CURRENT_ITERATION}/${FREE_ROAM_LOOP_LIMIT})."
+    echo "Free-roam loop guard triggered for $TASK_LABEL at iteration $CURRENT_ITERATION. Halting."
+    log_meta_event "$TASK_ID" "$META_FILE" "loop_guard" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} phase=${CURRENT_PHASE:-unknown} iteration=$CURRENT_ITERATION limit=$FREE_ROAM_LOOP_LIMIT agent=free-roam"
+    exit 1
+  elif [[ "$AGENT" != "free-roam" && "$CURRENT_ITERATION" -ge "$LOOP_LIMIT" ]]; then
+    LOOP_REASON="Loop guard triggered: exceeded max_iterations (${CURRENT_ITERATION}/${LOOP_LIMIT}) while attempting ${AGENT}."
+    echo "Loop guard triggered for $TASK_LABEL at iteration $CURRENT_ITERATION. Routing to free-roam."
+    force_status_route "$TASK_ID" "$STATUS_FILE" "$TODAY" "free-roam" "escalated" "$AGENT" "$LOOP_REASON"
+    log_meta_event "$TASK_ID" "$META_FILE" "loop_guard" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} phase=${CURRENT_PHASE:-unknown} iteration=$CURRENT_ITERATION limit=$LOOP_LIMIT routed_to=free-roam"
+    exit 1
+  fi
 fi
 
 if [[ "$AGENT" == "auto" ]]; then

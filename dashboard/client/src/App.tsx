@@ -27,14 +27,27 @@ const App: React.FC = () => {
   const [logError, setLogError] = useState<string | null>(null);
   const selectedRunIdRef = useRef<string | null>(null);
   const selectedLogFileRef = useRef<string>('');
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const refreshInFlightRef = useRef<boolean>(false);
 
   useEffect(() => {
     fetchInitialData();
-    return setupSSE();
+    const cleanupSSE = setupSSE();
+    return () => {
+      cleanupSSE();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
     if (selectedRunId) {
+      // Abort any previous in-flight fetches when selectedRunId changes
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       selectedLogFileRef.current = '';
       setSelectedLogFile('');
       setLogContent(null);
@@ -42,23 +55,29 @@ const App: React.FC = () => {
       fetchRunDetail(selectedRunId);
     }
     selectedRunIdRef.current = selectedRunId;
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
   }, [selectedRunId]);
 
   useEffect(() => {
     selectedLogFileRef.current = selectedLogFile;
   }, [selectedLogFile]);
 
-  const fetchInitialData = async () => {
+  const fetchInitialData = async (signal?: AbortSignal) => {
     try {
       const [healthRes, runsRes] = await Promise.all([
-        fetch('/api/health'),
-        fetch('/api/runs'),
+        fetch('/api/health', { signal }),
+        fetch('/api/runs', { signal }),
       ]);
       const healthData = await healthRes.json();
       const runsData = await runsRes.json();
       setHealth(healthData);
       setRuns(runsData);
-      
+
       if (
         selectedRunIdRef.current &&
         !runsData.some((run: RunSummary) => run.id === selectedRunIdRef.current)
@@ -72,16 +91,17 @@ const App: React.FC = () => {
       }
       setLoading(false);
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('Error fetching initial data:', err);
       setLoading(false);
     }
   };
 
-  const fetchRunDetail = async (id: string) => {
+  const fetchRunDetail = async (id: string, signal?: AbortSignal) => {
     setRunDetailLoading(true);
     setRunDetailError(null);
     try {
-      const res = await fetch(`/api/runs/${id}`);
+      const res = await fetch(`/api/runs/${id}`, { signal });
       if (!res.ok) {
         setRunDetail(null);
         setRunDetailError(res.status === 404 ? 'Selected run not found.' : 'Failed to load run details.');
@@ -102,6 +122,7 @@ const App: React.FC = () => {
         }
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('Error fetching run detail:', err);
       setRunDetail(null);
       setRunDetailError('Failed to load run details.');
@@ -110,14 +131,14 @@ const App: React.FC = () => {
     }
   };
 
-  const fetchLogContent = async (taskId: string, fileName: string) => {
+  const fetchLogContent = async (taskId: string, fileName: string, signal?: AbortSignal) => {
     if (!fileName) {
       setLogContent(null);
       setLogError(null);
       return;
     }
     try {
-      const res = await fetch(`/api/logs/${taskId}/${fileName}`);
+      const res = await fetch(`/api/logs/${taskId}/${fileName}`, { signal });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         setLogContent(null);
@@ -128,6 +149,7 @@ const App: React.FC = () => {
       setLogContent(data.content);
       setLogError(null);
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('Error fetching log content:', err);
       setLogContent(null);
       setLogError('Failed to load log content.');
@@ -136,18 +158,34 @@ const App: React.FC = () => {
 
   const setupSSE = () => {
     const eventSource = new EventSource('/api/events');
-    const onRunsChanged = (event: MessageEvent<string>) => {
+    const onRunsChanged = async (event: MessageEvent<string>) => {
       const update = JSON.parse(event.data) as DashboardSseEvent;
       console.log('Update received:', update);
-      
-      // Coordinated refresh
-      fetchInitialData();
-      
-      if (selectedRunIdRef.current) {
-        fetchRunDetail(selectedRunIdRef.current);
-        if (selectedLogFileRef.current) {
-          fetchLogContent(selectedRunIdRef.current, selectedLogFileRef.current);
+
+      // Deduplicate: skip if a refresh is already in flight
+      if (refreshInFlightRef.current) return;
+      refreshInFlightRef.current = true;
+
+      // Abort any previous in-flight fetches before starting a new refresh cycle
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      const { signal } = controller;
+
+      try {
+        // Coordinated refresh
+        await fetchInitialData(signal);
+
+        if (selectedRunIdRef.current) {
+          await fetchRunDetail(selectedRunIdRef.current, signal);
+          if (selectedLogFileRef.current) {
+            await fetchLogContent(selectedRunIdRef.current, selectedLogFileRef.current, signal);
+          }
         }
+      } finally {
+        refreshInFlightRef.current = false;
       }
 
       // Trigger Analytics refresh via a global event or similar
