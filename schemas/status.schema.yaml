@@ -90,6 +90,10 @@ properties:
     type: string
   updated_at:
     type: string
+  # Idempotency marker for driver-side decision reconcile: the decided_at of the
+  # most recent human decision already applied to this task's workflow.
+  decision_applied_at:
+    type: string
   ready:
     type: boolean
   blocked_on:

@@ -136,6 +136,7 @@ def validate_status(data, label, errors)
 
   expect_string(data["created_at"], "#{label}.created_at", errors) if data.key?("created_at")
   expect_string(data["updated_at"], "#{label}.updated_at", errors) if data.key?("updated_at")
+  expect_string(data["decision_applied_at"], "#{label}.decision_applied_at", errors) if data.key?("decision_applied_at")
   expect_boolean(data["ready"], "#{label}.ready", errors) if data.key?("ready")
 
   if data.key?("blocked_on")

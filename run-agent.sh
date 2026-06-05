@@ -1849,6 +1849,23 @@ if [[ "$AGENT" != "pm" && -f "$STATUS_FILE" && "$AUTO_RECONCILE_BEFORE_DISPATCH"
   reconcile_blocked_status "$TASK_ID" "$STATUS_FILE" "$RUNS_DIR" "$TODAY" "$UNBLOCK_WHEN_UPSTREAM_PHASE" "$REVIEWER_QUEUE_PHASE" "$UNBLOCK_CLEAR_WAITING_FOR" "$UNBLOCK_SET_READY" "$UNBLOCK_ROUTE_FROM_ASSIGNMENT"
 fi
 
+# Apply any pending human decision (decision.yaml) before reading phase. The
+# dashboard only writes decision.yaml; this driver step is the only writer that
+# reconciles it into status.yaml (single-writer invariant preserved).
+if [[ "$AGENT" != "pm" && -f "$STATUS_FILE" ]]; then
+  DECISION_RESULT="$(ruby "$OFFICE_DIR/scripts/reconcile-decision.rb" "$TASK_ID" 2>/dev/null || true)"
+  if [[ "$DECISION_RESULT" == applied:* ]]; then
+    echo "Applied human decision (${DECISION_RESULT#applied:})."
+    log_meta_event "$TASK_ID" "$META_FILE" "decision_applied" "$AGENT" "task=$TASK_LABEL ${DECISION_RESULT#applied:}"
+    case "$DECISION_RESULT" in
+      applied:approve:*|applied:reject:*)
+        echo "Task reached a terminal state by human decision; not dispatching $AGENT."
+        exit 0
+        ;;
+    esac
+  fi
+fi
+
 CURRENT_ITERATION="$(effective_iteration "$STATUS_FILE")"
 CURRENT_PHASE="$(status_value "$STATUS_FILE" "phase")"
 CURRENT_STATE="$(status_value "$STATUS_FILE" "state")"

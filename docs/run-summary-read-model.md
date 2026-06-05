@@ -94,9 +94,9 @@ a contract, not a producer signal.
 the contracted signals the decision was made against (captured server-side for
 an audit trail; `againstVerdict` is normalized to a valid enum or `null`).
 
-`latestDecision` is **descriptive only** — recording it does not change `phase`,
-`verdict`, or `needsReview`. The driver acting on a decision is a separate
-(not-yet-wired) step.
+`latestDecision` reflects what the human chose; the **driver** turns it into a
+`phase` transition at the next dispatch (see the decision → phase table above).
+The read model itself stays read-only — it never writes `status.yaml`.
 
 ## Listing invariant
 
@@ -111,8 +111,21 @@ rather than shown-but-unusable.
 `POST /api/decisions/:id` appends a human decision to `runs/<id>/decision.yaml`
 (`approve | request_changes | escalate | reject`). This is a **new input signal**,
 not a mutation of `status.yaml` — so the dashboard and the driver are never
-concurrent writers of the same file. The driver does not yet act on decisions
-automatically; wiring decision → workflow transition is a deliberate follow-up.
+concurrent writers of the same file.
+
+The **driver** reconciles it: at dispatch, `run-agent.sh` runs
+`scripts/reconcile-decision.rb`, which reads `decision.yaml` and applies the
+latest decision to `status.yaml`. This keeps the single-writer invariant — only
+the driver writes `status.yaml`. It is idempotent via
+`status.decision_applied_at` (= the applied decision's `decided_at`), so a
+decision is applied exactly once.
+
+| decision | phase | current_agent | dispatch |
+|---|---|---|---|
+| `approve` | `done` | `done` | terminal — driver stops |
+| `request_changes` | `debugging` | `debugger` | continues (rework loop) |
+| `escalate` | `escalated` | `free-roam` | continues |
+| `reject` | `aborted` | — | terminal — driver stops |
 
 ## API
 
@@ -133,4 +146,5 @@ automatically; wiring decision → workflow transition is a deliberate follow-up
 - Slice 2 — producer contract / `validation_failed` ✅
 - Slice 3 — risk / confidence (contract-backed) ✅
 - Slice 4 — human decision write-back (`decision.yaml`, record + surface) ✅
-- Follow-up — driver acts on a recorded decision (workflow transition). Not yet wired.
+- Driver reconcile — `run-agent.sh` applies a decision to `status.yaml` at dispatch,
+  idempotently, preserving the single-writer invariant ✅
