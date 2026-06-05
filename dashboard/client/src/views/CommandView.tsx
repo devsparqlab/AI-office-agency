@@ -14,16 +14,16 @@ const ACTOR_KEY = 'dashboard_actor';
 
 interface Zone { id: string; label: string; phases: RunPhase[]; agent: AgentName | null; left: number; top: number; }
 const ZONES: Zone[] = [
-  { id: 'inbox', label: 'Inbox', phases: ['pending'], agent: 'pm', left: 9, top: 24 },
-  { id: 'review', label: 'Review', phases: ['review', 'in_review'], agent: 'reviewer', left: 30, top: 24 },
-  { id: 'escalation', label: 'Escalation', phases: ['escalated', 'free_roam_complete'], agent: 'free-roam', left: 58, top: 20 },
-  { id: 'devops', label: 'DevOps', phases: ['devops_needed', 'devops_complete'], agent: 'devops', left: 80, top: 20 },
-  { id: 'dev', label: 'Dev Bay', phases: ['assigned', 'assigned_parallel'], agent: 'dev', left: 24, top: 58 },
-  { id: 'done', label: 'Done', phases: ['done'], agent: null, left: 48, top: 42 },
-  { id: 'debug', label: 'Debug Lab', phases: ['debugging', 'debugging_complete'], agent: 'debugger', left: 82, top: 48 },
-  { id: 'blocked', label: 'Blocked', phases: ['blocked'], agent: null, left: 10, top: 70 },
-  { id: 'rejected', label: 'Val.Failed', phases: ['validation_failed'], agent: null, left: 64, top: 66 },
-  { id: 'aborted', label: 'Aborted', phases: ['aborted'], agent: null, left: 46, top: 82 },
+  { id: 'inbox', label: 'Inbox', phases: ['pending'], agent: 'pm', left: 13, top: 31 },
+  { id: 'review', label: 'Review', phases: ['review', 'in_review'], agent: 'reviewer', left: 34, top: 30 },
+  { id: 'escalation', label: 'Escalation', phases: ['escalated', 'free_roam_complete'], agent: 'free-roam', left: 54, top: 26 },
+  { id: 'devops', label: 'DevOps', phases: ['devops_needed', 'devops_complete'], agent: 'devops', left: 78, top: 26 },
+  { id: 'dev', label: 'Dev Bay', phases: ['assigned', 'assigned_parallel'], agent: 'dev', left: 23, top: 56 },
+  { id: 'done', label: 'Done', phases: ['done'], agent: null, left: 48, top: 46 },
+  { id: 'debug', label: 'Debug Lab', phases: ['debugging', 'debugging_complete'], agent: 'debugger', left: 85, top: 49 },
+  { id: 'blocked', label: 'Blocked', phases: ['blocked'], agent: null, left: 18, top: 61 },
+  { id: 'rejected', label: 'Val.Failed', phases: ['validation_failed'], agent: null, left: 69, top: 59 },
+  { id: 'aborted', label: 'Aborted', phases: ['aborted'], agent: null, left: 48, top: 80 },
 ];
 const ZONE_BY_ID = new Map(ZONES.map((z) => [z.id, z]));
 const PHASE_TO_ZONE = new Map<string, string>();
@@ -42,7 +42,21 @@ const DECISION_ACTIONS: { action: DecisionAction; label: string }[] = [
 interface Task extends ReviewSummary { title: string; status: RunSummary['status']; updatedAt?: string; currentAgent?: AgentName; }
 interface Flow { id: number; from: string; to: string; }
 interface LogLine { id: number; time: string; text: string; color: string; }
-type Filter = 'all' | 'running' | 'needs' | 'done' | 'failed';
+type Filter = 'actionable' | 'needs' | 'running' | 'failed' | 'done' | 'all';
+
+// Queue ordering: a human should see what needs action first; finished work sinks.
+function priority(t: { status: RunSummary['status']; needsReview: boolean }): number {
+  if (t.status === 'failed') return 0;       // validation failed
+  if (t.needsReview) return 1;
+  if (t.status === 'running' || t.status === 'waiting_review') return 2;
+  if (t.status === 'blocked') return 3;
+  if (t.status === 'queued') return 4;
+  if (t.status === 'cancelled') return 5;    // aborted
+  return 6;                                   // completed / unknown
+}
+function isActionable(t: { status: RunSummary['status'] }): boolean {
+  return t.status !== 'completed' && t.status !== 'cancelled';
+}
 
 const STYLE = `
 .cc { display: grid; grid-template-columns: 1fr 340px; gap: 12px; height: 100%; padding: 12px;
@@ -51,14 +65,16 @@ const STYLE = `
 .cc-top { display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .cc-map { position: relative; flex: 1; border: 1px solid #1e2733; border-radius: 6px; overflow: hidden;
   background: #05070b center/cover no-repeat; min-height: 220px; }
-.flow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.flow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 .flowpath { fill: none; stroke: #22d3ee; stroke-width: 2; vector-effect: non-scaling-stroke;
   stroke-dasharray: 4 5; animation: dash 0.5s linear infinite; filter: drop-shadow(0 0 3px #22d3ee); opacity: 0.9; }
 @keyframes dash { to { stroke-dashoffset: -9; } }
-.pin { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 5px;
-  background: rgba(8,12,18,0.82); border: 1px solid #2a3744; border-radius: 12px; padding: 3px 7px;
-  font-size: 10px; white-space: nowrap; cursor: pointer; }
-.pin:hover { border-color: #3d6e8c; }
+.pin { position: absolute; z-index: 5; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 5px;
+  background: rgba(6,10,16,0.94); border: 1px solid #38465a; border-radius: 12px; padding: 4px 8px;
+  font-size: 10px; white-space: nowrap; cursor: pointer; backdrop-filter: blur(3px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.55); transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s; }
+.pin:hover { z-index: 6; border-color: #22d3ee; transform: translate(-50%, -50%) scale(1.07);
+  box-shadow: 0 0 16px 2px rgba(34,211,238,0.6), 0 2px 8px rgba(0,0,0,0.6); }
 .pin.sel { outline: 1px solid #22d3ee; }
 .dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px currentColor; flex: none; }
 .pin .cnt { color: #8a97a8; }
@@ -94,7 +110,7 @@ function statusOf(t: Task): { label: string; color: string } {
   switch (t.status) {
     case 'running': return { label: 'Running', color: C.green };
     case 'waiting_review': return { label: 'Waiting', color: C.cyan };
-    case 'failed': return { label: 'Error', color: C.red };
+    case 'failed': return { label: 'Validation', color: C.red };
     case 'blocked': return { label: 'Blocked', color: C.amber };
     case 'completed': return { label: 'Done', color: C.gray };
     case 'cancelled': return { label: 'Aborted', color: C.gray };
@@ -119,7 +135,7 @@ export const CommandView: React.FC = () => {
   const [flows, setFlows] = useState<Flow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<Filter>('actionable');
   const [zoneFilter, setZoneFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [actor, setActor] = useState(() => localStorage.getItem(ACTOR_KEY) || '');
@@ -224,15 +240,18 @@ export const CommandView: React.FC = () => {
   const filtered = useMemo(() => {
     let list = tasks;
     if (zoneFilter) list = list.filter((t) => (t.phase && PHASE_TO_ZONE.get(t.phase)) === zoneFilter);
-    if (filter === 'running') list = list.filter((t) => t.status === 'running' || t.status === 'waiting_review');
+    if (filter === 'actionable') list = list.filter(isActionable);
     else if (filter === 'needs') list = list.filter((t) => t.needsReview);
-    else if (filter === 'done') list = list.filter((t) => t.status === 'completed');
+    else if (filter === 'running') list = list.filter((t) => t.status === 'running' || t.status === 'waiting_review');
     else if (filter === 'failed') list = list.filter((t) => t.status === 'failed');
-    return [...list].sort((a, b) => (a.needsReview === b.needsReview ? 0 : a.needsReview ? -1 : 1));
+    else if (filter === 'done') list = list.filter((t) => t.status === 'completed');
+    // Always order actionable-first; Done/aborted sink to the bottom.
+    return [...list].sort((a, b) => priority(a) - priority(b) || b.taskId.localeCompare(a.taskId));
   }, [tasks, filter, zoneFilter]);
 
   const counts = useMemo(() => ({
     all: tasks.length,
+    actionable: tasks.filter(isActionable).length,
     running: tasks.filter((t) => t.status === 'running' || t.status === 'waiting_review').length,
     needs: tasks.filter((t) => t.needsReview).length,
     done: tasks.filter((t) => t.status === 'completed').length,
@@ -258,11 +277,12 @@ export const CommandView: React.FC = () => {
   const selTask = tasks.find((t) => t.taskId === selected) || null;
   const s = analytics?.summary;
   const CHIPS: { id: Filter; label: string; color: string }[] = [
-    { id: 'all', label: `All ${counts.all}`, color: '#8a97a8' },
-    { id: 'running', label: `Running ${counts.running}`, color: C.green },
+    { id: 'actionable', label: `Actionable ${counts.actionable}`, color: C.cyan },
     { id: 'needs', label: `Needs ${counts.needs}`, color: C.amber },
-    { id: 'failed', label: `Error ${counts.failed}`, color: C.red },
+    { id: 'running', label: `Running ${counts.running}`, color: C.green },
+    { id: 'failed', label: `Validation ${counts.failed}`, color: C.red },
     { id: 'done', label: `Done ${counts.done}`, color: C.gray },
+    { id: 'all', label: `All ${counts.all}`, color: '#8a97a8' },
   ];
 
   return (
