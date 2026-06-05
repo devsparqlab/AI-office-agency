@@ -258,6 +258,22 @@ export const CommandView: React.FC = () => {
     failed: tasks.filter((t) => t.status === 'failed').length,
   }), [tasks]);
 
+  // Health computed from the live task set (not the windowed analytics summary).
+  // SUCCESS = of FINISHED work, the fraction that succeeded — in-progress tasks
+  // are not counted as failures, so the number reflects quality, not backlog.
+  const healthStats = useMemo(() => {
+    let completed = 0, failed = 0, blocked = 0, running = 0, cancelled = 0;
+    for (const t of tasks) {
+      if (t.status === 'completed') completed++;
+      else if (t.status === 'failed') failed++;
+      else if (t.status === 'blocked') blocked++;
+      else if (t.status === 'running' || t.status === 'waiting_review') running++;
+      else if (t.status === 'cancelled') cancelled++;
+    }
+    const finished = completed + failed + cancelled;
+    return { completed, failed, blocked, running, successPct: finished ? Math.round((completed / finished) * 100) : 0 };
+  }, [tasks]);
+
   const decide = async (taskId: string, action: DecisionAction) => {
     const noteRequired = action !== 'approve';
     const note = window.prompt(`Note for "${action}" on ${taskId}${noteRequired ? ' (required):' : ' (optional):'}`) ?? undefined;
@@ -279,7 +295,6 @@ export const CommandView: React.FC = () => {
   const CHIPS: { id: Filter; label: string; color: string }[] = [
     { id: 'actionable', label: `Actionable ${counts.actionable}`, color: C.cyan },
     { id: 'needs', label: `Needs ${counts.needs}`, color: C.amber },
-    { id: 'running', label: `Running ${counts.running}`, color: C.green },
     { id: 'failed', label: `Validation ${counts.failed}`, color: C.red },
     { id: 'done', label: `Done ${counts.done}`, color: C.gray },
     { id: 'all', label: `All ${counts.all}`, color: '#8a97a8' },
@@ -294,9 +309,12 @@ export const CommandView: React.FC = () => {
           <strong style={{ color: '#e6edf5', letterSpacing: 1 }}>◢ AI WORKFORCE COMMAND CENTER</strong>
           <span className="dot pulse" style={{ color: C.green, background: C.green }} />
           <span style={{ color: '#5b6776' }}>live</span>
-          <input type="text" placeholder="your name (decisions)" value={actor}
-            onChange={(e) => { setActor(e.target.value); localStorage.setItem(ACTOR_KEY, e.target.value); }}
-            style={{ marginLeft: 'auto', font: 'inherit', fontSize: 11, padding: 4, background: '#0d131b', color: '#fff', border: '1px solid #1e2733', borderRadius: 4 }} />
+          <button title="Set your name for decisions"
+            onClick={() => { const n = (window.prompt('Your name (used on decisions):', actor) ?? actor).trim(); setActor(n); localStorage.setItem(ACTOR_KEY, n); }}
+            style={{ marginLeft: 'auto', font: 'inherit', fontSize: 11, padding: '4px 9px', cursor: 'pointer',
+              background: '#0d131b', color: actor ? '#c9d4e3' : '#5b6776', border: '1px solid #1e2733', borderRadius: 14 }}>
+            👤 {actor || 'set name'}
+          </button>
           {error && <span style={{ color: C.red }}>{error}</span>}
         </div>
 
@@ -328,10 +346,10 @@ export const CommandView: React.FC = () => {
           <div className="panel">
             <h3>♥ SYSTEM HEALTH {s && <span style={{ marginLeft: 'auto', color: s.healthScore.status === 'ok' ? C.green : s.healthScore.status === 'warning' ? C.amber : C.red }}>{s.healthScore.score}</span>}</h3>
             <div className="stats">
-              <div className="stat"><div className="v" style={{ color: C.green }}>{s ? `${Math.round(s.successRate * 100)}%` : '—'}</div><div className="k">SUCCESS</div></div>
-              <div className="stat"><div className="v" style={{ color: C.red }}>{s?.failedRuns ?? '—'}</div><div className="k">FAILED</div></div>
-              <div className="stat"><div className="v" style={{ color: C.amber }}>{s?.blockedRuns ?? '—'}</div><div className="k">BLOCKED</div></div>
-              <div className="stat"><div className="v" style={{ color: C.cyan }}>{s?.runningRuns ?? '—'}</div><div className="k">RUNNING</div></div>
+              <div className="stat"><div className="v" style={{ color: C.green }}>{`${healthStats.successPct}%`}</div><div className="k">SUCCESS</div></div>
+              <div className="stat"><div className="v" style={{ color: C.red }}>{healthStats.failed}</div><div className="k">FAILED</div></div>
+              <div className="stat"><div className="v" style={{ color: C.amber }}>{healthStats.blocked}</div><div className="k">BLOCKED</div></div>
+              <div className="stat"><div className="v" style={{ color: C.cyan }}>{healthStats.running}</div><div className="k">RUNNING</div></div>
             </div>
           </div>
 
@@ -346,7 +364,13 @@ export const CommandView: React.FC = () => {
           </div>
 
           <div className="panel">
-            <h3>📈 WORKFLOW ACTIVITY</h3>
+            <h3>📈 WORKFLOW ACTIVITY
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: 7, fontSize: 8, letterSpacing: 0 }}>
+                <span style={{ color: '#22d3ee' }}>● total</span>
+                <span style={{ color: '#22c55e' }}>● done</span>
+                <span style={{ color: '#ef4444' }}>● fail</span>
+              </span>
+            </h3>
             <div className="spark"><Spark trends={analytics?.trends ?? []} /></div>
           </div>
         </div>

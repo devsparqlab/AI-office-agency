@@ -16,7 +16,7 @@ test('buildHealthStatus includes diagnostics needed to inspect dashboard wiring'
   });
 
   assert.equal(status.ok, true);
-  assert.equal(status.status, 'warning');
+  assert.equal(status.status, 'ok'); // missing top-level logs/ is not a warning (logs are per-task)
   assert.equal(status.paths.runsDir, '/workspace/ai-dev-office/runs');
   assert.equal(status.config.logTailLines, 500);
   assert.equal(status.watcher.active, true);

@@ -26,7 +26,9 @@ function resolveHealthSeverity(input: HealthStatusInput): HealthStatus['status']
   if (!input.runsDirExists || input.error) {
     return 'error';
   }
-  if (!input.logsDirExists || !input.watcherActive) {
+  // A missing top-level logs/ dir is normal here — logs live per-task under
+  // runs/<id>/*.log. Only the watcher being down is an actual warning.
+  if (!input.watcherActive) {
     return 'warning';
   }
   return 'ok';

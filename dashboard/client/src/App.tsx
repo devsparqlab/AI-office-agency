@@ -16,7 +16,7 @@ import { apiFetch, apiEventSourceUrl } from './api';
 import { Activity, Search, Clock, Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<DashboardSection>('monitor');
+  const [activeSection, setActiveSection] = useState<DashboardSection>('command');
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
@@ -256,16 +256,18 @@ const App: React.FC = () => {
               style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted, #8a97a8)',
                 cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2 }}>«</button>
           </div>
+          {activeSection !== 'command' && (
           <div className="search-input-shell">
             <Search size={16} className="search-input-icon" />
-            <input 
+            <input
               className="search-input"
-              type="text" 
-              placeholder="Search tasks..." 
+              type="text"
+              placeholder="Search tasks..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          )}
 
           <div className="section-tabs">
             {sections.map((section) => (
@@ -279,11 +281,14 @@ const App: React.FC = () => {
               </button>
             ))}
           </div>
+          {activeSection !== 'command' && (
           <div className="sidebar-subhead">
             <span className="sidebar-subhead-label">Task Runs</span>
             <span className="sidebar-subhead-value">{sidebarSummaryLabel}</span>
           </div>
+          )}
         </div>
+        {activeSection !== 'command' && (
         <div className="run-list">
           {loading ? (
             <div className="sidebar-list-state"><Loader2 className="animate-spin" /></div>
@@ -312,6 +317,7 @@ const App: React.FC = () => {
             ))
           )}
         </div>
+        )}
         <div className="sidebar-footer">
           <div className="sidebar-footer-status">
             <div className="status-dot" style={{ backgroundColor: healthAccent }}></div>
