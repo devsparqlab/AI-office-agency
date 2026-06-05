@@ -28,6 +28,16 @@ function taskIdNumber(taskId: string): number | null {
   return parseInt(match[1], 10);
 }
 
+/**
+ * Coerces parsed YAML into a plain object. A half-written status.yaml can parse
+ * to a scalar, array, or null, which would break property access downstream.
+ */
+export function asObject(value: unknown): Record<string, any> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, any>)
+    : {};
+}
+
 export function sortRunsByPriority(runs: RunSummary[]): RunSummary[] {
   return [...runs].sort((a: RunSummary, b: RunSummary) => {
     const priorityDiff = RUN_STATUS_PRIORITY[a.status] - RUN_STATUS_PRIORITY[b.status];
@@ -70,6 +80,15 @@ export class RunScanner {
    * when multiple frontend panels (Summary, Trends, etc.) request analytics simultaneously.
    */
   private readonly SCAN_COALESCE_MS = 1000;
+
+  /**
+   * Drops the cached snapshot so the next listRuns() re-scans the filesystem.
+   * Wired to the watcher's update event so SSE-driven refreshes see fresh data.
+   */
+  invalidate(): void {
+    this.cache = null;
+    this.cacheTimestamp = 0;
+  }
 
   async listRuns(forceRefresh = false): Promise<RunSummary[]> {
     const now = Date.now();
@@ -137,10 +156,10 @@ export class RunScanner {
       const statusPath = path.join(runPath, 'status.yaml');
       try {
         const statusContent = await fs.readFile(statusPath, 'utf8');
-        const statusData = yaml.load(statusContent) as any;
+        const statusData = asObject(yaml.load(statusContent));
         detail.statusRaw = statusData;
-        
-        if (statusData.history) {
+
+        if (Array.isArray(statusData.history)) {
           detail.timeline = statusData.history.map((h: any, index: number) => ({
             id: `${taskId}-h-${index}`,
             agent: this.mapAgentName(h.agent),
@@ -151,29 +170,32 @@ export class RunScanner {
         }
       } catch (e) { /* ignore */ }
 
-      // List artifacts
-      const files = await fs.readdir(runPath);
-      detail.artifacts = files.map(file => {
-        const ext = path.extname(file).toLowerCase();
-        let type: RunArtifact['type'] = 'other';
-        if (ext === '.md') type = 'markdown';
-        else if (ext === '.patch') type = 'patch';
-        else if (ext === '.log') type = 'log';
-        else if (ext === '.json') type = 'json';
-        else if (ext === '.yaml' || ext === '.yml') type = 'yaml';
+      // List artifacts. A transient readdir failure must not nuke the whole
+      // detail — keep the summary/timeline we already have.
+      try {
+        const files = await fs.readdir(runPath);
+        detail.artifacts = files.map(file => {
+          const ext = path.extname(file).toLowerCase();
+          let type: RunArtifact['type'] = 'other';
+          if (ext === '.md') type = 'markdown';
+          else if (ext === '.patch') type = 'patch';
+          else if (ext === '.log') type = 'log';
+          else if (ext === '.json') type = 'json';
+          else if (ext === '.yaml' || ext === '.yml') type = 'yaml';
 
-        return {
-          name: file,
-          path: path.join('runs', taskId, file),
-          type
-        };
-      });
+          return {
+            name: file,
+            path: path.join('runs', taskId, file),
+            type
+          };
+        });
 
-      // Try to find output markdown
-      const outputFiles = detail.artifacts.filter((a: RunArtifact) => a.name.endsWith('-output.md'));
-      if (outputFiles.length > 0) {
-        detail.outputMarkdown = await fs.readFile(path.join(runPath, outputFiles[0].name), 'utf8');
-      }
+        // Try to find output markdown
+        const outputFiles = detail.artifacts.filter((a: RunArtifact) => a.name.endsWith('-output.md'));
+        if (outputFiles.length > 0) {
+          detail.outputMarkdown = await fs.readFile(path.join(runPath, outputFiles[0].name), 'utf8');
+        }
+      } catch (e) { /* ignore — artifacts are best-effort */ }
 
       return detail;
     } catch (err) {
@@ -186,17 +208,26 @@ export class RunScanner {
     const runPath = path.join(config.runsDir, taskId);
     const statusPath = path.join(runPath, 'status.yaml');
     
-    let statusData: any = {};
+    let statusData: Record<string, any> = {};
     try {
       const content = await fs.readFile(statusPath, 'utf8');
-      statusData = yaml.load(content) || {};
+      // asObject guards against a half-written file parsing to a scalar/array/null.
+      statusData = asObject(yaml.load(content));
     } catch (e) {
-      // If status.yaml is missing, we still want to show the task
+      // Missing or malformed status.yaml: still show the task with what we have.
     }
 
-    const stats = await fs.stat(runPath);
+    // A transient stat failure (dir being written/renamed) must not sink the
+    // whole summary — fall back to status.yaml's own timestamp.
+    let mtimeIso: string | undefined;
+    try {
+      mtimeIso = (await fs.stat(runPath)).mtime.toISOString();
+    } catch (e) {
+      /* ignore */
+    }
+
     const status = this.mapStatus(statusData.state || statusData.phase);
-    const updatedAt = statusData.updated_at || stats.mtime.toISOString();
+    const updatedAt = statusData.updated_at || mtimeIso || new Date().toISOString();
     const startedAt = statusData.created_at;
 
     // Precedence: Explicit status.yaml completed_at -> terminal status updatedAt -> null

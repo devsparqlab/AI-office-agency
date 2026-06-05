@@ -12,7 +12,10 @@ export interface DashboardConfig {
   port: number;
   sseHeartbeatMs: number;
   watcherDebounceMs: number;
+  watcherMaxWaitMs: number;
   logTailLines: number;
+  allowedOrigins: string[];
+  authToken?: string;
 }
 
 export const config: DashboardConfig = {
@@ -22,5 +25,15 @@ export const config: DashboardConfig = {
   port: parseInt(process.env.DASHBOARD_PORT || '4310', 10),
   sseHeartbeatMs: parseInt(process.env.SSE_HEARTBEAT_MS || '15000', 10),
   watcherDebounceMs: parseInt(process.env.WATCHER_DEBOUNCE_MS || '500', 10),
+  // Upper bound on how long bursty writes can defer an SSE update.
+  // Guarantees a flush within this window even under continuous file changes.
+  watcherMaxWaitMs: parseInt(process.env.WATCHER_MAX_WAIT_MS || '5000', 10),
   logTailLines: parseInt(process.env.LOG_TAIL_LINES || '500', 10),
+  // Comma-separated allowlist for CORS. Defaults to the Vite dev origin.
+  allowedOrigins: (process.env.DASHBOARD_ALLOWED_ORIGINS || 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  // Shared bearer token for API access. When unset, auth is disabled (local dev).
+  authToken: process.env.DASHBOARD_AUTH_TOKEN?.trim() || undefined,
 };

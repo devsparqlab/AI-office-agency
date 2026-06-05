@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import { RunScanner } from '../services/runScanner';
+import { globalScanner } from '../services/runScanner';
 import { resolveRunDir } from '../pathSecurity';
 import { config } from '../config';
 
 const router = Router();
-const scanner = new RunScanner();
+// Share the single global scanner so its cache is consistent with analytics
+// and gets invalidated by the watcher (see index.ts).
+const scanner = globalScanner;
 
 router.get('/', async (req, res) => {
   const runs = await scanner.listRuns();

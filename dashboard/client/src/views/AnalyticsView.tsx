@@ -9,6 +9,7 @@ import type {
   AnalyticsAgents,
   AgentActivitySummary
 } from '../../../shared/types';
+import { apiFetch } from '../api';
 
 export function AnalyticsView() {
   // Reuse /api/analytics for initial load of summary, trends, and topFailureReasons.
@@ -86,7 +87,7 @@ function useDashboardRefresh(callback: () => void) {
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await apiFetch(url);
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `HTTP error! status: ${res.status}`);

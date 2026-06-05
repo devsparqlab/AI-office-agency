@@ -10,6 +10,7 @@ import type { DashboardSection } from './views/types';
 import { MonitorView } from './views/MonitorView';
 import { AnalyticsView } from './views/AnalyticsView';
 import { ReportsView } from './views/ReportsView';
+import { apiFetch, apiEventSourceUrl } from './api';
 import { Activity, Search, Clock, Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -70,8 +71,8 @@ const App: React.FC = () => {
   const fetchInitialData = async (signal?: AbortSignal) => {
     try {
       const [healthRes, runsRes] = await Promise.all([
-        fetch('/api/health', { signal }),
-        fetch('/api/runs', { signal }),
+        apiFetch('/api/health', { signal }),
+        apiFetch('/api/runs', { signal }),
       ]);
       const healthData = await healthRes.json();
       const runsData = await runsRes.json();
@@ -101,7 +102,7 @@ const App: React.FC = () => {
     setRunDetailLoading(true);
     setRunDetailError(null);
     try {
-      const res = await fetch(`/api/runs/${id}`, { signal });
+      const res = await apiFetch(`/api/runs/${id}`, { signal });
       if (!res.ok) {
         setRunDetail(null);
         setRunDetailError(res.status === 404 ? 'Selected run not found.' : 'Failed to load run details.');
@@ -138,7 +139,7 @@ const App: React.FC = () => {
       return;
     }
     try {
-      const res = await fetch(`/api/logs/${taskId}/${fileName}`, { signal });
+      const res = await apiFetch(`/api/logs/${taskId}/${fileName}`, { signal });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         setLogContent(null);
@@ -157,7 +158,7 @@ const App: React.FC = () => {
   };
 
   const setupSSE = () => {
-    const eventSource = new EventSource('/api/events');
+    const eventSource = new EventSource(apiEventSourceUrl('/api/events'));
     const onRunsChanged = async (event: MessageEvent<string>) => {
       const update = JSON.parse(event.data) as DashboardSseEvent;
       console.log('Update received:', update);
