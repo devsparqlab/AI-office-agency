@@ -11,6 +11,7 @@ import { MonitorView } from './views/MonitorView';
 import { AnalyticsView } from './views/AnalyticsView';
 import { ReportsView } from './views/ReportsView';
 import { ReviewView } from './views/ReviewView';
+import { OfficeView } from './views/OfficeView';
 import { apiFetch, apiEventSourceUrl } from './api';
 import { Activity, Search, Clock, Loader2 } from 'lucide-react';
 
@@ -205,6 +206,7 @@ const App: React.FC = () => {
   );
 
   const sections: Array<{ id: DashboardSection; label: string }> = [
+    { id: 'office', label: 'Office' },
     { id: 'monitor', label: 'Monitor' },
     { id: 'review', label: 'Review' },
     { id: 'analytics', label: 'Analytics' },
@@ -326,6 +328,10 @@ const App: React.FC = () => {
       </div>
 
       <div className="main-content">
+        {activeSection === 'office' && (
+          <OfficeView />
+        )}
+
         {activeSection === 'monitor' && (
           <MonitorView
             loading={loading}

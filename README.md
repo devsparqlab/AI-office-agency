@@ -54,6 +54,9 @@ ai-dev-office/tests/integration/status-command.sh
 ai-dev-office/tests/integration/runner-fallback.sh
 ai-dev-office/tests/integration/bootstrap-sync.sh
 ai-dev-office/tests/integration/profile-merge.sh
+ai-dev-office/tests/integration/output-contract.sh
+ai-dev-office/tests/integration/decision-reconcile.sh
+ai-dev-office/tests/integration/driver-decision-e2e.sh
 ```
 
 | Script | What it checks |
@@ -68,6 +71,9 @@ ai-dev-office/tests/integration/profile-merge.sh
 | `runner-fallback.sh` | Runner auto-switch on quota/auth failures |
 | `bootstrap-sync.sh` | Bootstrap/sync install boundaries |
 | `profile-merge.sh` | `--profile` / `OFFICE_PROFILE` merge |
+| `output-contract.sh` | Invalid agent output routes to `validation_failed` |
+| `decision-reconcile.sh` | Driver applies `decision.yaml` to `status.yaml` (idempotent) |
+| `driver-decision-e2e.sh` | End-to-end dispatch: enforce gate + decision reconcile + terminal-stop |
 
 Smoke: `ai-dev-office/tests/smoke/socraticode-graph.sh`
 

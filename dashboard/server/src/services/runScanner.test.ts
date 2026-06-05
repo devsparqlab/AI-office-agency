@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import yaml from 'js-yaml';
-import { sortRunsByPriority, asObject, RunScanner } from './runScanner';
+import { sortRunsByPriority, asObject, RunScanner, mapPhaseToRunStatus } from './runScanner';
 import type { RunSummary } from '@shared/types';
 
 test('sortRunsByPriority puts active work first, then newest task id', () => {
@@ -20,6 +20,26 @@ test('sortRunsByPriority puts active work first, then newest task id', () => {
     'TASK-050',
     'TASK-099',
   ]);
+});
+
+test('mapPhaseToRunStatus maps phases by exact enum (no substring guessing)', () => {
+  // Phases that the old fuzzy matcher wrongly dropped to "unknown".
+  assert.equal(mapPhaseToRunStatus('assigned'), 'running');
+  assert.equal(mapPhaseToRunStatus('assigned_parallel'), 'running');
+  assert.equal(mapPhaseToRunStatus('debugging'), 'running');
+  assert.equal(mapPhaseToRunStatus('devops_needed'), 'running');
+  assert.equal(mapPhaseToRunStatus('escalated'), 'blocked');
+  assert.equal(mapPhaseToRunStatus('aborted'), 'cancelled');
+  // Already-correct mappings still hold.
+  assert.equal(mapPhaseToRunStatus('in_review'), 'waiting_review');
+  assert.equal(mapPhaseToRunStatus('validation_failed'), 'failed');
+  assert.equal(mapPhaseToRunStatus('done'), 'completed');
+  assert.equal(mapPhaseToRunStatus('pending'), 'queued');
+  // Off-contract / empty -> unknown, never guessed.
+  assert.equal(mapPhaseToRunStatus('in-review'), 'unknown'); // wrong separator
+  assert.equal(mapPhaseToRunStatus('RUNNING'), 'unknown');   // not an enum value
+  assert.equal(mapPhaseToRunStatus(undefined), 'unknown');
+  assert.equal(mapPhaseToRunStatus(''), 'unknown');
 });
 
 test('asObject passes through a real object', () => {

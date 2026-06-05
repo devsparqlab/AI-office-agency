@@ -7,6 +7,7 @@ import type {
   RunSummary,
   RunDetail,
   RunStatus,
+  RunPhase,
   AgentName,
   RunArtifact,
   AgentTimelineEvent
@@ -22,6 +23,35 @@ const RUN_STATUS_PRIORITY: Record<RunStatus, number> = {
   completed: 6,
   cancelled: 7,
 };
+
+// Exact phase → dashboard status. Mirrors the status.schema.yaml phase enum, so
+// the dashboard renders the contracted phase instead of guessing via substrings.
+const PHASE_TO_STATUS: Record<RunPhase, RunStatus> = {
+  pending: 'queued',
+  blocked: 'blocked',
+  assigned: 'running',
+  assigned_parallel: 'running',
+  review: 'waiting_review',
+  in_review: 'waiting_review',
+  debugging: 'running',
+  debugging_complete: 'running',
+  devops_needed: 'running',
+  devops_complete: 'running',
+  escalated: 'blocked',
+  free_roam_complete: 'running',
+  validation_failed: 'failed',
+  done: 'completed',
+  aborted: 'cancelled',
+};
+
+/**
+ * Maps a status.yaml phase/state to a dashboard RunStatus by exact enum match.
+ * Unknown/off-contract values become 'unknown' — never fuzzy-matched.
+ */
+export function mapPhaseToRunStatus(value: string | undefined): RunStatus {
+  if (!value) return 'unknown';
+  return (PHASE_TO_STATUS as Record<string, RunStatus>)[value] ?? 'unknown';
+}
 
 function taskIdNumber(taskId: string): number | null {
   const match = taskId.match(/^TASK-(\d+)$/);
@@ -282,17 +312,8 @@ export class RunScanner {
     };
   }
 
-  private mapStatus(s: string): RunStatus {
-    if (!s) return 'unknown';
-    s = s.toLowerCase();
-    if (s.includes('running')) return 'running';
-    if (s.includes('done') || s.includes('completed') || s.includes('success')) return 'completed';
-    if (s.includes('fail') || s.includes('error')) return 'failed';
-    if (s.includes('block')) return 'blocked';
-    if (s.includes('wait') || s.includes('review')) return 'waiting_review';
-    if (s.includes('cancel')) return 'cancelled';
-    if (s.includes('queue') || s.includes('pending')) return 'queued';
-    return 'unknown';
+  private mapStatus(s: string | undefined): RunStatus {
+    return mapPhaseToRunStatus(s);
   }
 
   private mapAgentName(a: string): AgentName {
