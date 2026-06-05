@@ -4,8 +4,10 @@ import yaml from 'js-yaml';
 import { config } from '../config';
 import { asObject } from './runScanner';
 import type {
-  ReviewSummary, RunPhase, ReviewVerdict, ConfidenceLevel, RiskLevel, IssueCounts,
+  ReviewSummary, RunPhase, ReviewVerdict, ConfidenceLevel, RiskLevel, IssueCounts, DecisionRecord,
 } from '@shared/types';
+import { DecisionStore } from './decisionStore';
+import { TASK_ID_PATTERN } from '../pathSecurity';
 
 // Exact enum membership — these mirror the producer schemas. We match by exact
 // equality (never substring), so the read model reflects the contract, not a guess.
@@ -85,6 +87,7 @@ export function buildReviewSummary(
   statusData: Record<string, any>,
   reviewerData: Record<string, any> | null,
   debuggerData: Record<string, any> | null = null,
+  latestDecision: DecisionRecord | null = null,
 ): ReviewSummary {
   const phase = normalizePhase(statusData.phase);
   const verdict = reviewerData ? normalizeVerdict(reviewerData.review_verdict) : null;
@@ -111,6 +114,7 @@ export function buildReviewSummary(
     confidence,
     issueCounts,
     riskLevel,
+    latestDecision,
   };
 }
 
@@ -124,14 +128,21 @@ async function readYamlObject(filePath: string): Promise<Record<string, any> | n
 }
 
 export class ReviewModelService {
-  constructor(private readonly runsDir: string = config.runsDir) {}
+  private readonly decisionStore: DecisionStore;
+
+  constructor(private readonly runsDir: string = config.runsDir) {
+    // Bind the decision store to the same runsDir so injection stays consistent.
+    this.decisionStore = new DecisionStore(runsDir);
+  }
 
   async getReviewSummaries(): Promise<ReviewSummary[]> {
     let taskDirs: string[] = [];
     try {
       const entries = await fs.readdir(this.runsDir, { withFileTypes: true });
       taskDirs = entries
-        .filter((entry) => entry.isDirectory() && entry.name.startsWith('TASK'))
+        // Same strict id rule the detail/decision endpoints enforce, so every
+        // listed row is addressable (no rows you can't open or decide on).
+        .filter((entry) => entry.isDirectory() && TASK_ID_PATTERN.test(entry.name))
         .map((entry) => entry.name);
     } catch (e) {
       return [];
@@ -144,7 +155,8 @@ export class ReviewModelService {
         // null (not {}) means the output is absent → that signal stays null.
         const reviewerData = await readYamlObject(path.join(runPath, 'reviewer-output.yaml'));
         const debuggerData = await readYamlObject(path.join(runPath, 'debugger-output.yaml'));
-        return buildReviewSummary(taskId, statusData, reviewerData, debuggerData);
+        const latestDecision = await this.decisionStore.latest(taskId);
+        return buildReviewSummary(taskId, statusData, reviewerData, debuggerData, latestDecision);
       }),
     );
 

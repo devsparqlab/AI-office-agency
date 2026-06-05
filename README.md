@@ -29,6 +29,8 @@ Detailed behavior lives in the linked docs; keep this README as an index.
 | [profiles/games-labs.md](profiles/games-labs.md) | Games Lab monorepo overlay (dependency guard, shared-lib policy) |
 | [SKILL.md](SKILL.md) | Codex and Cursor skill entrypoint |
 
+Claude and Gemini are documented here as manual advisory lanes only. They are not automated runners in this framework.
+
 ## Quick commands
 
 ```bash

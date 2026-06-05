@@ -352,6 +352,27 @@ rescue => e
   errors << e.message
 end
 
+DECISION_ACTIONS = %w[approve request_changes escalate reject].freeze
+DECISION_VERDICTS = %w[approved changes_requested escalate infra_failure].freeze
+
+def validate_decision(data, label, errors)
+  expect_hash(data, label, errors)
+  return unless data.is_a?(Hash)
+
+  expect_string(data["task_id"], "#{label}.task_id", errors)
+  expect_array(data["decisions"], "#{label}.decisions", errors)
+  Array(data["decisions"]).each_with_index do |entry, i|
+    expect_hash(entry, "#{label}.decisions[#{i}]", errors)
+    next unless entry.is_a?(Hash)
+    expect_enum(entry["decision"], DECISION_ACTIONS, "#{label}.decisions[#{i}].decision", errors)
+    expect_string(entry["actor"], "#{label}.decisions[#{i}].actor", errors)
+    expect_string(entry["decided_at"], "#{label}.decisions[#{i}].decided_at", errors)
+    if entry.key?("against_verdict") && !entry["against_verdict"].nil?
+      expect_enum(entry["against_verdict"], DECISION_VERDICTS, "#{label}.decisions[#{i}].against_verdict", errors)
+    end
+  end
+end
+
 def validate_task_dir(task_dir, errors)
   status_file = File.join(task_dir, "status.yaml")
   if File.exist?(status_file)
@@ -366,6 +387,9 @@ def validate_task_dir(task_dir, errors)
   Dir.glob(File.join(task_dir, "*-output.yaml")).sort.each do |path|
     validate_output_file(path, errors)
   end
+
+  decision_file = File.join(task_dir, "decision.yaml")
+  validate_decision(load_yaml(decision_file), "decision.yaml", errors) if File.exist?(decision_file)
 
   return unless File.exist?(status_file)
 
@@ -398,6 +422,8 @@ elsif File.file?(target_path)
     validate_status(load_yaml(target_path), basename, errors)
   elsif basename == "meta.yaml"
     validate_meta(load_yaml(target_path), basename, errors)
+  elsif basename == "decision.yaml"
+    validate_decision(load_yaml(target_path), basename, errors)
   else
     validate_output_file(target_path, errors)
   end

@@ -21,6 +21,7 @@ required:
   - confidence
   - issueCounts
   - riskLevel
+  - latestDecision
 properties:
   taskId:
     type: string
@@ -105,3 +106,34 @@ properties:
       - medium
       - low
       - none
+  latestDecision:
+    description: "Provenance: latest entry in decision.yaml decisions[] (human input); null if none."
+    oneOf:
+      - type: "null"
+      - type: object
+        required:
+          - decision
+          - actor
+          - decidedAt
+        properties:
+          decision:
+            type: string
+            enum:
+              - approve
+              - request_changes
+              - escalate
+              - reject
+          actor:
+            type: string
+          note:
+            type: string
+          decidedAt:
+            type: string
+          againstVerdict:
+            oneOf:
+              - type: "null"
+              - type: string
+          againstPhase:
+            oneOf:
+              - type: "null"
+              - type: string

@@ -1,0 +1,54 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://sparqlab.local/ai-dev-office/schemas/decision.schema.yaml"
+title: AI Dev Office Human Decision Log
+description: >
+  Append-only log of human supervisor decisions for a task, written by the
+  dashboard Review layer (Slice 4). This is a NEW input signal — it never mutates
+  status.yaml, so the dashboard and the driver are never concurrent writers of the
+  same file. The driver may later read this to act on a decision (separate step).
+type: object
+additionalProperties: false
+required:
+  - task_id
+  - decisions
+properties:
+  task_id:
+    type: string
+    pattern: "^TASK(?:-PKG)?-[0-9]+$"
+  decisions:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - decision
+        - actor
+        - decided_at
+      properties:
+        decision:
+          type: string
+          enum:
+            - approve
+            - request_changes
+            - escalate
+            - reject
+        actor:
+          type: string
+        note:
+          type: string
+        decided_at:
+          type: string
+        # Traceability: which contracted signals the decision was made against.
+        against_verdict:
+          oneOf:
+            - type: "null"
+            - type: string
+              enum:
+                - approved
+                - changes_requested
+                - escalate
+                - infra_failure
+        against_phase:
+          oneOf:
+            - type: "null"
+            - type: string

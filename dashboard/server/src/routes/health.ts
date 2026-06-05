@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { config } from '../config';
 import { globalWatcher } from '../services/watcher';
+import { TASK_ID_PATTERN } from '../pathSecurity';
 import type { HealthStatus } from '@shared/types';
 import fs from 'fs/promises';
 
@@ -68,7 +69,7 @@ router.get('/', async (req, res) => {
   try {
     const entries = await fs.readdir(config.runsDir);
     runsDirExists = true;
-    totalRuns = entries.filter(e => e.startsWith('TASK')).length;
+    totalRuns = entries.filter(e => TASK_ID_PATTERN.test(e)).length;
   } catch (e) {}
 
   try {

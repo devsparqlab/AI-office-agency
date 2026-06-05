@@ -2,13 +2,14 @@ import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
 import { config } from '../config';
-import type { 
-  RunSummary, 
-  RunDetail, 
-  RunStatus, 
-  AgentName, 
-  RunArtifact, 
-  AgentTimelineEvent 
+import { TASK_ID_PATTERN } from '../pathSecurity';
+import type {
+  RunSummary,
+  RunDetail,
+  RunStatus,
+  AgentName,
+  RunArtifact,
+  AgentTimelineEvent
 } from '@shared/types';
 
 const RUN_STATUS_PRIORITY: Record<RunStatus, number> = {
@@ -108,7 +109,7 @@ export class RunScanner {
       try {
         const entries = await fs.readdir(config.runsDir, { withFileTypes: true });
         const taskDirs = entries
-          .filter(entry => entry.isDirectory() && entry.name.startsWith('TASK'))
+          .filter(entry => entry.isDirectory() && TASK_ID_PATTERN.test(entry.name))
           .map(entry => entry.name);
 
         const summaries = await Promise.all(

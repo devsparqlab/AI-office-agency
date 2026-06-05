@@ -33,6 +33,8 @@ Must-read runtime anchors:
 | [profiles/README.md](profiles/README.md) | `--profile` selection |
 | [AGENTS.md](AGENTS.md) | Framework portability rules |
 
+Runner set stays unchanged: `codex`, `cursor-agent`, and `cursor` remain the only configured runtime runners. Claude and Gemini stay manual advisory lanes.
+
 ## Minimal commands
 
 ```bash

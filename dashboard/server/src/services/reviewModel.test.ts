@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildReviewSummary } from './reviewModel';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import yaml from 'js-yaml';
+import { buildReviewSummary, ReviewModelService } from './reviewModel';
 
 test('approved + done: not in queue, no attention, not needsReview', () => {
   const r = buildReviewSummary('TASK-001', { phase: 'done', updated_at: '2026-06-01' }, { review_verdict: 'approved' });
@@ -91,4 +95,25 @@ test('unknown issue severities are ignored, never guessed', () => {
   const reviewer = { review_verdict: 'approved', artifacts: [{ issues: [{ severity: 'critical' }, { severity: 'error' }] }] };
   const r = buildReviewSummary('T', { phase: 'done' }, reviewer);
   assert.deepEqual(r.issueCounts, { error: 1, warning: 0, suggestion: 0 });
+});
+
+// --- Slice 4: human decision surfaced in the read model ---
+
+test('latestDecision defaults to null and is passed through when present', () => {
+  assert.equal(buildReviewSummary('T', { phase: 'done' }, null).latestDecision, null);
+
+  const decision = { decision: 'approve' as const, actor: 'alice', decidedAt: '2026-06-05T00:00:00Z' };
+  const r = buildReviewSummary('T', { phase: 'done' }, null, null, decision);
+  assert.deepEqual(r.latestDecision, decision);
+});
+
+test('getReviewSummaries lists only strict TASK ids (parity with detail/decision endpoints)', async () => {
+  const runsDir = await fs.mkdtemp(path.join(os.tmpdir(), 'review-filter-'));
+  for (const name of ['TASK-001', 'TASK-PKG-002', 'TASKbad', 'TASK', 'TASK-001.bak', 'notes', '.hidden']) {
+    await fs.mkdir(path.join(runsDir, name), { recursive: true });
+    await fs.writeFile(path.join(runsDir, name, 'status.yaml'), yaml.dump({ phase: 'done' }));
+  }
+  const summaries = await new ReviewModelService(runsDir).getReviewSummaries();
+  const ids = summaries.map((s) => s.taskId).sort();
+  assert.deepEqual(ids, ['TASK-001', 'TASK-PKG-002']); // loose "TASK*" dirs excluded
 });

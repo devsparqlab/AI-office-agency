@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, Loader2, ClipboardCopy, ShieldAlert } from 'lucide-react';
 import type {
   ReviewModelResponse, ReviewSummary, RiskLevel, ReviewVerdict, ConfidenceLevel,
+  DecisionAction, DecisionRecord,
 } from '../../../shared/types';
-import { apiFetchJson } from '../api';
+import { apiFetch, apiFetchJson } from '../api';
+
+const ACTOR_KEY = 'dashboard_actor';
 
 // All colors map from contracted enums only — the UI renders signals, never guesses.
 const RISK_COLOR: Record<RiskLevel, string> = {
@@ -12,6 +15,16 @@ const RISK_COLOR: Record<RiskLevel, string> = {
 const CONFIDENCE_COLOR: Record<ConfidenceLevel, string> = {
   high: '#22c55e', medium: '#f59e0b', low: '#ef4444',
 };
+const DECISION_COLOR: Record<DecisionAction, string> = {
+  approve: '#22c55e', request_changes: '#f59e0b', escalate: '#ef4444', reject: '#ef4444',
+};
+const DECISION_ACTIONS: { action: DecisionAction; label: string }[] = [
+  { action: 'approve', label: 'Approve' },
+  { action: 'request_changes', label: 'Request changes' },
+  { action: 'escalate', label: 'Escalate' },
+  { action: 'reject', label: 'Reject' },
+];
+
 function verdictColor(v: ReviewVerdict | null): string {
   if (v === 'approved') return '#22c55e';
   if (v === 'changes_requested') return '#f59e0b';
@@ -33,6 +46,10 @@ function riskText(r: ReviewSummary): string {
   return `${r.riskLevel} (e:${error} w:${warning} s:${suggestion})`;
 }
 
+function decisionLabel(d: DecisionRecord): string {
+  return `${d.decision} · ${d.actor}`;
+}
+
 function buildReport(data: ReviewModelResponse): string {
   const lines: string[] = [];
   lines.push(`AI Dev Office — Needs Review (${data.needsReviewCount}/${data.total})`);
@@ -42,7 +59,8 @@ function buildReport(data: ReviewModelResponse): string {
     lines.push(
       `[${r.taskId}] phase=${r.phase ?? '—'} verdict=${r.verdict ?? '—'} ` +
       `risk=${r.riskLevel} (err:${r.issueCounts.error} warn:${r.issueCounts.warning} sug:${r.issueCounts.suggestion}) ` +
-      `confidence=${r.confidence ?? '—'}`,
+      `confidence=${r.confidence ?? '—'}` +
+      (r.latestDecision ? ` decision=${r.latestDecision.decision}(${r.latestDecision.actor})` : ''),
     );
   }
   return lines.join('\n');
@@ -53,25 +71,54 @@ export const ReviewView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [actor, setActor] = useState<string>(() => localStorage.getItem(ACTOR_KEY) || '');
+  const [pending, setPending] = useState<string | null>(null);
+
+  const load = async () => {
+    try {
+      const res = await apiFetchJson<ReviewModelResponse>('/api/review');
+      setData(res); setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load review model');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
-    const load = async () => {
-      try {
-        const res = await apiFetchJson<ReviewModelResponse>('/api/review');
-        if (active) { setData(res); setError(null); }
-      } catch (e) {
-        if (active) setError(e instanceof Error ? e.message : 'Failed to load review model');
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    load();
-    // Refresh in lockstep with the rest of the dashboard (SSE-driven).
-    const onRefresh = () => load();
-    window.addEventListener('dashboard:refresh', onRefresh);
-    return () => { active = false; window.removeEventListener('dashboard:refresh', onRefresh); };
+    const run = () => { if (active) load(); };
+    run();
+    window.addEventListener('dashboard:refresh', run);
+    return () => { active = false; window.removeEventListener('dashboard:refresh', run); };
   }, []);
+
+  const onActorChange = (value: string) => {
+    setActor(value);
+    localStorage.setItem(ACTOR_KEY, value);
+  };
+
+  const decide = async (taskId: string, action: DecisionAction) => {
+    const note = window.prompt(`Note for "${action}" on ${taskId} (optional):`) ?? undefined;
+    setPending(taskId);
+    try {
+      const res = await apiFetch(`/api/decisions/${taskId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: action, actor: actor.trim() || undefined, note }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || `Failed to record decision (${res.status})`);
+      } else {
+        await load();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to record decision');
+    } finally {
+      setPending(null);
+    }
+  };
 
   const copyReport = async () => {
     if (!data) return;
@@ -87,37 +134,51 @@ export const ReviewView: React.FC = () => {
   if (loading) {
     return <div className="view-state"><Loader2 className="animate-spin" /> Loading review model…</div>;
   }
-  if (error) {
-    return <div className="view-state"><AlertCircle color="#ef4444" /> {error}</div>;
+  if (!data) {
+    return <div className="view-state"><AlertCircle color="#ef4444" /> {error || 'No data'}</div>;
   }
-  if (!data) return null;
 
   const queue = data.reviews.filter((r) => r.needsReview);
   const rest = data.reviews.filter((r) => !r.needsReview);
 
   return (
     <div style={{ padding: 20, overflow: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
           <ShieldAlert size={20} /> Review
           <span style={{ fontSize: 14, color: '#6b7280' }}>
             {data.needsReviewCount} need review · {data.total} total
           </span>
         </h2>
-        <button type="button" onClick={copyReport} disabled={queue.length === 0}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', cursor: queue.length ? 'pointer' : 'not-allowed' }}>
-          <ClipboardCopy size={14} /> {copied ? 'Copied' : 'Copy review report'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="text" placeholder="Your name (for decisions)" value={actor}
+            onChange={(e) => onActorChange(e.target.value)}
+            style={{ padding: '6px 10px', fontSize: 13, borderRadius: 6 }}
+          />
+          <button type="button" onClick={copyReport} disabled={queue.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', cursor: queue.length ? 'pointer' : 'not-allowed' }}>
+            <ClipboardCopy size={14} /> {copied ? 'Copied' : 'Copy review report'}
+          </button>
+        </div>
       </div>
 
-      <ReviewTable title={`Needs Review (${queue.length})`} rows={queue} emptyText="Nothing awaiting review." />
+      {error && <div style={{ color: '#ef4444', marginBottom: 12 }}>{error}</div>}
+
+      <ReviewTable title={`Needs Review (${queue.length})`} rows={queue} emptyText="Nothing awaiting review."
+        onDecide={decide} pending={pending} />
       <div style={{ height: 20 }} />
       <ReviewTable title={`All runs (${rest.length})`} rows={rest} emptyText="No other runs." />
     </div>
   );
 };
 
-function ReviewTable({ title, rows, emptyText }: { title: string; rows: ReviewSummary[]; emptyText: string }) {
+function ReviewTable({
+  title, rows, emptyText, onDecide, pending,
+}: {
+  title: string; rows: ReviewSummary[]; emptyText: string;
+  onDecide?: (taskId: string, action: DecisionAction) => void; pending?: string | null;
+}) {
   return (
     <section>
       <h3 style={{ fontSize: 14, color: '#9ca3af', margin: '0 0 8px' }}>{title}</h3>
@@ -132,6 +193,8 @@ function ReviewTable({ title, rows, emptyText }: { title: string; rows: ReviewSu
               <th style={{ padding: '6px 8px' }}>Verdict</th>
               <th style={{ padding: '6px 8px' }}>Risk</th>
               <th style={{ padding: '6px 8px' }}>Confidence</th>
+              <th style={{ padding: '6px 8px' }}>Decision</th>
+              {onDecide && <th style={{ padding: '6px 8px' }}>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -148,6 +211,26 @@ function ReviewTable({ title, rows, emptyText }: { title: string; rows: ReviewSu
                 <td style={{ padding: '6px 8px' }}>
                   <Badge text={r.confidence ?? '—'} color={r.confidence ? CONFIDENCE_COLOR[r.confidence] : '#6b7280'} />
                 </td>
+                <td style={{ padding: '6px 8px' }}>
+                  {r.latestDecision
+                    ? <Badge text={decisionLabel(r.latestDecision)} color={DECISION_COLOR[r.latestDecision.decision]} />
+                    : <span style={{ color: '#6b7280' }}>—</span>}
+                </td>
+                {onDecide && (
+                  <td style={{ padding: '6px 8px' }}>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {DECISION_ACTIONS.map(({ action, label }) => (
+                        <button key={action} type="button" disabled={pending === r.taskId}
+                          onClick={() => onDecide(r.taskId, action)}
+                          style={{
+                            padding: '3px 8px', fontSize: 12, borderRadius: 6,
+                            border: `1px solid ${DECISION_COLOR[action]}`, color: DECISION_COLOR[action],
+                            background: 'transparent', cursor: pending === r.taskId ? 'wait' : 'pointer',
+                          }}>{label}</button>
+                      ))}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

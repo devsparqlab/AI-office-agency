@@ -69,6 +69,29 @@ export interface IssueCounts {
 }
 
 /**
+ * Human supervisor decision (Slice 4). Written by the dashboard into
+ * runs/<id>/decision.yaml — a NEW input signal, never a mutation of status.yaml.
+ * See schemas/decision.schema.yaml.
+ */
+export type DecisionAction = "approve" | "request_changes" | "escalate" | "reject";
+
+export interface DecisionRecord {
+  decision: DecisionAction;
+  actor: string;
+  note?: string;
+  decidedAt: string;
+  /** Traceability: the contracted signals this decision was made against. */
+  againstVerdict?: ReviewVerdict | null;
+  /** Loose string (any phase, incl. future ones) — matches decision.schema.yaml. */
+  againstPhase?: string | null;
+}
+
+export interface DecisionLogResponse {
+  taskId: string;
+  decisions: DecisionRecord[];
+}
+
+/**
  * Read-only Review read model. Every field is a projection of a contracted
  * producer field — the dashboard renders these, it never infers them from prose.
  * See schemas/run-summary.schema.yaml and docs/run-summary-read-model.md.
@@ -93,6 +116,8 @@ export interface ReviewSummary {
   issueCounts: IssueCounts;
   /** Projection (server-owned rule): error>0 → high; warning>0 → medium; reviewed & clean → low; not reviewed → none. */
   riskLevel: RiskLevel;
+  /** Provenance: latest entry in decision.yaml `decisions[]` (human input); null if none. */
+  latestDecision: DecisionRecord | null;
 }
 
 export interface ReviewModelResponse {
