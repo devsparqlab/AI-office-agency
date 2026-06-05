@@ -1,3 +1,6 @@
+# NOT loaded at runtime. The canonical runtime validator is validate-yaml.rb
+# (rules are hardcoded in Ruby); this schema is documentation/tooling only.
+# tests/integration/schema-validator-parity.sh keeps the two in sync. (S7)
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://sparqlab.local/ai-dev-office/schemas/agent-output.schema.yaml"
 title: AI Dev Office Base Agent Output Schema

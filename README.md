@@ -64,6 +64,7 @@ ai-dev-office/tests/integration/validation-failed-bounded.sh
 ai-dev-office/tests/integration/idempotency-and-reentry.sh
 ai-dev-office/tests/integration/decision-path-integrity.sh
 ai-dev-office/tests/integration/state-machine-consistency.sh
+ai-dev-office/tests/integration/schema-validator-parity.sh
 ```
 
 | Script | What it checks |
@@ -88,6 +89,7 @@ ai-dev-office/tests/integration/state-machine-consistency.sh
 | `idempotency-and-reentry.sh` | Re-syncing the same output artifact is a no-op (no double-increment); pm/auto refuse to re-open a done/aborted task |
 | `decision-path-integrity.sh` | Malformed decision.yaml is surfaced (not dropped); a decision without decided_at is skipped; a non-terminal decision re-aligns the dispatched agent |
 | `state-machine-consistency.sh` | A failed upstream escalates the dependent (no forever-wedge); cleanup maps validation_failed/blocked and flags unmapped phases; reviewer scaffold/schema agree on the queue phase |
+| `schema-validator-parity.sh` | The runtime validator (validate-yaml.rb) and the (non-runtime) schemas agree on the key enums — catches contract drift |
 
 Smoke: `ai-dev-office/tests/smoke/socraticode-graph.sh`
 
