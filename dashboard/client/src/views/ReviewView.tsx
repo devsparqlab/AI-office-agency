@@ -99,7 +99,15 @@ export const ReviewView: React.FC = () => {
   };
 
   const decide = async (taskId: string, action: DecisionAction) => {
-    const note = window.prompt(`Note for "${action}" on ${taskId} (optional):`) ?? undefined;
+    const noteRequired = action !== 'approve'; // mirrors server contract
+    const note = window.prompt(
+      `Note for "${action}" on ${taskId}${noteRequired ? ' (required):' : ' (optional):'}`,
+    ) ?? undefined;
+    if (noteRequired && !note?.trim()) {
+      setError(`A note is required for "${action}".`);
+      return;
+    }
+    setError(null);
     setPending(taskId);
     try {
       const res = await apiFetch(`/api/decisions/${taskId}`, {

@@ -4,7 +4,7 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { config } from '../config';
 import { resolveRunDir } from '../pathSecurity';
-import { globalDecisionStore, isDecisionAction, buildDecisionRecord } from '../services/decisionStore';
+import { globalDecisionStore, validateDecisionInput, buildDecisionRecord } from '../services/decisionStore';
 import { asObject } from '../services/runScanner';
 import type { DecisionLogResponse } from '@shared/types';
 
@@ -41,8 +41,9 @@ router.post('/:id', async (req, res) => {
   }
 
   const body = req.body ?? {};
-  if (!isDecisionAction(body.decision)) {
-    return res.status(400).json({ error: 'Invalid decision; expected approve|request_changes|escalate|reject' });
+  const valid = validateDecisionInput(body);
+  if (!valid.ok) {
+    return res.status(400).json({ error: valid.error });
   }
 
   // Capture the contracted signals the decision was made against (server-side,

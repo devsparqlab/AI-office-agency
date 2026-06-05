@@ -4,7 +4,10 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
-import { DecisionStore, isDecisionAction, buildDecisionRecord } from './decisionStore';
+import {
+  DecisionStore, isDecisionAction, buildDecisionRecord, validateDecisionInput,
+  ACTOR_MAX_LEN, NOTE_MAX_LEN,
+} from './decisionStore';
 import { ReviewModelService } from './reviewModel';
 import type { DecisionRecord } from '@shared/types';
 
@@ -81,6 +84,64 @@ test('read returns [] for missing file and drops malformed/unknown entries', asy
   const read = await store.read(taskId);
   assert.equal(read.length, 1);
   assert.equal(read[0].decision, 'approve');
+});
+
+test('concurrent appends to the same task do not lose entries (per-task queue)', async () => {
+  const { runsDir, taskId } = await tempTask();
+  const store = new DecisionStore(runsDir);
+  const N = 25;
+  await Promise.all(
+    Array.from({ length: N }, (_, i) =>
+      store.append(taskId, { ...sample, note: `n${i}`, decidedAt: `t${i}` })),
+  );
+  const all = await store.read(taskId);
+  assert.equal(all.length, N);
+  // Every note survived (no lost read-modify-write).
+  const notes = new Set(all.map((d) => d.note));
+  for (let i = 0; i < N; i++) assert.ok(notes.has(`n${i}`), `missing n${i}`);
+});
+
+test('validateDecisionInput: enum, required note, and length caps', () => {
+  assert.equal(validateDecisionInput({ decision: 'nope' }).ok, false);
+  assert.equal(validateDecisionInput({}).ok, false);
+  assert.equal(validateDecisionInput({ decision: 'approve' }).ok, true);          // approve: note optional
+  assert.equal(validateDecisionInput({ decision: 'reject' }).ok, false);          // note required
+  assert.equal(validateDecisionInput({ decision: 'reject', note: '   ' }).ok, false);
+  assert.equal(validateDecisionInput({ decision: 'reject', note: 'why' }).ok, true);
+  assert.equal(validateDecisionInput({ decision: 'escalate', note: 'x' }).ok, true);
+  assert.equal(validateDecisionInput({ decision: 'request_changes', note: 'x' }).ok, true);
+  assert.equal(validateDecisionInput({ decision: 'approve', actor: 'a'.repeat(ACTOR_MAX_LEN + 1) }).ok, false);
+  assert.equal(validateDecisionInput({ decision: 'approve', note: 'a'.repeat(NOTE_MAX_LEN + 1) }).ok, false);
+  assert.equal(validateDecisionInput({ decision: 'approve', actor: 123 }).ok, false);
+});
+
+test('read tolerates malformed YAML and normalizes off-contract fields', async () => {
+  const { runsDir, taskId } = await tempTask();
+  const store = new DecisionStore(runsDir);
+  const file = path.join(runsDir, taskId, 'decision.yaml');
+
+  await fs.writeFile(file, 'decisions:\n  - decision: approve\n    actor: "unterminated');
+  assert.deepEqual(await store.read(taskId), []); // invalid YAML -> []
+
+  await fs.writeFile(file, yaml.dump({
+    task_id: taskId,
+    decisions: [{ decision: 'approve', actor: 'a', decided_at: 't', against_verdict: 'bogus', against_phase: 42 }],
+  }));
+  const [rec] = await store.read(taskId);
+  assert.equal(rec.againstVerdict, null); // off-contract verdict dropped on read
+  assert.equal(rec.againstPhase, null);   // non-string phase dropped on read
+});
+
+test('read truncates oversized actor/note (bounds memory from hand-edited files)', async () => {
+  const { runsDir, taskId } = await tempTask();
+  const store = new DecisionStore(runsDir);
+  await fs.writeFile(path.join(runsDir, taskId, 'decision.yaml'), yaml.dump({
+    task_id: taskId,
+    decisions: [{ decision: 'approve', actor: 'a'.repeat(500), decided_at: 't', note: 'b'.repeat(5000) }],
+  }));
+  const [rec] = await store.read(taskId);
+  assert.equal(rec.actor.length, ACTOR_MAX_LEN);
+  assert.equal(rec.note?.length, NOTE_MAX_LEN);
 });
 
 test('decisionPath rejects invalid taskId: read stays safe, append throws', async () => {
