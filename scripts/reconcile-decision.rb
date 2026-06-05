@@ -30,13 +30,20 @@ DECISION_MAP = {
   "reject"          => { "phase" => "aborted",   "current_agent" => nil,         "ready" => false }
 }.freeze
 
-def load_yaml(path)
+# Returns the parsed mapping, or nil if the file is ABSENT. A present-but-
+# unreadable file (S3) is surfaced and exits 3 — never silently treated as
+# "nothing pending", which would drop a real human decision.
+def load_or_die(path, label)
   return nil unless File.exist?(path)
 
   data = YAML.safe_load(File.read(path), permitted_classes: [Date, Time], aliases: true)
-  data.is_a?(Hash) ? data : nil
-rescue StandardError
-  nil
+  return data if data.is_a?(Hash)
+
+  warn "#{label} is present but not a valid mapping; refusing to silently ignore it."
+  exit 3
+rescue Psych::SyntaxError => e
+  warn "#{label} is malformed YAML (#{e.message}); refusing to silently ignore it."
+  exit 3
 end
 
 def noop!
@@ -61,18 +68,23 @@ if File.directory?(task_dir)
   lock.flock(File::LOCK_EX)
 end
 
-status = load_yaml(status_path)
-decisions_doc = load_yaml(decision_path)
+status = load_or_die(status_path, "status.yaml")
+decisions_doc = load_or_die(decision_path, "decision.yaml")
 noop! unless status && decisions_doc
 
 list = decisions_doc["decisions"]
-# Newest valid decision (every action in the map is valid).
-latest = list.is_a?(Array) ? list.reverse.find { |d| d.is_a?(Hash) && DECISION_MAP.key?(d["decision"]) } : nil
+candidates = list.is_a?(Array) ? list.select { |d| d.is_a?(Hash) && DECISION_MAP.key?(d["decision"]) } : []
+# S4: a decision with no decided_at can never be marked applied (its idempotency
+# key would be ""), so it would re-apply on every dispatch. Require decided_at.
+latest = candidates.reverse.find { |d| !d["decided_at"].to_s.strip.empty? }
+if latest.nil? && !candidates.empty?
+  warn "Newest decision for #{task_id} has no decided_at; skipping (it could never be marked applied)."
+end
 noop! unless latest
 
 decided_at = latest["decided_at"].to_s
-# Already applied this exact decision?
-noop! if !decided_at.empty? && status["decision_applied_at"].to_s == decided_at
+# Already applied this exact decision? (decided_at is guaranteed non-empty now.)
+noop! if status["decision_applied_at"].to_s == decided_at
 
 mapping = DECISION_MAP.fetch(latest["decision"])
 prev_phase = status["phase"].to_s

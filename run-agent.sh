@@ -1928,7 +1928,16 @@ fi
 # dashboard only writes decision.yaml; this driver step is the only writer that
 # reconciles it into status.yaml (single-writer invariant preserved).
 if [[ "$AGENT" != "pm" && -f "$STATUS_FILE" ]]; then
-  DECISION_RESULT="$(ruby "$OFFICE_DIR/scripts/reconcile-decision.rb" "$TASK_ID" 2>/dev/null || true)"
+  DECISION_ERR="$(mktemp)"
+  DECISION_RC=0
+  DECISION_RESULT="$(ruby "$OFFICE_DIR/scripts/reconcile-decision.rb" "$TASK_ID" 2>"$DECISION_ERR")" || DECISION_RC=$?
+  # S3: surface a malformed/unreadable decision.yaml instead of silently dropping it.
+  [[ -s "$DECISION_ERR" ]] && cat "$DECISION_ERR" >&2
+  rm -f "$DECISION_ERR"
+  if [[ "$DECISION_RC" -eq 3 ]]; then
+    echo "A human decision is pending but unreadable; refusing to dispatch. Fix runs/$TASK_ID/decision.yaml (or remove it)."
+    exit 1
+  fi
   if [[ "$DECISION_RESULT" == applied:* ]]; then
     echo "Applied human decision (${DECISION_RESULT#applied:})."
     log_meta_event "$TASK_ID" "$META_FILE" "decision_applied" "$AGENT" "task=$TASK_LABEL ${DECISION_RESULT#applied:}"
@@ -1936,6 +1945,16 @@ if [[ "$AGENT" != "pm" && -f "$STATUS_FILE" ]]; then
       applied:approve:*|applied:reject:*)
         echo "Task reached a terminal state by human decision; not dispatching $AGENT."
         exit 0
+        ;;
+      applied:*)
+        # S5: a non-terminal decision (request_changes->debugger, escalate->free-roam)
+        # reassigned the task. Dispatch the agent it routed to, regardless of the
+        # route-enforcement flag — a just-applied human decision is authoritative.
+        DECISION_AGENT="$(status_value "$STATUS_FILE" "current_agent")"
+        if [[ -n "$DECISION_AGENT" && "$DECISION_AGENT" != "done" && "$DECISION_AGENT" != "$AGENT" ]]; then
+          echo "Human decision routed this task to '$DECISION_AGENT'; dispatching that instead of '$AGENT'."
+          AGENT="$DECISION_AGENT"
+        fi
         ;;
     esac
   fi

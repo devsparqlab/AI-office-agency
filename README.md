@@ -62,6 +62,7 @@ ai-dev-office/tests/integration/resilience-fail-loud.sh
 ai-dev-office/tests/integration/loop-guard-bounded.sh
 ai-dev-office/tests/integration/validation-failed-bounded.sh
 ai-dev-office/tests/integration/idempotency-and-reentry.sh
+ai-dev-office/tests/integration/decision-path-integrity.sh
 ```
 
 | Script | What it checks |
@@ -84,6 +85,7 @@ ai-dev-office/tests/integration/idempotency-and-reentry.sh
 | `loop-guard-bounded.sh` | free-roam no longer resets the iteration budget; a free_roam_entries cap halts runaway escalation before dispatch |
 | `validation-failed-bounded.sh` | validation_failed routes to free-roam, counts retries, refuses re-dispatch of the failing agent, and halts at the cap |
 | `idempotency-and-reentry.sh` | Re-syncing the same output artifact is a no-op (no double-increment); pm/auto refuse to re-open a done/aborted task |
+| `decision-path-integrity.sh` | Malformed decision.yaml is surfaced (not dropped); a decision without decided_at is skipped; a non-terminal decision re-aligns the dispatched agent |
 
 Smoke: `ai-dev-office/tests/smoke/socraticode-graph.sh`
 
