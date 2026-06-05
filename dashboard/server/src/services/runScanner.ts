@@ -54,7 +54,7 @@ export function mapPhaseToRunStatus(value: string | undefined): RunStatus {
 }
 
 function taskIdNumber(taskId: string): number | null {
-  const match = taskId.match(/^TASK-(\d+)$/);
+  const match = taskId.match(/^TASK(?:-PKG)?-(\d+)$/); // S10: also match TASK-PKG-NNN
   if (!match) return null;
   return parseInt(match[1], 10);
 }
@@ -196,7 +196,7 @@ export class RunScanner {
             agent: this.mapAgentName(h.agent),
             action: h.phase || 'action',
             message: h.reason || h.message,
-            timestamp: h.timestamp || summary.updatedAt
+            timestamp: h.at || h.timestamp || summary.updatedAt // S10/N1: real per-transition time
           }));
         }
       } catch (e) { /* ignore */ }

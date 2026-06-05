@@ -151,6 +151,20 @@ def validate_status(data, label, errors)
 
   expect_string_array(data["waiting_for"], "#{label}.waiting_for", errors) if data.key?("waiting_for")
 
+  # N4: history is the only place transitions are recorded — validate its shape.
+  if data.key?("history")
+    expect_array(data["history"], "#{label}.history", errors)
+    Array(data["history"]).each_with_index do |entry, index|
+      if entry.is_a?(Hash)
+        %w[phase agent reason].each do |key|
+          expect_string(entry[key], "#{label}.history[#{index}].#{key}", errors)
+        end
+      else
+        errors << "#{label}.history[#{index}] must be a map"
+      end
+    end
+  end
+
   if data.key?("handoff")
     expect_hash(data["handoff"], "#{label}.handoff", errors)
     if data["handoff"].is_a?(Hash)

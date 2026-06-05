@@ -159,6 +159,15 @@ if task_filter && !task_filter.empty?
   puts "Waiting for: #{waiting_for.empty? ? 'none' : waiting_for.join(', ')}"
   puts "Validation: #{validation_status(validator, task_filter)}"
   puts "Next: #{next_command(task_filter, status)}"
+  # N5: show the most recent transitions so `status` answers "why", not just "where".
+  recent = Array(status["history"]).select { |h| h.is_a?(Hash) }.last(3)
+  unless recent.empty?
+    puts "Recent:"
+    recent.each do |h|
+      stamp = h["at"].to_s.empty? ? "" : " @#{h['at']}"
+      puts "  #{h['phase']} [#{h['agent']}]#{stamp}: #{h['reason']}"
+    end
+  end
   exit 0
 end
 
@@ -965,6 +974,14 @@ run_runner_once() {
   esac
 }
 
+# N2: a runner crash used to leave only a dangling prompt_assembly event and the
+# transcript was rm'd. Persist the transcript and record the failure.
+log_runner_failure() {  # <runner> <exit_code> <output_log> <classification>
+  local saved="$TASK_DIR/$AGENT-runner.log"
+  cp -f "$3" "$saved" 2>/dev/null || true
+  log_meta_event "$TASK_ID" "$META_FILE" "runner_failed" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} runner=$1 exit_code=$2 classification=$4 phase=${CURRENT_PHASE:-unknown} iteration=${CURRENT_ITERATION:-unknown} log=runs/$TASK_ID/$(basename "$saved")"
+}
+
 run_runner_with_fallback() {
   local current_runner="$1"
   local auto_switch
@@ -999,6 +1016,7 @@ run_runner_with_fallback() {
     cat "$output_log"
 
     if [[ "$auto_switch" != "true" ]] || ! matched_pattern="$(runner_failure_pattern "$output_log")"; then
+      log_runner_failure "$current_runner" "$status" "$output_log" "non-switchable"
       rm -f "$output_log"
       return "$status"
     fi
@@ -1014,6 +1032,7 @@ run_runner_with_fallback() {
     next_runner="$(next_runner_after "$current_runner" || true)"
     if [[ -z "$next_runner" ]]; then
       echo "Runner '$current_runner' failed with switchable pattern '$matched_pattern', but no fallback runner is configured."
+      log_runner_failure "$current_runner" "$status" "$output_log" "no-fallback"
       rm -f "$output_log"
       return "$status"
     fi
@@ -1414,7 +1433,8 @@ unless failed_deps.empty?
   status["history"] << {
     "phase" => "#{old_phase} -> escalated",
     "agent" => "orchestrator",
-    "reason" => "Upstream dependency failed (#{failed_deps.join(', ')}); cannot unblock by waiting."
+    "reason" => "Upstream dependency failed (#{failed_deps.join(', ')}); cannot unblock by waiting.",
+    "at" => Time.now.utc.strftime("%FT%TZ")  # N1
   }
   tmp_path = "#{status_path}.tmp.#{$$}"
   begin
@@ -1454,7 +1474,8 @@ if pending.empty?
   status["history"] << {
     "phase" => "#{old_phase} -> #{new_phase}",
     "agent" => "orchestrator",
-    "reason" => "Dependencies resolved: #{blocked_on.join(', ')}"
+    "reason" => "Dependencies resolved: #{blocked_on.join(', ')}",
+    "at" => Time.now.utc.strftime("%FT%TZ")  # N1
   }
 
   tmp_path = "#{status_path}.tmp.#{$$}"
@@ -1650,7 +1671,8 @@ reason = "Transitioned by #{actor_agent} output." if reason.empty?
 status["history"] << {
   "phase" => "#{old_phase} -> #{new_phase}",
   "agent" => actor_agent,
-  "reason" => reason
+  "reason" => reason,
+  "at" => Time.now.utc.strftime("%FT%TZ")  # N1
 }
 
 # M2: record what we just processed so a retried dispatch of the same artifact
@@ -1904,7 +1926,8 @@ status["history"] = [] unless status["history"].is_a?(Array)
 status["history"] << {
   "phase" => "#{old_phase} -> #{new_phase}",
   "agent" => actor_agent,
-  "reason" => reason
+  "reason" => reason,
+  "at" => Time.now.utc.strftime("%FT%TZ")  # N1
 }
 
 tmp_path = "#{status_path}.tmp.#{$$}"
@@ -2261,7 +2284,7 @@ INTERACTIVE_RUNNER="false"
 
 run_runner_with_fallback "$RUNNER" || exit $?
 
-log_meta_event "$TASK_ID" "$META_FILE" "runner_complete" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} runner=$RUNNER output_expected=runs/$TASK_ID/$(basename "$OUTPUT_FILE")"
+log_meta_event "$TASK_ID" "$META_FILE" "runner_complete" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} runner=$RUNNER exit_code=0 output_expected=runs/$TASK_ID/$(basename "$OUTPUT_FILE")"
 
 echo ""
 echo "=== $AGENT completed for $TASK_LABEL ==="

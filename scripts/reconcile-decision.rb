@@ -102,7 +102,8 @@ history = status["history"].is_a?(Array) ? status["history"] : []
 history << {
   "phase" => "#{prev_phase.empty? ? 'unknown' : prev_phase} -> #{mapping['phase']}",
   "agent" => "orchestrator",
-  "reason" => "human decision: #{latest['decision']} by #{actor}"
+  "reason" => "human decision: #{latest['decision']} by #{actor}",
+  "at" => Time.now.utc.strftime("%FT%TZ")  # N1
 }
 status["history"] = history
 

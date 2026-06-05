@@ -51,7 +51,7 @@ rescue StandardError => e
   die("status.yaml unreadable/corrupt (#{e.class}: #{e.message}); backed up to #{backup}. Refusing to overwrite it with a stub.", 2)
 end
 
-def mark_validation_failed(status_path, agent)
+def mark_validation_failed(status_path, agent, detail = "")
   # M1: per-task lock around the read-modify-write (released at block exit).
   File.open(File.join(File.dirname(status_path), ".lock"), File::RDWR | File::CREAT, 0o644) do |lock|
     lock.flock(File::LOCK_EX)
@@ -73,10 +73,15 @@ def mark_validation_failed(status_path, agent)
     # M4: don't churn history on a repeated validation_failed -> validation_failed.
     unless prev_phase == VALIDATION_FAILED_PHASE
       history = data["history"].is_a?(Array) ? data["history"] : []
+      # N3: keep the specific validator message, not just a generic line.
+      detail_line = detail.to_s.strip.lines.first(3).map(&:strip).reject(&:empty?).join("; ")
+      reason = "#{agent} output failed schema validation"
+      reason += ": #{detail_line[0, 400]}" unless detail_line.empty?
       history << {
         "phase" => "#{prev_phase.empty? ? 'unknown' : prev_phase} -> #{VALIDATION_FAILED_PHASE}",
         "agent" => "orchestrator",
-        "reason" => "#{agent} output failed schema validation"
+        "reason" => reason,
+        "at" => Time.now.utc.strftime("%FT%TZ")  # N1
       }
       data["history"] = history
     end
@@ -111,7 +116,7 @@ exit 0 unless File.exist?(output_path)
 _stdout, stderr, status = Open3.capture3("ruby", VALIDATOR, output_path)
 exit 0 if status.success?
 
-mark_validation_failed(File.join(task_dir, "status.yaml"), agent)
+mark_validation_failed(File.join(task_dir, "status.yaml"), agent, stderr)
 
 warn "Output contract failed for #{task_id}/#{agent}; phase set to #{VALIDATION_FAILED_PHASE}."
 warn stderr unless stderr.strip.empty?

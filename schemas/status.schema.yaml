@@ -179,6 +179,9 @@ properties:
             - orchestrator
         reason:
           type: string
+        at:
+          type: string
+          description: ISO-8601 UTC timestamp of the transition (N1; present on newer entries only).
   pm_output:
     type: object
   dev_output:
