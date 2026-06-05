@@ -18,6 +18,9 @@ required:
   - verdictNeedsAttention
   - needsReview
   - lastReviewedAt
+  - confidence
+  - issueCounts
+  - riskLevel
 properties:
   taskId:
     type: string
@@ -40,6 +43,7 @@ properties:
           - devops_complete
           - escalated
           - free_roam_complete
+          - validation_failed
           - done
           - aborted
   verdict:
@@ -66,3 +70,38 @@ properties:
     oneOf:
       - type: "null"
       - type: string
+  confidence:
+    description: "Provenance: debugger-output.yaml `diagnosis.confidence` (exact enum); null if never debugged."
+    oneOf:
+      - type: "null"
+      - type: string
+        enum:
+          - high
+          - medium
+          - low
+  issueCounts:
+    description: "Provenance: counts of reviewer-output.yaml artifacts[].issues[].severity (exact enum)."
+    type: object
+    additionalProperties: false
+    required:
+      - error
+      - warning
+      - suggestion
+    properties:
+      error:
+        type: integer
+        minimum: 0
+      warning:
+        type: integer
+        minimum: 0
+      suggestion:
+        type: integer
+        minimum: 0
+  riskLevel:
+    description: "Projection (server-owned): error>0→high; warning>0→medium; reviewed&clean→low; not reviewed→none."
+    type: string
+    enum:
+      - high
+      - medium
+      - low
+      - none

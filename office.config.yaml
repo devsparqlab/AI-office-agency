@@ -72,6 +72,7 @@ state_model:
     - devops_complete
     - escalated
     - free_roam_complete
+    - validation_failed
     - done
     - aborted
   reviewer_queue_phase: in_review

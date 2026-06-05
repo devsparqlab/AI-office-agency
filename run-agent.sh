@@ -2083,13 +2083,19 @@ if [[ -f "$OUTPUT_FILE" ]]; then
   elif [[ "${AI_DEV_OFFICE_PARALLEL_AUTO_SKIP_STATUS:-false}" == "true" ]]; then
     echo "Parallel auto lane output saved; parent auto runner will route to reviewer after all lanes finish."
   else
-    echo "Syncing status.yaml from $AGENT output..."
-    sync_status_from_output "$TASK_ID" "$AGENT" "$STATUS_FILE" "$OUTPUT_FILE" "$TODAY" "$REVIEWER_QUEUE_PHASE"
-    echo "Validating runtime files..."
-    if ruby "$OFFICE_DIR/validate-yaml.rb" "$TASK_ID"; then
-      echo "Validation passed."
+    echo "Enforcing $AGENT output contract..."
+    if ruby "$OFFICE_DIR/scripts/enforce-output-contract.rb" "$TASK_ID" "$AGENT"; then
+      echo "Syncing status.yaml from $AGENT output..."
+      sync_status_from_output "$TASK_ID" "$AGENT" "$STATUS_FILE" "$OUTPUT_FILE" "$TODAY" "$REVIEWER_QUEUE_PHASE"
+      echo "Validating runtime files..."
+      if ruby "$OFFICE_DIR/validate-yaml.rb" "$TASK_ID"; then
+        echo "Validation passed."
+      else
+        echo "Validation failed. Review the messages above before continuing."
+      fi
     else
-      echo "Validation failed. Review the messages above before continuing."
+      echo "Output contract failed; phase set to validation_failed. Not propagating downstream."
+      log_meta_event "$TASK_ID" "$META_FILE" "validation_failed" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} runner=$RUNNER phase=${CURRENT_PHASE:-unknown} output=runs/$TASK_ID/$(basename "$OUTPUT_FILE")"
     fi
   fi
 else

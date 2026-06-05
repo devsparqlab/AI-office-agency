@@ -35,6 +35,7 @@ export type RunPhase =
   | "devops_complete"
   | "escalated"
   | "free_roam_complete"
+  | "validation_failed"
   | "done"
   | "aborted";
 
@@ -47,6 +48,25 @@ export type ReviewVerdict =
   | "changes_requested"
   | "escalate"
   | "infra_failure";
+
+/**
+ * Confidence from runs/<id>/debugger-output.yaml `diagnosis.confidence`.
+ * Mirrors the enum enforced by validate-yaml.rb.
+ */
+export type ConfidenceLevel = "high" | "medium" | "low";
+
+/**
+ * Risk level derived (server-owned rule) from contracted issue severities —
+ * never inferred from free-form prose. "none" = no review issues assessed.
+ */
+export type RiskLevel = "high" | "medium" | "low" | "none";
+
+/** Counts of reviewer-output artifacts[].issues[].severity (contracted enum). */
+export interface IssueCounts {
+  error: number;
+  warning: number;
+  suggestion: number;
+}
 
 /**
  * Read-only Review read model. Every field is a projection of a contracted
@@ -67,6 +87,12 @@ export interface ReviewSummary {
   needsReview: boolean;
   /** Provenance: status.yaml `updated_at` when a reviewer-output exists; else null. */
   lastReviewedAt: string | null;
+  /** Provenance: debugger-output.yaml `diagnosis.confidence` (exact enum; null if never debugged). */
+  confidence: ConfidenceLevel | null;
+  /** Provenance: counts of reviewer-output.yaml artifacts[].issues[].severity (exact enum). */
+  issueCounts: IssueCounts;
+  /** Projection (server-owned rule): error>0 → high; warning>0 → medium; reviewed & clean → low; not reviewed → none. */
+  riskLevel: RiskLevel;
 }
 
 export interface ReviewModelResponse {

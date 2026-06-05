@@ -1,1 +1,1 @@
-export type DashboardSection = 'monitor' | 'analytics' | 'reports';
+export type DashboardSection = 'monitor' | 'analytics' | 'reports' | 'review';

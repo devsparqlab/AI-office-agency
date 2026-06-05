@@ -55,3 +55,40 @@ test('lastReviewedAt is null when reviewer output exists but updated_at is absen
   const r = buildReviewSummary('TASK-006', { phase: 'done' }, { review_verdict: 'approved' });
   assert.equal(r.lastReviewedAt, null);
 });
+
+// --- Slice 3: confidence + risk (contract-backed, no prose) ---
+
+test('confidence is projected from debugger diagnosis.confidence (exact enum)', () => {
+  const r = buildReviewSummary('T', { phase: 'debugging' }, null, { diagnosis: { confidence: 'high' } });
+  assert.equal(r.confidence, 'high');
+});
+
+test('confidence is null when no debugger output, and unknown values drop to null', () => {
+  assert.equal(buildReviewSummary('T', { phase: 'done' }, null, null).confidence, null);
+  assert.equal(buildReviewSummary('T', { phase: 'done' }, null, { diagnosis: { confidence: 'very-sure' } }).confidence, null);
+});
+
+test('riskLevel: error issue → high', () => {
+  const reviewer = { review_verdict: 'changes_requested', artifacts: [{ issues: [{ severity: 'error', description: 'x' }] }] };
+  const r = buildReviewSummary('T', { phase: 'debugging' }, reviewer);
+  assert.deepEqual(r.issueCounts, { error: 1, warning: 0, suggestion: 0 });
+  assert.equal(r.riskLevel, 'high');
+});
+
+test('riskLevel: only warnings → medium; reviewed & clean → low; not reviewed → none', () => {
+  const warn = buildReviewSummary('T', { phase: 'done' }, { review_verdict: 'approved', artifacts: [{ issues: [{ severity: 'warning', description: 'x' }] }] });
+  assert.equal(warn.riskLevel, 'medium');
+
+  const clean = buildReviewSummary('T', { phase: 'done' }, { review_verdict: 'approved', artifacts: [] });
+  assert.equal(clean.riskLevel, 'low');
+
+  const unreviewed = buildReviewSummary('T', { phase: 'in_review' }, null);
+  assert.equal(unreviewed.riskLevel, 'none');
+  assert.deepEqual(unreviewed.issueCounts, { error: 0, warning: 0, suggestion: 0 });
+});
+
+test('unknown issue severities are ignored, never guessed', () => {
+  const reviewer = { review_verdict: 'approved', artifacts: [{ issues: [{ severity: 'critical' }, { severity: 'error' }] }] };
+  const r = buildReviewSummary('T', { phase: 'done' }, reviewer);
+  assert.deepEqual(r.issueCounts, { error: 1, warning: 0, suggestion: 0 });
+});

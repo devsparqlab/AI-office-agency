@@ -1,0 +1,42 @@
+# Agent manifest — single source of truth mapping each agent to its prompt,
+# output artifact, and output schema.
+#
+# The driver uses this to enforce the producer contract (Slice 2): an agent
+# output that fails its schema routes the task to `validation_failed` instead of
+# propagating downstream. See scripts/enforce-output-contract.rb.
+version: "1.0"
+
+validation:
+  # strict = invalid agent output halts propagation and sets on_invalid_phase.
+  policy: strict
+  on_invalid_phase: validation_failed
+
+agents:
+  pm:
+    prompt: agents/pm.md
+    output_file: pm-output.yaml
+    output_schema: schemas/pm-output.schema.yaml
+  dev:
+    prompt: agents/dev.md
+    output_file: dev-output.yaml
+    output_schema: schemas/dev-output.schema.yaml
+  dev-2:
+    prompt: agents/dev-2.md
+    output_file: dev-2-output.yaml
+    output_schema: schemas/dev-2-output.schema.yaml
+  reviewer:
+    prompt: agents/reviewer.md
+    output_file: reviewer-output.yaml
+    output_schema: schemas/reviewer-output.schema.yaml
+  debugger:
+    prompt: agents/debugger.md
+    output_file: debugger-output.yaml
+    output_schema: schemas/debugger-output.schema.yaml
+  devops:
+    prompt: agents/devops.md
+    output_file: devops-output.yaml
+    output_schema: schemas/devops-output.schema.yaml
+  free-roam:
+    prompt: agents/free-roam.md
+    output_file: free-roam-output.yaml
+    output_schema: schemas/free-roam-output.schema.yaml

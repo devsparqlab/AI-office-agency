@@ -30,6 +30,7 @@ properties:
       - devops_complete
       - escalated
       - free_roam_complete
+      - validation_failed
       - done
       - aborted
   state:
@@ -47,6 +48,7 @@ properties:
       - devops_complete
       - escalated
       - free_roam_complete
+      - validation_failed
       - done
       - aborted
   iteration:

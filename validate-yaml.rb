@@ -8,7 +8,7 @@ STATUS_ACTORS = (AGENTS + %w[orchestrator]).freeze
 PHASES = %w[
   pending blocked assigned assigned_parallel review in_review debugging
   debugging_complete devops_needed devops_complete escalated
-  free_roam_complete done aborted
+  free_roam_complete validation_failed done aborted
 ].freeze
 
 def load_yaml(path)
