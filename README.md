@@ -57,6 +57,7 @@ ai-dev-office/tests/integration/profile-merge.sh
 ai-dev-office/tests/integration/output-contract.sh
 ai-dev-office/tests/integration/decision-reconcile.sh
 ai-dev-office/tests/integration/driver-decision-e2e.sh
+ai-dev-office/tests/integration/concurrent-status-writes.sh
 ```
 
 | Script | What it checks |
@@ -74,6 +75,7 @@ ai-dev-office/tests/integration/driver-decision-e2e.sh
 | `output-contract.sh` | Invalid agent output routes to `validation_failed` |
 | `decision-reconcile.sh` | Driver applies `decision.yaml` to `status.yaml` (idempotent) |
 | `driver-decision-e2e.sh` | End-to-end dispatch: enforce gate + decision reconcile + terminal-stop |
+| `concurrent-status-writes.sh` | Per-task flock prevents lost updates under concurrent (parallel-lane) writes |
 
 Smoke: `ai-dev-office/tests/smoke/socraticode-graph.sh`
 

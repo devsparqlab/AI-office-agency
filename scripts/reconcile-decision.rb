@@ -54,6 +54,13 @@ task_dir = File.join(RUNS_DIR, task_id)
 status_path = File.join(task_dir, "status.yaml")
 decision_path = File.join(task_dir, "decision.yaml")
 
+# M1: serialize with the driver's status writers (parallel lanes share .lock).
+# Held for the whole process; released on exit (including via noop!).
+if File.directory?(task_dir)
+  lock = File.open(File.join(task_dir, ".lock"), File::RDWR | File::CREAT, 0o644)
+  lock.flock(File::LOCK_EX)
+end
+
 status = load_yaml(status_path)
 decisions_doc = load_yaml(decision_path)
 noop! unless status && decisions_doc

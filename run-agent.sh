@@ -585,6 +585,11 @@ require "date"
 
 task_id, meta_path, event_type, actor, details, timestamp = ARGV
 
+# M1: serialize concurrent writers (parallel dev lanes) on one per-task lock.
+# flock is advisory but released automatically when this short-lived process exits.
+__lock = File.open(File.join(File.dirname(meta_path), ".lock"), File::RDWR | File::CREAT, 0o644)
+__lock.flock(File::LOCK_EX)
+
 meta = if File.exist?(meta_path)
   YAML.safe_load(File.read(meta_path), permitted_classes: [Date, Time], aliases: true) || {}
 else
@@ -1331,6 +1336,10 @@ require "date"
 task_id, status_path, runs_dir, today, unblock_phase, reviewer_queue_phase, clear_waiting_for, set_ready, route_from_assignment = ARGV
 exit 0 unless File.exist?(status_path)
 
+# M1: per-task lock around the read-modify-write (released on process exit).
+__lock = File.open(File.join(File.dirname(status_path), ".lock"), File::RDWR | File::CREAT, 0o644)
+__lock.flock(File::LOCK_EX)
+
 status = YAML.safe_load(File.read(status_path), permitted_classes: [Date, Time], aliases: true) || {}
 phase = status["state"].to_s.strip
 phase = status["phase"].to_s.strip if phase.empty?
@@ -1415,6 +1424,10 @@ unless File.exist?(output_path)
   warn "Status sync skipped: output file missing at #{output_path}"
   exit 0
 end
+
+# M1: per-task lock around the read-modify-write (released on process exit).
+__lock = File.open(File.join(File.dirname(status_path), ".lock"), File::RDWR | File::CREAT, 0o644)
+__lock.flock(File::LOCK_EX)
 
 status = if File.exist?(status_path)
   YAML.safe_load(File.read(status_path), permitted_classes: [Date, Time], aliases: true) || {}
@@ -1757,6 +1770,10 @@ require "yaml"
 require "date"
 
 task_id, status_path, today, next_agent, new_phase, actor_agent, reason = ARGV
+
+# M1: per-task lock around the read-modify-write (released on process exit).
+__lock = File.open(File.join(File.dirname(status_path), ".lock"), File::RDWR | File::CREAT, 0o644)
+__lock.flock(File::LOCK_EX)
 
 status = if File.exist?(status_path)
   YAML.safe_load(File.read(status_path), permitted_classes: [Date, Time], aliases: true) || {}

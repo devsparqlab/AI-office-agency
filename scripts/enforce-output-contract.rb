@@ -43,26 +43,31 @@ rescue StandardError
 end
 
 def mark_validation_failed(status_path, agent)
-  data = File.exist?(status_path) ? load_status(status_path) : {}
-  prev_phase = data["phase"].to_s
+  # M1: per-task lock around the read-modify-write (released at block exit).
+  File.open(File.join(File.dirname(status_path), ".lock"), File::RDWR | File::CREAT, 0o644) do |lock|
+    lock.flock(File::LOCK_EX)
 
-  data["phase"] = VALIDATION_FAILED_PHASE
-  data["state"] = VALIDATION_FAILED_PHASE
-  data["updated_at"] = Date.today.to_s
-  data["ready"] = false
+    data = File.exist?(status_path) ? load_status(status_path) : {}
+    prev_phase = data["phase"].to_s
 
-  history = data["history"].is_a?(Array) ? data["history"] : []
-  history << {
-    "phase" => "#{prev_phase.empty? ? 'unknown' : prev_phase} -> #{VALIDATION_FAILED_PHASE}",
-    "agent" => "orchestrator",
-    "reason" => "#{agent} output failed schema validation"
-  }
-  data["history"] = history
+    data["phase"] = VALIDATION_FAILED_PHASE
+    data["state"] = VALIDATION_FAILED_PHASE
+    data["updated_at"] = Date.today.to_s
+    data["ready"] = false
 
-  # Atomic write (mirrors the driver's status-write pattern).
-  tmp = "#{status_path}.tmp.#{Process.pid}"
-  File.write(tmp, YAML.dump(data))
-  File.rename(tmp, status_path)
+    history = data["history"].is_a?(Array) ? data["history"] : []
+    history << {
+      "phase" => "#{prev_phase.empty? ? 'unknown' : prev_phase} -> #{VALIDATION_FAILED_PHASE}",
+      "agent" => "orchestrator",
+      "reason" => "#{agent} output failed schema validation"
+    }
+    data["history"] = history
+
+    # Atomic write (mirrors the driver's status-write pattern).
+    tmp = "#{status_path}.tmp.#{Process.pid}"
+    File.write(tmp, YAML.dump(data))
+    File.rename(tmp, status_path)
+  end
 end
 
 task_id, agent = ARGV
