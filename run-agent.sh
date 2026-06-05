@@ -808,6 +808,22 @@ puts data["iteration"].to_i
 RUBY
 }
 
+# M3: completed free-roam passes (non-resettable) — drives the free-roam halt.
+effective_free_roam_entries() {
+  local status_file="$1"
+
+  ruby - "$status_file" <<'RUBY'
+require "yaml"
+require "date"
+
+status_path = ARGV[0]
+exit 0 unless File.exist?(status_path)
+
+data = YAML.safe_load(File.read(status_path), permitted_classes: [Date, Time], aliases: true) || {}
+puts data["free_roam_entries"].to_i
+RUBY
+}
+
 resolve_loop_limit() {
   ruby "$CONFIG_RESOLVER" get "$OFFICE_DIR" loop_guard.max_iterations "$DEFAULT_LOOP_LIMIT"
 }
@@ -818,13 +834,17 @@ resolve_free_roam_loop_limit() {
   if [[ "$configured" =~ ^[0-9]+$ && "$configured" -gt 0 ]]; then
     echo "$configured"
   else
-    # Default: 2× normal loop limit — free-roam is the last resort, give it more room
-    echo $(( $(resolve_loop_limit) * 2 ))
+    # M3: now counts COMPLETED free-roam passes (not work iterations). Free-roam
+    # is the last resort before a hard halt — keep the cap small.
+    echo 3
   fi
 }
 
 LOOP_LIMIT="$(resolve_loop_limit)"
 FREE_ROAM_LOOP_LIMIT="$(resolve_free_roam_loop_limit)"
+# M4: how many times a task may hit validation_failed before a hard halt.
+VALIDATION_FAILED_RETRY_LIMIT="$(ruby "$CONFIG_RESOLVER" get "$OFFICE_DIR" loop_guard.validation_failed_retry_limit 3 2>/dev/null || echo 3)"
+[[ "$VALIDATION_FAILED_RETRY_LIMIT" =~ ^[0-9]+$ && "$VALIDATION_FAILED_RETRY_LIMIT" -gt 0 ]] || VALIDATION_FAILED_RETRY_LIMIT=3
 
 config_value() {
   local key_path="$1"
@@ -1536,8 +1556,11 @@ new_phase =
   end
 
 work_agents = ["dev", "dev-2", "reviewer", "debugger", "devops"]
+# M3: do NOT reset the work-agent budget on free-roam. Zeroing `iteration` made
+# the loop guard defeatable (infinite dev<->reviewer<->free-roam). Instead count
+# completed free-roam passes in a separate, non-resettable counter the guard reads.
 if actor_agent == "free-roam"
-  status["iteration"] = 0
+  status["free_roam_entries"] = status["free_roam_entries"].to_i + 1
 end
 
 if work_agents.include?(next_agent)
@@ -1899,6 +1922,7 @@ if [[ "$AGENT" != "pm" && -f "$STATUS_FILE" ]]; then
 fi
 
 CURRENT_ITERATION="$(effective_iteration "$STATUS_FILE")"
+CURRENT_FREE_ROAM_ENTRIES="$(effective_free_roam_entries "$STATUS_FILE")"
 CURRENT_PHASE="$(status_value "$STATUS_FILE" "phase")"
 CURRENT_STATE="$(status_value "$STATUS_FILE" "state")"
 CURRENT_READY="$(status_value "$STATUS_FILE" "ready")"
@@ -1908,6 +1932,26 @@ CURRENT_WAITING_FOR="$(status_list_values "$STATUS_FILE" "waiting_for")"
 
 if [[ -z "$CURRENT_STATE" ]]; then
   CURRENT_STATE="$CURRENT_PHASE"
+fi
+
+# M4: validation_failed is a bounded, route-out state. Don't silently re-dispatch
+# the failing agent against unchanged input, and hard-halt after repeated failures.
+if [[ "$AGENT" != "pm" && -f "$STATUS_FILE" && ( "$CURRENT_PHASE" == "validation_failed" || "$CURRENT_STATE" == "validation_failed" ) ]]; then
+  VF_RETRIES="$(status_value "$STATUS_FILE" "validation_failed_retries")"
+  [[ "$VF_RETRIES" =~ ^[0-9]+$ ]] || VF_RETRIES=0
+  if [[ "${AI_DEV_OFFICE_FORCE:-false}" != "true" ]]; then
+    if [[ "$VF_RETRIES" -ge "$VALIDATION_FAILED_RETRY_LIMIT" ]]; then
+      echo "Task $TASK_LABEL failed validation $VF_RETRIES times (limit $VALIDATION_FAILED_RETRY_LIMIT). Halting — needs human intervention."
+      echo "Set AI_DEV_OFFICE_FORCE=true to override."
+      log_meta_event "$TASK_ID" "$META_FILE" "loop_guard" "$AGENT" "task=$TASK_LABEL phase=validation_failed validation_failed_retries=$VF_RETRIES limit=$VALIDATION_FAILED_RETRY_LIMIT reason=validation_failed_exhausted"
+      exit 1
+    fi
+    if [[ "$AGENT" != "free-roam" && "$AGENT" != "auto" ]]; then
+      echo "Task $TASK_LABEL is in validation_failed; refusing to re-dispatch '$AGENT' against unchanged input."
+      echo "Routed to 'free-roam' for remediation: ./run-agent.sh $TASK_ID free-roam   (AI_DEV_OFFICE_FORCE=true to override)"
+      exit 1
+    fi
+  fi
 fi
 
 if [[ "$AGENT" != "pm" && "$AGENT" != "free-roam" && "$AGENT" != "auto" && -f "$STATUS_FILE" ]]; then
@@ -1940,10 +1984,11 @@ if [[ "$DEPENDENCY_GUARD_ENABLED" == "true" ]] && should_run_dependency_guard "$
 fi
 
 if [[ "$AGENT" != "pm" && -f "$STATUS_FILE" && "$CURRENT_ITERATION" =~ ^[0-9]+$ ]]; then
-  if [[ "$AGENT" == "free-roam" && "$CURRENT_ITERATION" -ge "$FREE_ROAM_LOOP_LIMIT" ]]; then
-    LOOP_REASON="Free-roam loop guard triggered: exceeded free_roam_max_iterations (${CURRENT_ITERATION}/${FREE_ROAM_LOOP_LIMIT})."
-    echo "Free-roam loop guard triggered for $TASK_LABEL at iteration $CURRENT_ITERATION. Halting."
-    log_meta_event "$TASK_ID" "$META_FILE" "loop_guard" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} phase=${CURRENT_PHASE:-unknown} iteration=$CURRENT_ITERATION limit=$FREE_ROAM_LOOP_LIMIT agent=free-roam"
+  if [[ "$AGENT" == "free-roam" && "$CURRENT_FREE_ROAM_ENTRIES" =~ ^[0-9]+$ && "$CURRENT_FREE_ROAM_ENTRIES" -ge "$FREE_ROAM_LOOP_LIMIT" ]]; then
+    # M3: halt on completed free-roam passes, not on the (now-non-reset) iteration.
+    LOOP_REASON="Free-roam loop guard triggered: exceeded free_roam_max_entries (${CURRENT_FREE_ROAM_ENTRIES}/${FREE_ROAM_LOOP_LIMIT})."
+    echo "Free-roam loop guard triggered for $TASK_LABEL after $CURRENT_FREE_ROAM_ENTRIES free-roam passes. Halting."
+    log_meta_event "$TASK_ID" "$META_FILE" "loop_guard" "$AGENT" "task=$TASK_LABEL epic=${TASK_EPIC:-none} phase=${CURRENT_PHASE:-unknown} free_roam_entries=$CURRENT_FREE_ROAM_ENTRIES limit=$FREE_ROAM_LOOP_LIMIT agent=free-roam"
     exit 1
   elif [[ "$AGENT" != "free-roam" && "$CURRENT_ITERATION" -ge "$LOOP_LIMIT" ]]; then
     LOOP_REASON="Loop guard triggered: exceeded max_iterations (${CURRENT_ITERATION}/${LOOP_LIMIT}) while attempting ${AGENT}."
@@ -2141,7 +2186,7 @@ if [[ -f "$OUTPUT_FILE" ]]; then
       if [[ "$SYNC_RC" -eq 3 ]]; then
         # S1: malformed agent output — route to validation_failed, don't crash/propagate.
         echo "Agent output is malformed YAML; routing to validation_failed (not propagating)."
-        force_status_route "$TASK_ID" "$STATUS_FILE" "$TODAY" "$AGENT" "validation_failed" "$AGENT" "output could not be parsed during sync"
+        force_status_route "$TASK_ID" "$STATUS_FILE" "$TODAY" "free-roam" "validation_failed" "$AGENT" "output could not be parsed during sync"
         log_meta_event "$TASK_ID" "$META_FILE" "validation_failed" "$AGENT" "task=$TASK_LABEL reason=sync_parse_error output=runs/$TASK_ID/$(basename "$OUTPUT_FILE")"
       elif [[ "$SYNC_RC" -ne 0 ]]; then
         echo "Status sync aborted (rc=$SYNC_RC); see messages above. Not propagating downstream."

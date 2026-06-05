@@ -59,6 +59,8 @@ ai-dev-office/tests/integration/decision-reconcile.sh
 ai-dev-office/tests/integration/driver-decision-e2e.sh
 ai-dev-office/tests/integration/concurrent-status-writes.sh
 ai-dev-office/tests/integration/resilience-fail-loud.sh
+ai-dev-office/tests/integration/loop-guard-bounded.sh
+ai-dev-office/tests/integration/validation-failed-bounded.sh
 ```
 
 | Script | What it checks |
@@ -78,6 +80,8 @@ ai-dev-office/tests/integration/resilience-fail-loud.sh
 | `driver-decision-e2e.sh` | End-to-end dispatch: enforce gate + decision reconcile + terminal-stop |
 | `concurrent-status-writes.sh` | Per-task flock prevents lost updates under concurrent (parallel-lane) writes |
 | `resilience-fail-loud.sh` | Malformed output routes to validation_failed (no crash); corrupt status.yaml is backed up, never flattened to a stub |
+| `loop-guard-bounded.sh` | free-roam no longer resets the iteration budget; a free_roam_entries cap halts runaway escalation before dispatch |
+| `validation-failed-bounded.sh` | validation_failed routes to free-roam, counts retries, refuses re-dispatch of the failing agent, and halts at the cap |
 
 Smoke: `ai-dev-office/tests/smoke/socraticode-graph.sh`
 

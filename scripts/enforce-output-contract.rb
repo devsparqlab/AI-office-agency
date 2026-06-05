@@ -63,14 +63,23 @@ def mark_validation_failed(status_path, agent)
     data["state"] = VALIDATION_FAILED_PHASE
     data["updated_at"] = Date.today.to_s
     data["ready"] = false
+    # M4: route OUT to free-roam for remediation instead of leaving the failing
+    # agent as current_agent (which made `next`/auto re-run it on the same input).
+    data["current_agent"] = "free-roam"
+    # M4: bounded retry counter. sync is skipped on validation_failed, so
+    # `iteration` never advances — the driver halts once this hits the limit.
+    data["validation_failed_retries"] = data["validation_failed_retries"].to_i + 1
 
-    history = data["history"].is_a?(Array) ? data["history"] : []
-    history << {
-      "phase" => "#{prev_phase.empty? ? 'unknown' : prev_phase} -> #{VALIDATION_FAILED_PHASE}",
-      "agent" => "orchestrator",
-      "reason" => "#{agent} output failed schema validation"
-    }
-    data["history"] = history
+    # M4: don't churn history on a repeated validation_failed -> validation_failed.
+    unless prev_phase == VALIDATION_FAILED_PHASE
+      history = data["history"].is_a?(Array) ? data["history"] : []
+      history << {
+        "phase" => "#{prev_phase.empty? ? 'unknown' : prev_phase} -> #{VALIDATION_FAILED_PHASE}",
+        "agent" => "orchestrator",
+        "reason" => "#{agent} output failed schema validation"
+      }
+      data["history"] = history
+    end
 
     # Atomic write (mirrors the driver's status-write pattern).
     tmp = "#{status_path}.tmp.#{Process.pid}"

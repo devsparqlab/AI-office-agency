@@ -54,6 +54,14 @@ properties:
   iteration:
     type: integer
     minimum: 0
+  free_roam_entries:
+    type: integer
+    minimum: 0
+    description: Completed free-roam passes (non-resettable). Drives the free-roam halt guard.
+  validation_failed_retries:
+    type: integer
+    minimum: 0
+    description: Times the task entered validation_failed (non-resettable). Drives the validation-failed halt guard.
   current_agent:
     anyOf:
       - type: "null"
