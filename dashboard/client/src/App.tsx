@@ -11,7 +11,7 @@ import { MonitorView } from './views/MonitorView';
 import { AnalyticsView } from './views/AnalyticsView';
 import { ReportsView } from './views/ReportsView';
 import { ReviewView } from './views/ReviewView';
-import { OfficeView } from './views/OfficeView';
+import { CommandView } from './views/CommandView';
 import { apiFetch, apiEventSourceUrl } from './api';
 import { Activity, Search, Clock, Loader2 } from 'lucide-react';
 
@@ -25,6 +25,7 @@ const App: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [navOpen, setNavOpen] = useState(true);
   const [selectedLogFile, setSelectedLogFile] = useState('');
   const [logContent, setLogContent] = useState<string | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
@@ -194,7 +195,7 @@ const App: React.FC = () => {
       // Trigger Analytics refresh via a global event or similar
       // For now, we can rely on the fact that AnalyticsView will likely re-mount
       // or we can add a refresh counter if needed.
-      window.dispatchEvent(new CustomEvent('dashboard:refresh'));
+      window.dispatchEvent(new CustomEvent('dashboard:refresh', { detail: update }));
     };
     eventSource.addEventListener('runs.changed', onRunsChanged);
     return () => eventSource.close();
@@ -206,7 +207,7 @@ const App: React.FC = () => {
   );
 
   const sections: Array<{ id: DashboardSection; label: string }> = [
-    { id: 'office', label: 'Office' },
+    { id: 'command', label: 'Command' },
     { id: 'monitor', label: 'Monitor' },
     { id: 'review', label: 'Review' },
     { id: 'analytics', label: 'Analytics' },
@@ -245,11 +246,15 @@ const App: React.FC = () => {
 
   return (
     <div className="app-container">
+      {navOpen && (
       <div className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-title-row">
             <Activity color="var(--accent-color)" />
             <span className="sidebar-title">AI Dev Dashboard</span>
+            <button type="button" onClick={() => setNavOpen(false)} title="Hide sidebar"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted, #8a97a8)',
+                cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2 }}>«</button>
           </div>
           <div className="search-input-shell">
             <Search size={16} className="search-input-icon" />
@@ -326,10 +331,17 @@ const App: React.FC = () => {
           )}
         </div>
       </div>
+      )}
 
       <div className="main-content">
-        {activeSection === 'office' && (
-          <OfficeView />
+        {!navOpen && (
+          <button type="button" onClick={() => setNavOpen(true)} title="Show sidebar"
+            style={{ position: 'fixed', top: 10, left: 10, zIndex: 50, width: 30, height: 30,
+              borderRadius: 6, border: '1px solid #2a3744', background: 'rgba(13,19,27,0.9)',
+              color: '#c9d4e3', cursor: 'pointer', fontSize: 15 }}>☰</button>
+        )}
+        {activeSection === 'command' && (
+          <CommandView />
         )}
 
         {activeSection === 'monitor' && (
