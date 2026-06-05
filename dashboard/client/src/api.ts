@@ -7,16 +7,40 @@ const TOKEN_KEY = 'dashboard_token';
 // value meaning "user dismissed / auth disabled" — so we don't re-prompt.
 let cachedToken: string | null = null;
 
+function readStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function persistToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // Ignore storage failures so unsupported runtimes still render the UI.
+  }
+}
+
+function requestToken(): string {
+  try {
+    return (window.prompt('Enter dashboard access token (leave blank if auth is disabled):') || '').trim();
+  } catch {
+    return '';
+  }
+}
+
 export function getToken(): string {
   if (cachedToken !== null) {
     return cachedToken;
   }
 
-  let token = localStorage.getItem(TOKEN_KEY);
+  let token = readStoredToken();
   if (token === null) {
-    token = (window.prompt('Enter dashboard access token (leave blank if auth is disabled):') || '').trim();
+    token = requestToken();
     // Persist even when blank so we remember the choice across reloads.
-    localStorage.setItem(TOKEN_KEY, token);
+    persistToken(token);
   }
 
   cachedToken = token;
@@ -25,7 +49,11 @@ export function getToken(): string {
 
 export function clearToken(): void {
   cachedToken = null;
-  localStorage.removeItem(TOKEN_KEY);
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Ignore storage failures so token reset never crashes the dashboard.
+  }
 }
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {

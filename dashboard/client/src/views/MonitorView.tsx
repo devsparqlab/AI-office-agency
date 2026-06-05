@@ -30,82 +30,120 @@ export function MonitorView({
   logError,
   onSelectLogFile,
 }: MonitorViewProps) {
+  const healthHeadline =
+    health?.status === 'warning'
+      ? 'Dashboard health warning'
+      : health?.status === 'error'
+        ? 'Dashboard health degraded'
+        : 'Dashboard health';
+  const healthSummary =
+    health?.status === 'warning'
+      ? 'The monitor is still available, but one or more file-system dependencies need attention.'
+      : 'The monitor may not reflect current run state until the underlying dashboard wiring is restored.';
+
   return (
     <div>
       {!health && !loading && (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--status-error)', border: '1px solid var(--status-error)', marginBottom: '24px' }}>
-          <AlertCircle size={48} style={{ marginBottom: '16px' }} />
-          <h2 style={{ margin: '0 0 8px 0' }}>Backend Server Offline</h2>
-          <p>Cannot connect to the dashboard API. Please ensure the server is running on port 4310.</p>
+        <div className="card state-panel state-panel-error" style={{ marginBottom: '24px' }}>
+          <AlertCircle size={44} className="state-panel-icon" />
+          <div className="state-panel-body">
+            <div className="state-panel-eyebrow">Connection Issue</div>
+            <h2 className="state-panel-title">Backend server offline</h2>
+            <p className="state-panel-copy">Cannot connect to the dashboard API. Please ensure the server is running on port 4310.</p>
+          </div>
         </div>
       )}
 
       {health && health.status !== 'ok' && (
-        <div className="card" style={{ marginBottom: '24px', border: `1px solid ${healthAccent}` }}>
-          <div className="card-title" style={{ color: healthAccent }}>
-            <AlertCircle size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-            Dashboard health {health.status}
+        <div className="card health-banner" style={{ marginBottom: '24px', borderColor: healthAccent }}>
+          <div className="health-banner-header">
+            <div className="health-banner-title-row">
+              <AlertCircle size={15} style={{ color: healthAccent }} />
+              <div className="health-banner-title" style={{ color: healthAccent }}>
+                {healthHeadline}
+              </div>
+            </div>
+            <span className="health-banner-chip" style={{ color: healthAccent, borderColor: healthAccent }}>
+              {health.status}
+            </span>
           </div>
-          <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            Runs directory: {health.runsDirExists ? 'available' : 'missing'} | Logs directory: {health.logsDirExists ? 'available' : 'missing'} | Watcher: {health.watcherActive ? 'active' : 'inactive'}
+          <p className="health-banner-summary">
+            {healthSummary}
+          </p>
+          <div className="health-banner-facts">
+            <span>Runs directory: {health.runsDirExists ? 'available' : 'missing'}</span>
+            <span>Logs directory: {health.logsDirExists ? 'available' : 'missing'}</span>
+            <span>Watcher: {health.watcherActive ? 'active' : 'inactive'}</span>
           </div>
         </div>
       )}
 
       {selectedRunId ? (
         runDetailLoading ? (
-          <div style={{ textAlign: 'center', marginTop: '100px' }}><Loader2 className="animate-spin" size={48} /></div>
+          <div className="card state-panel state-panel-neutral">
+            <Loader2 className="animate-spin state-panel-icon" size={40} />
+            <div className="state-panel-body">
+              <div className="state-panel-eyebrow">Loading Run</div>
+              <h3 className="state-panel-title">Fetching the latest run details</h3>
+              <p className="state-panel-copy">The monitor is syncing task details, artifacts, and log availability for the selected run.</p>
+            </div>
+          </div>
         ) : runDetailError ? (
-          <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <AlertCircle size={40} style={{ marginBottom: '16px', color: 'var(--status-error)' }} />
-            <h3 style={{ marginBottom: '8px' }}>{runDetailError}</h3>
-            <p>Choose another run from the sidebar to continue.</p>
+          <div className="card state-panel state-panel-neutral">
+            <AlertCircle size={40} className="state-panel-icon" style={{ color: 'var(--status-error)' }} />
+            <div className="state-panel-body">
+              <div className="state-panel-eyebrow">Run Unavailable</div>
+              <h3 className="state-panel-title">{runDetailError}</h3>
+              <p className="state-panel-copy">Choose another run from the sidebar to continue inspecting current task state.</p>
+            </div>
           </div>
         ) : runDetail ? (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-              <div>
-                <h1 style={{ margin: '0 0 8px 0' }}>{runDetail.id}: {runDetail.title}</h1>
-                <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-                  Path: {runDetail.runPath} | Updated: {new Date(runDetail.updatedAt || '').toLocaleString()}
+            <div className="monitor-run-header">
+              <div className="monitor-run-heading">
+                <div className="monitor-run-kicker">Selected Run</div>
+                <h1 className="monitor-run-title">{runDetail.id}: {runDetail.title}</h1>
+                <div className="monitor-run-meta">
+                  <span>Path: {runDetail.runPath}</span>
+                  <span>Updated: {new Date(runDetail.updatedAt || '').toLocaleString()}</span>
                 </div>
               </div>
-              <span className={`status-badge status-${runDetail.status}`} style={{ padding: '6px 12px', fontSize: '14px' }}>{runDetail.status}</span>
+              <span className={`status-badge status-${runDetail.status} monitor-status-badge`}>{runDetail.status}</span>
             </div>
 
             <div className="summary-cards">
-              <div className="card">
+              <div className="card monitor-summary-card">
                 <div className="card-title">Current Agent</div>
-                <div className="card-value" style={{ textTransform: 'uppercase' }}>{runDetail.currentAgent || 'None'}</div>
+                <div className="card-value monitor-summary-value" style={{ textTransform: 'uppercase' }}>{runDetail.currentAgent || 'None'}</div>
               </div>
-              <div className="card">
+              <div className="card monitor-summary-card">
                 <div className="card-title">Phase</div>
-                <div className="card-value">{runDetail.currentStep || 'Unknown'}</div>
+                <div className="card-value monitor-summary-value">{runDetail.currentStep || 'Unknown'}</div>
               </div>
-              <div className="card">
+              <div className="card monitor-summary-card">
                 <div className="card-title">Artifacts</div>
-                <div className="card-value">{runDetail.artifacts.length}</div>
+                <div className="card-value monitor-summary-value">{runDetail.artifacts.length}</div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px' }}>
-              <div>
-                <div className="card" style={{ marginBottom: '24px' }}>
-                  <div className="card-title"><Terminal size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Task Description</div>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            <div className="monitor-detail-grid">
+              <div className="monitor-primary-column">
+                <div className="card monitor-section-card">
+                  <div className="panel-heading"><Terminal size={14} /> <span>Task Description</span></div>
+                  <div className="monitor-markdown-body">
                     <ReactMarkdown>{runDetail.taskMarkdown || 'No description available'}</ReactMarkdown>
                   </div>
                 </div>
 
                 {runDetail.outputMarkdown && (
-                  <div className="card" style={{ marginBottom: '24px' }}>
-                    <div className="card-title">Output Summary</div>
+                  <div className="card monitor-section-card">
+                    <div className="panel-heading"><span>Output Summary</span></div>
                     <ReactMarkdown>{runDetail.outputMarkdown}</ReactMarkdown>
                   </div>
                 )}
 
-                <div className="card">
-                  <div className="card-title">Timeline</div>
+                <div className="card monitor-section-card">
+                  <div className="panel-heading"><span>Timeline</span></div>
                   <div className="timeline">
                     {runDetail.timeline.map((event: any) => (
                       <div key={event.id} className="timeline-item">
@@ -119,11 +157,11 @@ export function MonitorView({
                 </div>
 
                 {runDetail.artifacts.some((a: any) => a.type === 'log') && (
-                  <div className="card" style={{ marginTop: '24px' }}>
-                    <div className="card-title"><Terminal size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Live Logs</div>
+                  <div className="card monitor-section-card">
+                    <div className="panel-heading"><Terminal size={14} /> <span>Live Logs</span></div>
                     <select 
+                      className="log-select"
                       value={selectedLogFile}
-                      style={{ marginBottom: '12px', padding: '4px', backgroundColor: 'var(--bg-color)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
                       onChange={(e) => onSelectLogFile(e.target.value)}
                     >
                       <option value="">Select a log file...</option>
@@ -138,40 +176,46 @@ export function MonitorView({
                 )}
               </div>
 
-              <div>
-                <div className="card" style={{ marginBottom: '24px' }}>
-                  <div className="card-title">Artifacts</div>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <div className="monitor-side-column">
+                <div className="card monitor-section-card">
+                  <div className="panel-heading"><span>Artifacts</span></div>
+                  <ul className="artifact-list">
                     {runDetail.artifacts.map((a: any) => (
-                      <li key={a.name} style={{ padding: '8px 0', borderBottom: '1px solid var(--border-color)', fontSize: '13px' }}>
-                        <div style={{ fontWeight: 500 }}>{a.name}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Type: {a.type}</div>
+                      <li key={a.name} className="artifact-item">
+                        <div className="artifact-name">{a.name}</div>
+                        <div className="artifact-meta">Type: {a.type}</div>
                       </li>
                     ))}
                   </ul>
                 </div>
                 
                 {runDetail.errorReason && (
-                  <div className="card" style={{ border: '1px solid var(--status-error)' }}>
+                  <div className="card monitor-error-card">
                     <div className="card-title" style={{ color: 'var(--status-error)' }}>Error Reason</div>
-                    <div style={{ fontSize: '14px' }}>{runDetail.errorReason}</div>
+                    <div className="monitor-error-copy">{runDetail.errorReason}</div>
                   </div>
                 )}
               </div>
             </div>
           </div>
         ) : (
-          <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <AlertCircle size={40} style={{ marginBottom: '16px', color: 'var(--status-error)' }} />
-            <h3 style={{ marginBottom: '8px' }}>Selected run not found.</h3>
-            <p>Choose another run from the sidebar to continue.</p>
+          <div className="card state-panel state-panel-neutral">
+            <AlertCircle size={40} className="state-panel-icon" style={{ color: 'var(--status-error)' }} />
+            <div className="state-panel-body">
+              <div className="state-panel-eyebrow">Run Unavailable</div>
+              <h3 className="state-panel-title">Selected run not found.</h3>
+              <p className="state-panel-copy">Choose another run from the sidebar to continue inspecting current task state.</p>
+            </div>
           </div>
         )
       ) : (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          <LayoutDashboard size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-          <h3>Select a run from the sidebar to see details</h3>
-          <p>Real-time updates are active via File Watcher.</p>
+        <div className="card state-panel state-panel-neutral">
+          <LayoutDashboard size={46} className="state-panel-icon state-panel-icon-muted" />
+          <div className="state-panel-body">
+            <div className="state-panel-eyebrow">Monitor Ready</div>
+            <h3 className="state-panel-title">Select a run to inspect its current state</h3>
+            <p className="state-panel-copy">Choose a task from the sidebar to view its summary, timeline, artifacts, and available logs. Real-time updates are already active via the file watcher.</p>
+          </div>
         </div>
       )}
     </div>

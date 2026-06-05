@@ -208,6 +208,9 @@ const App: React.FC = () => {
     { id: 'analytics', label: 'Analytics' },
     { id: 'reports', label: 'Reports' },
   ];
+  const sidebarSummaryLabel = loading
+    ? 'Loading runs...'
+    : `${filteredRuns.length} of ${runs.length} runs visible`;
 
   const healthAccent =
     !health
@@ -239,56 +242,44 @@ const App: React.FC = () => {
   return (
     <div className="app-container">
       <div className="sidebar">
-        <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <div className="sidebar-header">
+          <div className="sidebar-title-row">
             <Activity color="var(--accent-color)" />
-            <span style={{ fontWeight: 'bold', fontSize: '18px' }}>AI Dev Dashboard</span>
+            <span className="sidebar-title">AI Dev Dashboard</span>
           </div>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '8px', top: '10px', color: 'var(--text-secondary)' }} />
+          <div className="search-input-shell">
+            <Search size={16} className="search-input-icon" />
             <input 
+              className="search-input"
               type="text" 
               placeholder="Search tasks..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ 
-                width: '100%', 
-                padding: '8px 8px 8px 32px', 
-                backgroundColor: 'var(--bg-color)', 
-                border: '1px solid var(--border-color)',
-                borderRadius: '4px',
-                color: 'var(--text-primary)'
-              }} 
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '12px' }}>
+          <div className="section-tabs">
             {sections.map((section) => (
               <button
                 key={section.id}
                 type="button"
                 onClick={() => setActiveSection(section.id)}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-color)',
-                  backgroundColor: activeSection === section.id ? 'var(--card-bg)' : 'transparent',
-                  color: 'var(--text-primary)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
+                className={`section-tab ${activeSection === section.id ? 'active' : ''}`}
               >
                 {section.label}
               </button>
             ))}
           </div>
+          <div className="sidebar-subhead">
+            <span className="sidebar-subhead-label">Task Runs</span>
+            <span className="sidebar-subhead-value">{sidebarSummaryLabel}</span>
+          </div>
         </div>
         <div className="run-list">
           {loading ? (
-            <div style={{ padding: '20px', textAlign: 'center' }}><Loader2 className="animate-spin" /></div>
+            <div className="sidebar-list-state"><Loader2 className="animate-spin" /></div>
           ) : filteredRuns.length === 0 ? (
-            <div style={{ padding: '20px', color: 'var(--text-secondary)' }}>No runs found</div>
+            <div className="sidebar-list-state muted-meta">No runs found</div>
           ) : (
             filteredRuns.map(run => (
               <div 
@@ -296,30 +287,37 @@ const App: React.FC = () => {
                 className={`run-item ${selectedRunId === run.id ? 'active' : ''}`}
                 onClick={() => setSelectedRunId(run.id)}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: 600 }}>{run.id}</span>
+                <div className="run-item-header">
+                  <span className="run-item-id">{run.id}</span>
                   <span className={`status-badge status-${run.status}`}>{run.status}</span>
                 </div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div className="run-item-title">
                   {run.title}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  <Clock size={10} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                <div className="run-item-updated">
+                  <span className="run-item-updated-label">Updated</span>
+                  <Clock size={10} />
                   {new Date(run.updatedAt || '').toLocaleString()}
                 </div>
               </div>
             ))
           )}
         </div>
-        <div style={{ padding: '12px', borderTop: '1px solid var(--border-color)', fontSize: '11px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: healthAccent }}></div>
-            <span style={{ fontWeight: 600 }}>Backend: {healthLabel}</span>
+        <div className="sidebar-footer">
+          <div className="sidebar-footer-status">
+            <div className="status-dot" style={{ backgroundColor: healthAccent }}></div>
+            <strong>Backend {healthLabel}</strong>
           </div>
           {health && (
-            <div style={{ color: 'var(--text-secondary)' }}>
-              <div>Uptime: {formatUptime(health.uptime)}</div>
-              <div>Runs: {health.totalRuns ?? 0} folders</div>
+            <div className="sidebar-footer-details muted-meta">
+              <div className="sidebar-footer-row">
+                <span>Uptime</span>
+                <strong>{formatUptime(health.uptime)}</strong>
+              </div>
+              <div className="sidebar-footer-row">
+                <span>Runs</span>
+                <strong>{health.totalRuns ?? 0} folders</strong>
+              </div>
             </div>
           )}
         </div>
