@@ -1437,6 +1437,7 @@ sync_status_from_output() {
 require "yaml"
 require "time"
 require "date"
+require "digest"
 
 task_id, actor_agent, status_path, output_path, today, reviewer_queue_phase = ARGV
 
@@ -1469,6 +1470,17 @@ output = begin
 rescue Psych::SyntaxError => e
   warn "#{actor_agent} output is malformed YAML for #{task_id}: #{e.message}"
   exit 3
+end
+
+# M2: idempotency. If this exact output artifact was already synced, do not
+# re-apply the transition or re-increment iteration — a retried/duplicate
+# dispatch (flaky run, timeout retry, codex exiting 0 without rewriting) must
+# not advance the state machine twice.
+output_digest = Digest::SHA256.hexdigest(File.read(output_path))
+last_synced = status["last_synced_output"]
+if last_synced.is_a?(Hash) && last_synced["digest"].to_s == output_digest && last_synced["file"].to_s == File.basename(output_path)
+  puts "Output #{File.basename(output_path)} already synced (idempotent skip)."
+  exit 0
 end
 
 next_action = output["next_action"].is_a?(Hash) ? output["next_action"] : {}
@@ -1592,6 +1604,14 @@ status["history"] << {
   "phase" => "#{old_phase} -> #{new_phase}",
   "agent" => actor_agent,
   "reason" => reason
+}
+
+# M2: record what we just processed so a retried dispatch of the same artifact
+# is a no-op (see the idempotency check above).
+status["last_synced_output"] = {
+  "file" => File.basename(output_path),
+  "digest" => output_digest,
+  "next" => next_agent
 }
 
 tmp_path = "#{status_path}.tmp.#{$$}"
@@ -1951,6 +1971,18 @@ if [[ "$AGENT" != "pm" && -f "$STATUS_FILE" && ( "$CURRENT_PHASE" == "validation
       echo "Routed to 'free-roam' for remediation: ./run-agent.sh $TASK_ID free-roam   (AI_DEV_OFFICE_FORCE=true to override)"
       exit 1
     fi
+  fi
+fi
+
+# M6: don't silently re-open a finished task. pm/auto skip the other guards, so
+# re-running them on a done/aborted task would re-drive the whole machine and
+# undo a terminal decision (e.g. a human reject -> aborted).
+if [[ ( "$AGENT" == "pm" || "$AGENT" == "auto" ) && -f "$STATUS_FILE" && "${AI_DEV_OFFICE_FORCE:-false}" != "true" ]]; then
+  if [[ "$CURRENT_PHASE" == "done" || "$CURRENT_PHASE" == "aborted" || "$CURRENT_STATE" == "done" || "$CURRENT_STATE" == "aborted" ]]; then
+    echo "Task $TASK_LABEL is already ${CURRENT_PHASE:-$CURRENT_STATE}; refusing to re-open it with '$AGENT'."
+    echo "Set AI_DEV_OFFICE_FORCE=true to reopen."
+    log_meta_event "$TASK_ID" "$META_FILE" "reopen_blocked" "$AGENT" "task=$TASK_LABEL phase=${CURRENT_PHASE:-unknown} state=${CURRENT_STATE:-unknown}"
+    exit 1
   fi
 fi
 

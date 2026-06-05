@@ -62,6 +62,10 @@ properties:
     type: integer
     minimum: 0
     description: Times the task entered validation_failed (non-resettable). Drives the validation-failed halt guard.
+  last_synced_output:
+    type: object
+    description: Fingerprint of the last agent output synced (M2 idempotency guard).
+    additionalProperties: true
   current_agent:
     anyOf:
       - type: "null"

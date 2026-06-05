@@ -61,6 +61,7 @@ ai-dev-office/tests/integration/concurrent-status-writes.sh
 ai-dev-office/tests/integration/resilience-fail-loud.sh
 ai-dev-office/tests/integration/loop-guard-bounded.sh
 ai-dev-office/tests/integration/validation-failed-bounded.sh
+ai-dev-office/tests/integration/idempotency-and-reentry.sh
 ```
 
 | Script | What it checks |
@@ -82,6 +83,7 @@ ai-dev-office/tests/integration/validation-failed-bounded.sh
 | `resilience-fail-loud.sh` | Malformed output routes to validation_failed (no crash); corrupt status.yaml is backed up, never flattened to a stub |
 | `loop-guard-bounded.sh` | free-roam no longer resets the iteration budget; a free_roam_entries cap halts runaway escalation before dispatch |
 | `validation-failed-bounded.sh` | validation_failed routes to free-roam, counts retries, refuses re-dispatch of the failing agent, and halts at the cap |
+| `idempotency-and-reentry.sh` | Re-syncing the same output artifact is a no-op (no double-increment); pm/auto refuse to re-open a done/aborted task |
 
 Smoke: `ai-dev-office/tests/smoke/socraticode-graph.sh`
 
