@@ -6,6 +6,7 @@ import runRoutes from './routes/runs';
 import eventRoutes from './routes/events';
 import logRoutes from './routes/logs';
 import analyticsRoutes from './routes/analytics';
+import reviewRoutes from './routes/review';
 import { globalWatcher } from './services/watcher';
 import { globalScanner } from './services/runScanner';
 import { createAuthMiddleware } from './middleware/auth';
@@ -24,6 +25,7 @@ app.use('/api/runs', runRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/review', reviewRoutes);
 
 // Each SSE client subscribes one 'update' listener; with the persistent
 // invalidate listener below, the default cap of 10 would warn under a handful

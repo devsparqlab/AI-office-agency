@@ -1,0 +1,68 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://sparqlab.local/ai-dev-office/schemas/run-summary.schema.yaml"
+title: AI Dev Office Review Read Model
+description: >
+  Read-only projection consumed by the dashboard Review layer. Every field maps
+  to a contracted producer field (status.yaml / reviewer-output.yaml). The
+  dashboard RENDERS these signals; it must not infer them from free-form text
+  (summary, error_reason, review prose). Fields that can only be derived from
+  prose belong to a later slice once the producer contract emits them.
+  See docs/run-summary-read-model.md.
+type: object
+additionalProperties: false
+required:
+  - taskId
+  - phase
+  - verdict
+  - inReviewQueue
+  - verdictNeedsAttention
+  - needsReview
+  - lastReviewedAt
+properties:
+  taskId:
+    type: string
+    pattern: "^TASK(?:-PKG)?-[0-9]+$"
+  phase:
+    description: "Provenance: status.yaml `phase` (exact enum). null if missing/unrecognized."
+    oneOf:
+      - type: "null"
+      - type: string
+        enum:
+          - pending
+          - blocked
+          - assigned
+          - assigned_parallel
+          - review
+          - in_review
+          - debugging
+          - debugging_complete
+          - devops_needed
+          - devops_complete
+          - escalated
+          - free_roam_complete
+          - done
+          - aborted
+  verdict:
+    description: "Provenance: reviewer-output.yaml `review_verdict`. null if never reviewed."
+    oneOf:
+      - type: "null"
+      - type: string
+        enum:
+          - approved
+          - changes_requested
+          - escalate
+          - infra_failure
+  inReviewQueue:
+    description: "Projection: phase ∈ {review, in_review}."
+    type: boolean
+  verdictNeedsAttention:
+    description: "Projection: verdict ∈ {changes_requested, escalate, infra_failure}."
+    type: boolean
+  needsReview:
+    description: "Queue rule (server-owned): inReviewQueue || verdictNeedsAttention."
+    type: boolean
+  lastReviewedAt:
+    description: "Provenance: status.yaml `updated_at` when a reviewer-output exists; else null."
+    oneOf:
+      - type: "null"
+      - type: string

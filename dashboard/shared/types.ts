@@ -18,6 +18,64 @@ export type AgentName =
   | "free-roam"
   | "unknown";
 
+/**
+ * Raw workflow phase from runs/<id>/status.yaml `phase`.
+ * Mirrors the enum in schemas/status.schema.yaml exactly (no fuzzy mapping).
+ */
+export type RunPhase =
+  | "pending"
+  | "blocked"
+  | "assigned"
+  | "assigned_parallel"
+  | "review"
+  | "in_review"
+  | "debugging"
+  | "debugging_complete"
+  | "devops_needed"
+  | "devops_complete"
+  | "escalated"
+  | "free_roam_complete"
+  | "done"
+  | "aborted";
+
+/**
+ * Reviewer verdict from runs/<id>/reviewer-output.yaml `review_verdict`.
+ * Mirrors the enum in schemas/reviewer-output.schema.yaml exactly.
+ */
+export type ReviewVerdict =
+  | "approved"
+  | "changes_requested"
+  | "escalate"
+  | "infra_failure";
+
+/**
+ * Read-only Review read model. Every field is a projection of a contracted
+ * producer field — the dashboard renders these, it never infers them from prose.
+ * See schemas/run-summary.schema.yaml and docs/run-summary-read-model.md.
+ */
+export interface ReviewSummary {
+  taskId: string;
+  /** Provenance: status.yaml `phase` (exact enum; null if missing/unrecognized). */
+  phase: RunPhase | null;
+  /** Provenance: reviewer-output.yaml `review_verdict` (null if never reviewed). */
+  verdict: ReviewVerdict | null;
+  /** Projection: phase ∈ {review, in_review}. */
+  inReviewQueue: boolean;
+  /** Projection: verdict ∈ {changes_requested, escalate, infra_failure}. */
+  verdictNeedsAttention: boolean;
+  /** Queue rule (server-owned, not client-derived): inReviewQueue || verdictNeedsAttention. */
+  needsReview: boolean;
+  /** Provenance: status.yaml `updated_at` when a reviewer-output exists; else null. */
+  lastReviewedAt: string | null;
+}
+
+export interface ReviewModelResponse {
+  generatedAt: string;
+  total: number;
+  needsReviewCount: number;
+  reviews: ReviewSummary[];
+}
+
 export interface RunSummary {
   id: string;
   title: string;

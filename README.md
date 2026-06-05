@@ -20,12 +20,14 @@ Detailed behavior lives in the linked docs; keep this README as an index.
 |-----|----------|
 | [docs/getting-started.md](docs/getting-started.md) | First task, auto pipeline, status, validate, bootstrap |
 | [docs/codex.md](docs/codex.md) | Codex CLI runner (default), auto-switch |
-| [docs/cursor.md](docs/cursor.md) | Cursor IDE + cursor-agent runners |
+| [docs/cursor.md](docs/cursor.md) | Cursor CLI Agent and Cursor IDE runners |
+| [docs/claude.md](docs/claude.md) | Claude manual advisory lane |
+| [docs/gemini.md](docs/gemini.md) | Gemini manual advisory lane |
 | [docs/cursor-templates.md](docs/cursor-templates.md) | `.cursor/rules` and `.cursor/agents` templates |
 | [docs/socraticode.md](docs/socraticode.md) | Env/profile-based discovery flow |
 | [profiles/README.md](profiles/README.md) | Profile selection |
 | [profiles/games-labs.md](profiles/games-labs.md) | Games Lab monorepo overlay (dependency guard, shared-lib policy) |
-| [SKILL.md](SKILL.md) | Cursor/Codex skill entrypoint |
+| [SKILL.md](SKILL.md) | Codex and Cursor skill entrypoint |
 
 ## Quick commands
 

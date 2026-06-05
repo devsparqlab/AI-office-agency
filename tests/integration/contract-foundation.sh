@@ -13,6 +13,8 @@ PORTABLE_FILES=(
   docs/getting-started.md
   docs/codex.md
   docs/cursor.md
+  docs/claude.md
+  docs/gemini.md
   docs/cursor-templates.md
   docs/socraticode.md
   templates/project-AGENTS.md
@@ -111,6 +113,8 @@ required_core = %w[
   docs/getting-started.md
   docs/codex.md
   docs/cursor.md
+  docs/claude.md
+  docs/gemini.md
   docs/cursor-templates.md
   docs/socraticode.md
 ]
@@ -123,6 +127,8 @@ generic_docs = %w[
   docs/getting-started.md
   docs/codex.md
   docs/cursor.md
+  docs/claude.md
+  docs/gemini.md
   docs/cursor-templates.md
   docs/socraticode.md
   docs/config-profile-merge-contract.md
@@ -186,6 +192,8 @@ for rel in \
   docs/getting-started.md \
   docs/codex.md \
   docs/cursor.md \
+  docs/claude.md \
+  docs/gemini.md \
   docs/cursor-templates.md \
   docs/socraticode.md \
   profiles/README.md \

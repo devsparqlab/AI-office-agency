@@ -1,14 +1,14 @@
 # AI Dev Office Model Routing (Codex-first)
 
-Current policy: **Codex-first** (or the Cursor agent you invoke with Codex). Secondary Claude/Gemini review is allowed for architecture reasoning or an extra review pass when needed.
+Routing policy: **Codex-first**. Claude and Gemini may be used as `manual advisory lanes` for architecture reasoning or an extra review pass when needed.
 
 ## Routing Matrix
 
 | Role | Default runtime | Goal |
 |---|---|---|
 | `pm` | Codex | Task slicing, acceptance criteria, risk register |
-| `dev` | Codex or Cursor (Codex-backed) | Implementation, focused tests, merge-ready output |
-| `dev-2` | Codex or Cursor (Codex-backed) | Cross-service implementation, migration safety |
+| `dev` | Codex, Cursor CLI Agent, or Cursor IDE | Implementation, focused tests, merge-ready output |
+| `dev-2` | Codex, Cursor CLI Agent, or Cursor IDE | Cross-service implementation, migration safety |
 | `reviewer` | Codex | Regression, compatibility, release risk review |
 | `debugger` | Codex | RCA, minimal-risk fixes, production-aware mitigations |
 | `devops` | Codex | CI/CD, deploy risk, runbook and infra changes |
@@ -16,7 +16,7 @@ Current policy: **Codex-first** (or the Cursor agent you invoke with Codex). Sec
 
 ## Trigger Rules (Codex-first)
 
-- Same quality bar as before: evidence from build/tests, scoped changes, YAML handoff unchanged.
+- Require evidence from build/tests, scoped changes, and the existing YAML handoff contract.
 - Escalate to `free-roam` when blockers repeat, scope is unclear, or risk is too high for a single pass.
 - For high-risk work (multi-service, contract change, production incident), add **human** review or an extra Codex review round with stricter checklist—no separate model required unless evidence shows it's necessary.
 
@@ -25,6 +25,13 @@ Current policy: **Codex-first** (or the Cursor agent you invoke with Codex). Sec
 - Use Codex first for all automated phases.
 - If Codex is unavailable, switch to Cursor CLI Agent, then Cursor IDE.
 - Fallback runners do not replace `reviewer` / `debugger` gates.
+
+## Secondary Manual Advisory Lanes
+
+- Claude and Gemini may be used as `manual advisory lanes` for PM critique, reviewer second opinion, and selective dev/debugger cross-checks.
+- They are not part of automated runner routing.
+- They do not replace `reviewer` / `debugger` gates.
+- Any role response remains draft until normalized into AI Dev Office artifacts and validated.
 
 ## Cost and Throughput Guardrails
 
@@ -35,6 +42,6 @@ Current policy: **Codex-first** (or the Cursor agent you invoke with Codex). Sec
 ## Minimal Workflow
 
 1. `pm` (Codex): scope and acceptance criteria.
-2. `dev` or `dev-2` (Codex/Cursor): implement and test.
+2. `dev` or `dev-2` (Codex, Cursor CLI Agent, or Cursor IDE): implement and test.
 3. `reviewer` (Codex): release readiness and verdict.
 4. `debugger` (Codex): only when review requests fixes or incidents need RCA.

@@ -25,7 +25,9 @@ Must-read runtime anchors:
 |-------|------|
 | [docs/getting-started.md](docs/getting-started.md) | First task, auto, status, validate |
 | [docs/codex.md](docs/codex.md) | Codex CLI (default runner) |
-| [docs/cursor.md](docs/cursor.md) | Cursor IDE or cursor-agent |
+| [docs/cursor.md](docs/cursor.md) | Cursor CLI Agent or Cursor IDE |
+| [docs/claude.md](docs/claude.md) | Claude manual advisory lane |
+| [docs/gemini.md](docs/gemini.md) | Gemini manual advisory lane |
 | [docs/cursor-templates.md](docs/cursor-templates.md) | `.cursor/rules` / `.cursor/agents` |
 | [docs/socraticode.md](docs/socraticode.md) | Indexed discovery (env-based paths) |
 | [profiles/README.md](profiles/README.md) | `--profile` selection |

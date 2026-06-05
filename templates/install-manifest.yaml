@@ -19,6 +19,8 @@ installable:
     - docs/getting-started.md
     - docs/codex.md
     - docs/cursor.md
+    - docs/claude.md
+    - docs/gemini.md
     - docs/cursor-templates.md
     - docs/socraticode.md
   optional:
