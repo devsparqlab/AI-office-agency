@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type {
   ReviewModelResponse, ReviewSummary, RunSummary, RunPhase, AgentName,
   RiskLevel, DecisionAction,
@@ -92,6 +92,8 @@ export const OfficeView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
   const [actor, setActor] = useState(() => localStorage.getItem(ACTOR_KEY) || '');
+  const tileRefs = useRef(new Map<string, HTMLDivElement>());
+  const prevRects = useRef(new Map<string, DOMRect>());
 
   const load = async () => {
     try {
@@ -131,6 +133,37 @@ export const OfficeView: React.FC = () => {
       map.get(roomId)!.push(t);
     }
     return map;
+  }, [tasks]);
+
+  // FLIP: when a task changes room (phase), slide its tile from the old position
+  // to the new one. Compares each tile's last painted rect to its current rect.
+  useLayoutEffect(() => {
+    const newRects = new Map<string, DOMRect>();
+    tileRefs.current.forEach((el, id) => {
+      const rect = el.getBoundingClientRect();
+      newRects.set(id, rect);
+      const prev = prevRects.current.get(id);
+      if (!prev) return;
+      const dx = prev.left - rect.left;
+      const dy = prev.top - rect.top;
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+      // Invert: jump back to the old spot with no transition…
+      el.style.transition = 'none';
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      el.style.zIndex = '20';
+      // …then play: animate to the natural (new) spot on the next frame.
+      requestAnimationFrame(() => {
+        el.style.transition = 'transform 600ms cubic-bezier(0.5, 0, 0.2, 1)';
+        el.style.transform = '';
+        const done = () => {
+          el.style.zIndex = '';
+          el.style.transition = '';
+          el.removeEventListener('transitionend', done);
+        };
+        el.addEventListener('transitionend', done);
+      });
+    });
+    prevRects.current = newRects;
   }, [tasks]);
 
   const decide = async (taskId: string, action: DecisionAction) => {
@@ -188,6 +221,7 @@ export const OfficeView: React.FC = () => {
                 {items.map((t) => (
                   <div
                     key={t.taskId}
+                    ref={(el) => { if (el) tileRefs.current.set(t.taskId, el); else tileRefs.current.delete(t.taskId); }}
                     className={`tile ${t.needsReview ? 'blink' : ''} ${selected === t.taskId ? 'sel' : ''}`}
                     style={{ background: tileColor(t.riskLevel, t.needsReview),
                              borderColor: t.latestDecision ? '#22c55e' : '#0c0c14' }}
