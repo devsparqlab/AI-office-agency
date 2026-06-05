@@ -361,6 +361,8 @@ def validation_pass?(validator, task_id)
 end
 
 def expected_agents_for_phase(phase)
+  # S9: every PHASES enum value must appear here. An unmapped phase returns nil
+  # (surfaced as unmapped_phase) so a new phase can't silently bypass the check.
   {
     "pending" => %w[pm],
     "assigned" => %w[dev dev-2],
@@ -373,9 +375,11 @@ def expected_agents_for_phase(phase)
     "devops_complete" => %w[dev dev-2 reviewer],
     "escalated" => %w[free-roam],
     "free_roam_complete" => %w[dev dev-2 reviewer],
+    "validation_failed" => %w[free-roam],
+    "blocked" => %w[pm dev dev-2 reviewer debugger devops free-roam],
     "done" => %w[done],
     "aborted" => %w[done]
-  }[phase] || []
+  }[phase]
 end
 
 ids = Dir.children(runs_dir)
@@ -396,10 +400,15 @@ ids.each do |task_id|
     issues += 1
   end
 
-  expected = expected_agents_for_phase(phase)
-  if !expected.empty? && !current_agent.empty? && !expected.include?(current_agent)
-    puts "#{task_id} route_mismatch phase=#{phase} current_agent=#{current_agent} expected=#{expected.join(',')}"
-    issues += 1
+  unless phase.empty?
+    expected = expected_agents_for_phase(phase)
+    if expected.nil?
+      puts "#{task_id} unmapped_phase=#{phase} (no route-mismatch check; add it to expected_agents_for_phase)"
+      issues += 1
+    elsif !expected.empty? && !current_agent.empty? && !expected.include?(current_agent)
+      puts "#{task_id} route_mismatch phase=#{phase} current_agent=#{current_agent} expected=#{expected.join(',')}"
+      issues += 1
+    end
   end
 
   next unless phase == "blocked"
@@ -461,12 +470,13 @@ scaffold_output_template() {
   local task_id="$1"
   local scaffold_agent="$2"
   local pm_output_file="$3"
+  local reviewer_queue_phase="${4:-in_review}"
 
-  ruby - "$task_id" "$scaffold_agent" "$pm_output_file" <<'RUBY'
+  ruby - "$task_id" "$scaffold_agent" "$pm_output_file" "$reviewer_queue_phase" <<'RUBY'
 require "yaml"
 require "date"
 
-task_id, scaffold_agent, pm_output_path = ARGV
+task_id, scaffold_agent, pm_output_path, reviewer_queue_phase = ARGV
 pm_output = if File.exist?(pm_output_path)
   YAML.safe_load(File.read(pm_output_path), permitted_classes: [Date, Time], aliases: true) || {}
 else
@@ -538,7 +548,7 @@ payload =
         }
       },
       "transition" => {
-        "from_phase" => "review",
+        "from_phase" => reviewer_queue_phase,
         "to_phase" => "done"
       },
       "blockers" => []
@@ -565,7 +575,7 @@ write_scaffold_output() {
     exit 1
   fi
 
-  scaffold_output_template "$task_id" "$scaffold_agent" "$pm_output_file" > "$output_file"
+  scaffold_output_template "$task_id" "$scaffold_agent" "$pm_output_file" "$REVIEWER_QUEUE_PHASE" > "$output_file"
   echo "Scaffolded $scaffold_agent output: $output_file"
 }
 
@@ -1368,6 +1378,10 @@ blocked_on = Array(status["blocked_on"]).map(&:to_s).map(&:strip).reject(&:empty
 exit 0 unless phase == "blocked"
 exit 0 if blocked_on.empty?
 
+# S6: an upstream that ends in a failed terminal state can never reach the
+# unblock phase, so a dependent waiting on it would stay blocked forever.
+terminal_failed = %w[aborted validation_failed]
+failed_deps = []
 pending = blocked_on.each_with_object([]) do |dep_task_id, memo|
   dep_status_path = File.join(runs_dir, dep_task_id, "status.yaml")
   unless File.exist?(dep_status_path)
@@ -1378,7 +1392,40 @@ pending = blocked_on.each_with_object([]) do |dep_task_id, memo|
   dep_status = YAML.safe_load(File.read(dep_status_path), permitted_classes: [Date, Time], aliases: true) || {}
   dep_phase = dep_status["state"].to_s.strip
   dep_phase = dep_status["phase"].to_s.strip if dep_phase.empty?
-  memo << dep_task_id unless dep_phase == unblock_phase
+  if terminal_failed.include?(dep_phase)
+    failed_deps << dep_task_id
+  elsif dep_phase != unblock_phase
+    memo << dep_task_id
+  end
+end
+
+unless failed_deps.empty?
+  # S6: route the wedged dependent to free-roam for re-planning instead of
+  # leaving it blocked forever on a failed upstream.
+  old_phase = status["phase"].to_s.strip
+  old_phase = "blocked" if old_phase.empty?
+  status["phase"] = "escalated"
+  status["state"] = "escalated"
+  status["current_agent"] = "free-roam"
+  status["ready"] = true
+  status["waiting_for"] = [] if clear_waiting_for == "true"
+  status["updated_at"] = today
+  status["history"] = [] unless status["history"].is_a?(Array)
+  status["history"] << {
+    "phase" => "#{old_phase} -> escalated",
+    "agent" => "orchestrator",
+    "reason" => "Upstream dependency failed (#{failed_deps.join(', ')}); cannot unblock by waiting."
+  }
+  tmp_path = "#{status_path}.tmp.#{$$}"
+  begin
+    File.write(tmp_path, YAML.dump(status))
+    File.rename(tmp_path, status_path)
+  rescue => e
+    File.delete(tmp_path) if File.exist?(tmp_path)
+    raise e
+  end
+  puts "Status escalated: upstream dependency failed (#{failed_deps.join(', ')})"
+  exit 0
 end
 
 if pending.empty?

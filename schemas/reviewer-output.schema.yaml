@@ -49,7 +49,9 @@ properties:
     properties:
       from_phase:
         type: string
-        const: review
+        enum:
+          - review
+          - in_review
       to_phase:
         type: string
         enum:
