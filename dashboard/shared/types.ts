@@ -153,12 +153,25 @@ export interface RunSummary {
   normalizedReason?: string;
 }
 
+export interface ReviewIssue {
+  file: string;
+  severity: string;
+  description: string;
+}
+
 export interface RunDetail extends RunSummary {
   taskMarkdown?: string;
   statusRaw?: unknown;
   outputMarkdown?: string;
   artifacts: RunArtifact[];
   timeline: AgentTimelineEvent[];
+  reviewIssues?: ReviewIssue[];
+}
+
+export interface RunFileResponse {
+  name: string;
+  content: string;
+  truncated: boolean;
 }
 
 export interface RunArtifact {

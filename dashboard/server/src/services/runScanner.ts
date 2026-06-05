@@ -228,6 +228,23 @@ export class RunScanner {
         }
       } catch (e) { /* ignore — artifacts are best-effort */ }
 
+      // Reviewer issues (full text) — the "why" behind a changes_requested verdict.
+      try {
+        const rv = asObject(yaml.load(await fs.readFile(path.join(runPath, 'reviewer-output.yaml'), 'utf8')));
+        const issues: { file: string; severity: string; description: string }[] = [];
+        if (Array.isArray(rv.artifacts)) {
+          for (const a of rv.artifacts) {
+            const list = a && Array.isArray(a.issues) ? a.issues : [];
+            for (const iss of list) {
+              if (iss && typeof iss.description === 'string') {
+                issues.push({ file: typeof a.path === 'string' ? a.path : '', severity: String(iss.severity || 'info'), description: iss.description });
+              }
+            }
+          }
+        }
+        if (issues.length) detail.reviewIssues = issues;
+      } catch (e) { /* no reviewer-output */ }
+
       return detail;
     } catch (err) {
       console.error(`Error getting run detail for ${taskId}:`, err);

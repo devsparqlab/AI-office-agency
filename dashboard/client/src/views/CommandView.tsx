@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ReviewModelResponse, ReviewSummary, RunSummary, RunPhase, AgentName, DecisionAction,
-  AnalyticsResponse, HealthStatus, RunsTrendPoint, WatcherUpdate, RunDetail,
+  AnalyticsResponse, HealthStatus, RunsTrendPoint, WatcherUpdate, RunDetail, RunFileResponse,
 } from '../../../shared/types';
 import { apiFetch, apiFetchJson } from '../api';
 
@@ -152,6 +152,7 @@ export const CommandView: React.FC = () => {
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<RunDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [fileView, setFileView] = useState<RunFileResponse | null>(null);
   const [actor, setActor] = useState(() => localStorage.getItem(ACTOR_KEY) || '');
   const prevZone = useRef<Map<string, string>>(new Map());
   const seq = useRef(0);
@@ -229,9 +230,9 @@ export const CommandView: React.FC = () => {
 
   // Fetch full detail (task.md / timeline / artifacts) for the selected task.
   useEffect(() => {
-    if (!selected) { setDetail(null); return; }
+    if (!selected) { setDetail(null); setFileView(null); return; }
     let active = true;
-    setDetailLoading(true);
+    setDetailLoading(true); setFileView(null);
     apiFetchJson<RunDetail>(`/api/runs/${selected}`)
       .then((d) => { if (active) setDetail(d); })
       .catch(() => { if (active) setDetail(null); })
@@ -322,6 +323,16 @@ export const CommandView: React.FC = () => {
     } catch (e) { setError(e instanceof Error ? e.message : 'Failed'); }
   };
 
+  const openFile = async (name: string) => {
+    if (!selected) return;
+    setFileView({ name, content: 'Loading…', truncated: false });
+    try {
+      setFileView(await apiFetchJson<RunFileResponse>(`/api/runs/${selected}/file/${encodeURIComponent(name)}`));
+    } catch {
+      setFileView({ name, content: '(failed to load file)', truncated: false });
+    }
+  };
+
   if (loading) return <div className="view-state">Loading command center…</div>;
   const selTask = tasks.find((t) => t.taskId === selected) || null;
   const s = analytics?.summary;
@@ -365,7 +376,10 @@ export const CommandView: React.FC = () => {
             return (
               <div key={z.id} className={`pin ${zoneFilter === z.id ? 'sel' : ''}`}
                 style={{ left: `${z.left}%`, top: `${z.top}%` }}
-                onClick={() => setZoneFilter(zoneFilter === z.id ? null : z.id)}
+                onClick={() => {
+                  if (zoneFilter === z.id) { setZoneFilter(null); setFilter('actionable'); }
+                  else { setZoneFilter(z.id); setFilter('all'); } // focus the zone → show everything in it
+                }}
                 title={`${z.label}: ${st.count} task(s)`}>
                 <span className={`dot ${st.attention ? 'pulse' : ''}`} style={{ color, background: color }} />
                 {z.agent && <span>{AGENT_EMOJI[z.agent]}</span>}
@@ -412,7 +426,7 @@ export const CommandView: React.FC = () => {
       <div className="cc-side">
         <div className="panel" style={{ flex: 2 }}>
           <h3>▣ QUEUE {zoneFilter && <span style={{ color: C.cyan }}>· {ZONE_BY_ID.get(zoneFilter)?.label}
-            <span style={{ cursor: 'pointer', marginLeft: 6 }} onClick={() => setZoneFilter(null)}>✕</span></span>}</h3>
+            <span style={{ cursor: 'pointer', marginLeft: 6 }} onClick={() => { setZoneFilter(null); setFilter('actionable'); }}>✕</span></span>}</h3>
           <div className="chips">
             {CHIPS.map((c) => (
               <span key={c.id} className={`chip ${filter === c.id ? 'on' : ''}`}
@@ -474,6 +488,20 @@ export const CommandView: React.FC = () => {
                 <span>confidence: {selTask.confidence ?? '—'}</span>
                 {selTask.latestDecision && <span style={{ color: C.green }}>decided: {selTask.latestDecision.decision} · {selTask.latestDecision.actor}</span>}
               </div>
+              {detail?.reviewIssues?.length ? (
+                <div><h4>REVIEWER ISSUES ({detail.reviewIssues.length})</h4>
+                  <div className="tl">
+                    {detail.reviewIssues.map((iss, i) => {
+                      const c = iss.severity === 'error' ? C.red : iss.severity === 'warning' ? C.amber : '#8a97a8';
+                      return (
+                        <div key={i} style={{ borderLeftColor: c }}>
+                          <span style={{ color: c }}>[{iss.severity}]</span>
+                          {iss.file ? <span style={{ color: '#7f8da0' }}> {iss.file}</span> : null} — {iss.description}
+                        </div>);
+                    })}
+                  </div>
+                </div>
+              ) : null}
               <div><h4>TASK</h4><pre>{detail?.taskMarkdown || (detailLoading ? 'Loading…' : 'No task.md found.')}</pre></div>
               <div><h4>TIMELINE</h4>
                 <div className="tl">
@@ -483,13 +511,22 @@ export const CommandView: React.FC = () => {
                     : <span style={{ color: '#5b6776', fontSize: 11 }}>{detailLoading ? 'Loading…' : 'No history.'}</span>}
                 </div>
               </div>
-              <div><h4>ARTIFACTS</h4>
+              <div><h4>ARTIFACTS <span style={{ color: '#5b6776', fontWeight: 400 }}>(click to view)</span></h4>
                 <div className="arts">
                   {detail?.artifacts?.length
-                    ? detail.artifacts.map((a) => <span className="art" key={a.name}>{a.name}</span>)
+                    ? detail.artifacts.map((a) => (
+                        <span className="art" key={a.name} onClick={() => openFile(a.name)}
+                          style={{ cursor: 'pointer', color: fileView?.name === a.name ? '#22d3ee' : '#9aa0b4' }}>{a.name}</span>))
                     : <span style={{ color: '#5b6776', fontSize: 11 }}>none</span>}
                 </div>
               </div>
+              {fileView && (
+                <div><h4 style={{ display: 'flex' }}>FILE · {fileView.name}
+                  <span style={{ marginLeft: 'auto', cursor: 'pointer', color: '#8a97a8' }} onClick={() => setFileView(null)}>✕</span>
+                </h4>
+                  <pre>{fileView.content}{fileView.truncated ? '\n\n… (truncated)' : ''}</pre>
+                </div>
+              )}
             </div>
             <footer>
               {DECISION_ACTIONS.map(({ action, label }) => (

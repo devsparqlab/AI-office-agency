@@ -25,7 +25,6 @@ const App: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [navOpen, setNavOpen] = useState(true);
   const [selectedLogFile, setSelectedLogFile] = useState('');
   const [logContent, setLogContent] = useState<string | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
@@ -245,18 +244,32 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="app-container">
-      {navOpen && (
-      <div className="sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-title-row">
-            <Activity color="var(--accent-color)" />
-            <span className="sidebar-title">AI Dev Dashboard</span>
-            <button type="button" onClick={() => setNavOpen(false)} title="Hide sidebar"
-              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted, #8a97a8)',
-                cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2 }}>«</button>
-          </div>
-          {activeSection !== 'command' && (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <header style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '9px 16px',
+        borderBottom: '1px solid var(--border-color)', background: 'var(--sidebar-bg)', flex: 'none' }}>
+        <Activity color="var(--accent-color)" size={20} />
+        <span className="sidebar-title" style={{ whiteSpace: 'nowrap' }}>AI Dev Dashboard</span>
+        <nav style={{ display: 'flex', gap: 6, marginLeft: 10 }}>
+          {sections.map((section) => (
+            <button key={section.id} type="button"
+              onClick={() => setActiveSection(section.id)}
+              className={`section-tab ${activeSection === section.id ? 'active' : ''}`}
+              style={{ whiteSpace: 'nowrap' }}>
+              {section.label}
+            </button>
+          ))}
+        </nav>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: healthAccent }} />
+          <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Backend {healthLabel}</strong>
+          {health && <span style={{ color: '#5b6776' }}>· {health.totalRuns ?? 0} runs · up {formatUptime(health.uptime)}</span>}
+        </div>
+      </header>
+
+      <div className="app-container" style={{ flex: 1, minHeight: 0, height: 'auto' }}>
+        {activeSection === 'monitor' && (
+        <div className="sidebar">
+          <div className="sidebar-header">
           <div className="search-input-shell">
             <Search size={16} className="search-input-icon" />
             <input
@@ -267,28 +280,11 @@ const App: React.FC = () => {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          )}
-
-          <div className="section-tabs">
-            {sections.map((section) => (
-              <button
-                key={section.id}
-                type="button"
-                onClick={() => setActiveSection(section.id)}
-                className={`section-tab ${activeSection === section.id ? 'active' : ''}`}
-              >
-                {section.label}
-              </button>
-            ))}
-          </div>
-          {activeSection !== 'command' && (
           <div className="sidebar-subhead">
             <span className="sidebar-subhead-label">Task Runs</span>
             <span className="sidebar-subhead-value">{sidebarSummaryLabel}</span>
           </div>
-          )}
-        </div>
-        {activeSection !== 'command' && (
+          </div>
         <div className="run-list">
           {loading ? (
             <div className="sidebar-list-state"><Loader2 className="animate-spin" /></div>
@@ -317,35 +313,10 @@ const App: React.FC = () => {
             ))
           )}
         </div>
-        )}
-        <div className="sidebar-footer">
-          <div className="sidebar-footer-status">
-            <div className="status-dot" style={{ backgroundColor: healthAccent }}></div>
-            <strong>Backend {healthLabel}</strong>
-          </div>
-          {health && (
-            <div className="sidebar-footer-details muted-meta">
-              <div className="sidebar-footer-row">
-                <span>Uptime</span>
-                <strong>{formatUptime(health.uptime)}</strong>
-              </div>
-              <div className="sidebar-footer-row">
-                <span>Runs</span>
-                <strong>{health.totalRuns ?? 0} folders</strong>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
-      )}
+        )}
 
       <div className="main-content">
-        {!navOpen && (
-          <button type="button" onClick={() => setNavOpen(true)} title="Show sidebar"
-            style={{ position: 'fixed', top: 10, left: 10, zIndex: 50, width: 30, height: 30,
-              borderRadius: 6, border: '1px solid #2a3744', background: 'rgba(13,19,27,0.9)',
-              color: '#c9d4e3', cursor: 'pointer', fontSize: 15 }}>☰</button>
-        )}
         {activeSection === 'command' && (
           <CommandView />
         )}
@@ -380,6 +351,7 @@ const App: React.FC = () => {
         {activeSection === 'reports' && (
           <ReportsView />
         )}
+      </div>
       </div>
     </div>
   );
