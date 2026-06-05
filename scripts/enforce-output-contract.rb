@@ -38,8 +38,17 @@ end
 def load_status(path)
   data = YAML.safe_load(File.read(path), permitted_classes: [Date, Time], aliases: true)
   data.is_a?(Hash) ? data : {}
-rescue StandardError
-  {}
+rescue StandardError => e
+  # M5: load_status only runs for a file that EXISTS. If it won't parse, it is
+  # corrupt — do NOT flatten to {} (the caller would rename-commit a stub,
+  # dropping task_id/iteration/assignment). Back it up and fail loud instead.
+  backup = "#{path}.corrupt.#{Process.pid}"
+  begin
+    File.write(backup, File.read(path))
+  rescue StandardError
+    backup = "(backup failed)"
+  end
+  die("status.yaml unreadable/corrupt (#{e.class}: #{e.message}); backed up to #{backup}. Refusing to overwrite it with a stub.", 2)
 end
 
 def mark_validation_failed(status_path, agent)

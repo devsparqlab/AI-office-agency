@@ -58,6 +58,7 @@ ai-dev-office/tests/integration/output-contract.sh
 ai-dev-office/tests/integration/decision-reconcile.sh
 ai-dev-office/tests/integration/driver-decision-e2e.sh
 ai-dev-office/tests/integration/concurrent-status-writes.sh
+ai-dev-office/tests/integration/resilience-fail-loud.sh
 ```
 
 | Script | What it checks |
@@ -76,6 +77,7 @@ ai-dev-office/tests/integration/concurrent-status-writes.sh
 | `decision-reconcile.sh` | Driver applies `decision.yaml` to `status.yaml` (idempotent) |
 | `driver-decision-e2e.sh` | End-to-end dispatch: enforce gate + decision reconcile + terminal-stop |
 | `concurrent-status-writes.sh` | Per-task flock prevents lost updates under concurrent (parallel-lane) writes |
+| `resilience-fail-loud.sh` | Malformed output routes to validation_failed (no crash); corrupt status.yaml is backed up, never flattened to a stub |
 
 Smoke: `ai-dev-office/tests/smoke/socraticode-graph.sh`
 

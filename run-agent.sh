@@ -1429,12 +1429,27 @@ end
 __lock = File.open(File.join(File.dirname(status_path), ".lock"), File::RDWR | File::CREAT, 0o644)
 __lock.flock(File::LOCK_EX)
 
-status = if File.exist?(status_path)
-  YAML.safe_load(File.read(status_path), permitted_classes: [Date, Time], aliases: true) || {}
-else
-  {}
+# S1: a corrupt status.yaml must not crash the whole run with a raw backtrace.
+status = begin
+  if File.exist?(status_path)
+    YAML.safe_load(File.read(status_path), permitted_classes: [Date, Time], aliases: true) || {}
+  else
+    {}
+  end
+rescue Psych::SyntaxError => e
+  warn "status.yaml is corrupt for #{task_id}: #{e.message}"
+  warn "Refusing to sync against an unreadable status; inspect runs/#{task_id}/status.yaml."
+  exit 4
 end
-output = YAML.safe_load(File.read(output_path), permitted_classes: [Date, Time], aliases: true) || {}
+
+# S1: malformed agent output routes to validation_failed (driver handles exit 3)
+# instead of aborting the run after meta.yaml was already mutated.
+output = begin
+  YAML.safe_load(File.read(output_path), permitted_classes: [Date, Time], aliases: true) || {}
+rescue Psych::SyntaxError => e
+  warn "#{actor_agent} output is malformed YAML for #{task_id}: #{e.message}"
+  exit 3
+end
 
 next_action = output["next_action"].is_a?(Hash) ? output["next_action"] : {}
 next_agent = next_action["agent"]&.to_s&.strip
@@ -2109,7 +2124,8 @@ echo ""
 echo "=== $AGENT completed for $TASK_LABEL ==="
 echo "Save output to: $OUTPUT_FILE"
 if [[ -f "$OUTPUT_FILE" ]]; then
-  OUTPUT_MTIME_EPOCH="$(stat -f "%m" "$OUTPUT_FILE" 2>/dev/null || echo 0)"
+  # S2: portable mtime — BSD/macOS uses `stat -f %m`, GNU/Linux uses `stat -c %Y`.
+  OUTPUT_MTIME_EPOCH="$(stat -f "%m" "$OUTPUT_FILE" 2>/dev/null || stat -c "%Y" "$OUTPUT_FILE" 2>/dev/null || echo 0)"
   if [[ "$INTERACTIVE_RUNNER" == "true" && "$OUTPUT_MTIME_EPOCH" -le "$RUN_STARTED_AT_EPOCH" ]]; then
     echo "Output file exists but was not updated in this interactive run."
     echo "Skipping status sync to avoid replaying stale artifacts."
@@ -2120,12 +2136,22 @@ if [[ -f "$OUTPUT_FILE" ]]; then
     echo "Enforcing $AGENT output contract..."
     if ruby "$OFFICE_DIR/scripts/enforce-output-contract.rb" "$TASK_ID" "$AGENT"; then
       echo "Syncing status.yaml from $AGENT output..."
-      sync_status_from_output "$TASK_ID" "$AGENT" "$STATUS_FILE" "$OUTPUT_FILE" "$TODAY" "$REVIEWER_QUEUE_PHASE"
-      echo "Validating runtime files..."
-      if ruby "$OFFICE_DIR/validate-yaml.rb" "$TASK_ID"; then
-        echo "Validation passed."
+      SYNC_RC=0
+      sync_status_from_output "$TASK_ID" "$AGENT" "$STATUS_FILE" "$OUTPUT_FILE" "$TODAY" "$REVIEWER_QUEUE_PHASE" || SYNC_RC=$?
+      if [[ "$SYNC_RC" -eq 3 ]]; then
+        # S1: malformed agent output — route to validation_failed, don't crash/propagate.
+        echo "Agent output is malformed YAML; routing to validation_failed (not propagating)."
+        force_status_route "$TASK_ID" "$STATUS_FILE" "$TODAY" "$AGENT" "validation_failed" "$AGENT" "output could not be parsed during sync"
+        log_meta_event "$TASK_ID" "$META_FILE" "validation_failed" "$AGENT" "task=$TASK_LABEL reason=sync_parse_error output=runs/$TASK_ID/$(basename "$OUTPUT_FILE")"
+      elif [[ "$SYNC_RC" -ne 0 ]]; then
+        echo "Status sync aborted (rc=$SYNC_RC); see messages above. Not propagating downstream."
       else
-        echo "Validation failed. Review the messages above before continuing."
+        echo "Validating runtime files..."
+        if ruby "$OFFICE_DIR/validate-yaml.rb" "$TASK_ID"; then
+          echo "Validation passed."
+        else
+          echo "Validation failed. Review the messages above before continuing."
+        fi
       fi
     else
       echo "Output contract failed; phase set to validation_failed. Not propagating downstream."
