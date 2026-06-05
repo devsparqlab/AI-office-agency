@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ReviewModelResponse, ReviewSummary, RunSummary, RunPhase, AgentName, DecisionAction,
-  AnalyticsResponse, HealthStatus, RunsTrendPoint, WatcherUpdate,
+  AnalyticsResponse, HealthStatus, RunsTrendPoint, WatcherUpdate, RunDetail,
 } from '../../../shared/types';
 import { apiFetch, apiFetchJson } from '../api';
 
@@ -103,6 +103,18 @@ const STYLE = `
 .logs { overflow: auto; flex: 1; padding: 4px 8px; font-size: 10px; line-height: 1.7; }
 .logs .lg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .spark { padding: 8px 10px; flex: 1; display: flex; flex-direction: column; }
+.modal-bg { position: fixed; inset: 0; background: rgba(3,6,10,0.66); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px; backdrop-filter: blur(2px); }
+.modal { width: min(720px, 92vw); max-height: 86vh; background: #0d131b; border: 1px solid #2a3744; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 14px 44px rgba(0,0,0,0.6); }
+.modal > header { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid #1e2733; font-size: 13px; }
+.modal .x { margin-left: auto; cursor: pointer; background: none; border: none; color: #8a97a8; font-size: 16px; }
+.modal .body { overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 14px; }
+.modal h4 { margin: 0 0 6px; font-size: 9px; letter-spacing: 1px; color: #7f8da0; }
+.modal pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 11px; line-height: 1.55; color: #c9d4e3; background: #0a0e14; border: 1px solid #1a2330; border-radius: 4px; padding: 9px; max-height: 240px; overflow: auto; }
+.modal .tl > div { font-size: 11px; line-height: 1.7; border-left: 2px solid #243; padding-left: 8px; margin-bottom: 4px; }
+.modal .arts { display: flex; flex-wrap: wrap; gap: 5px; }
+.modal .art { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: #0f1620; border: 1px solid #1e2733; color: #9aa0b4; }
+.modal > footer { display: flex; gap: 6px; padding: 10px 14px; border-top: 1px solid #1e2733; flex-wrap: wrap; }
+.modal > footer button { font: inherit; font-size: 11px; padding: 5px 12px; cursor: pointer; border: 1px solid #2a3744; background: #16212e; color: #c9d4e3; border-radius: 5px; }
 `;
 
 function statusOf(t: Task): { label: string; color: string } {
@@ -138,6 +150,8 @@ export const CommandView: React.FC = () => {
   const [filter, setFilter] = useState<Filter>('actionable');
   const [zoneFilter, setZoneFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [detail, setDetail] = useState<RunDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [actor, setActor] = useState(() => localStorage.getItem(ACTOR_KEY) || '');
   const prevZone = useRef<Map<string, string>>(new Map());
   const seq = useRef(0);
@@ -211,6 +225,25 @@ export const CommandView: React.FC = () => {
     window.addEventListener('dashboard:refresh', onRefresh);
     return () => { active = false; window.removeEventListener('dashboard:refresh', onRefresh); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch full detail (task.md / timeline / artifacts) for the selected task.
+  useEffect(() => {
+    if (!selected) { setDetail(null); return; }
+    let active = true;
+    setDetailLoading(true);
+    apiFetchJson<RunDetail>(`/api/runs/${selected}`)
+      .then((d) => { if (active) setDetail(d); })
+      .catch(() => { if (active) setDetail(null); })
+      .finally(() => { if (active) setDetailLoading(false); });
+    return () => { active = false; };
+  }, [selected]);
+
+  // Esc closes the detail panel.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelected(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const zoneStats = useMemo(() => {
@@ -403,17 +436,6 @@ export const CommandView: React.FC = () => {
             })}
             {filtered.length === 0 && <div style={{ padding: 12, color: '#5b6776', fontSize: 11 }}>No tasks.</div>}
           </div>
-          {selTask && (
-            <div className="dec" style={{ borderTop: '1px solid #1e2733', padding: 8 }}>
-              <div style={{ fontSize: 11, marginBottom: 4 }}>
-                {selTask.taskId} · risk {selTask.riskLevel} · conf {selTask.confidence ?? '—'}
-                {selTask.latestDecision && <span style={{ color: C.green }}> · {selTask.latestDecision.decision}</span>}
-              </div>
-              {DECISION_ACTIONS.map(({ action, label }) => (
-                <button key={action} onClick={() => decide(selTask.taskId, action)}>{label}</button>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="panel">
@@ -432,6 +454,51 @@ export const CommandView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {selTask && (
+        <div className="modal-bg" onClick={() => setSelected(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <header>
+              <strong>{selTask.taskId}</strong>
+              <span style={{ color: '#9aa0b4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selTask.title}</span>
+              <button className="x" onClick={() => setSelected(null)}>✕</button>
+            </header>
+            <div className="body">
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 11 }}>
+                <span style={{ color: statusOf(selTask).color }}>● {statusOf(selTask).label}</span>
+                <span>phase: {selTask.phase ?? '—'}</span>
+                <span>verdict: {selTask.verdict ?? '—'}</span>
+                <span style={{ color: selTask.riskLevel === 'high' ? C.red : selTask.riskLevel === 'medium' ? C.amber : selTask.riskLevel === 'low' ? C.green : C.gray }}>
+                  risk: {selTask.riskLevel} (e{selTask.issueCounts.error}/w{selTask.issueCounts.warning}/s{selTask.issueCounts.suggestion})
+                </span>
+                <span>confidence: {selTask.confidence ?? '—'}</span>
+                {selTask.latestDecision && <span style={{ color: C.green }}>decided: {selTask.latestDecision.decision} · {selTask.latestDecision.actor}</span>}
+              </div>
+              <div><h4>TASK</h4><pre>{detail?.taskMarkdown || (detailLoading ? 'Loading…' : 'No task.md found.')}</pre></div>
+              <div><h4>TIMELINE</h4>
+                <div className="tl">
+                  {detail?.timeline?.length
+                    ? detail.timeline.map((ev) => (
+                        <div key={ev.id}><span style={{ color: C.cyan }}>{ev.agent}</span> · {ev.action}{ev.message ? <span style={{ color: '#8a97a8' }}> — {ev.message}</span> : null}</div>))
+                    : <span style={{ color: '#5b6776', fontSize: 11 }}>{detailLoading ? 'Loading…' : 'No history.'}</span>}
+                </div>
+              </div>
+              <div><h4>ARTIFACTS</h4>
+                <div className="arts">
+                  {detail?.artifacts?.length
+                    ? detail.artifacts.map((a) => <span className="art" key={a.name}>{a.name}</span>)
+                    : <span style={{ color: '#5b6776', fontSize: 11 }}>none</span>}
+                </div>
+              </div>
+            </div>
+            <footer>
+              {DECISION_ACTIONS.map(({ action, label }) => (
+                <button key={action} onClick={() => decide(selTask.taskId, action)}>{label}</button>
+              ))}
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
