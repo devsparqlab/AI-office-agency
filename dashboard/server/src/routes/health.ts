@@ -2,8 +2,10 @@ import { Router } from 'express';
 import { config } from '../config';
 import { globalWatcher } from '../services/watcher';
 import { TASK_ID_PATTERN } from '../pathSecurity';
-import type { HealthStatus } from '@shared/types';
+import { buildSocraticodeStatus } from '../services/socraticodeStatus';
+import type { HealthStatus, SocraticodeStatus } from '@shared/types';
 import fs from 'fs/promises';
+import path from 'path';
 
 const router = Router();
 
@@ -19,6 +21,7 @@ export interface HealthStatusInput {
   watcherActive: boolean;
   watcherDebounceMs?: number;
   totalRuns?: number;
+  socraticode?: SocraticodeStatus;
   error?: string;
 }
 
@@ -59,6 +62,12 @@ export function buildHealthStatus(input: HealthStatusInput): HealthStatus {
       active: input.watcherActive,
       debounceMs: input.watcherDebounceMs ?? 0,
     },
+    socraticode: input.socraticode ?? {
+      status: 'skipped',
+      backend: 'none',
+      checkedAt: new Date().toISOString(),
+      message: 'SocratiCode status was not checked.',
+    },
     error: input.error,
   };
 }
@@ -72,12 +81,16 @@ router.get('/', async (req, res) => {
     const entries = await fs.readdir(config.runsDir);
     runsDirExists = true;
     totalRuns = entries.filter(e => TASK_ID_PATTERN.test(e)).length;
-  } catch (e) {}
+  } catch (e) { }
 
   try {
     await fs.access(config.logsDir);
     logsDirExists = true;
-  } catch (e) {}
+  } catch (e) { }
+
+  const socraticode = await buildSocraticodeStatus(
+    path.join(config.aiOfficeRoot, 'scripts', 'socraticode-tcp-wrapper.sh')
+  );
 
   const status = buildHealthStatus({
     aiOfficeRoot: config.aiOfficeRoot,
@@ -91,6 +104,7 @@ router.get('/', async (req, res) => {
     watcherActive: globalWatcher.isActive(),
     watcherDebounceMs: globalWatcher.getDebounceMs(),
     totalRuns,
+    socraticode,
   });
 
   res.json(status);

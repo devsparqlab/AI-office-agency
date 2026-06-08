@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const dashboardApiOrigin = process.env.DASHBOARD_API_ORIGIN || 'http://localhost:4310'
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -13,7 +15,7 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': 'http://localhost:4310'
+      '/api': dashboardApiOrigin
     }
   }
 })

@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { AlertCircle, Terminal, Loader2, LayoutDashboard } from 'lucide-react';
+import { AlertCircle, Terminal, Loader2, LayoutDashboard, Network } from 'lucide-react';
 import type { HealthStatus, RunDetail } from '../../../shared/types';
 
 export interface MonitorViewProps {
@@ -39,7 +39,17 @@ export function MonitorView({
   const healthSummary =
     health?.status === 'warning'
       ? 'The monitor is still available, but one or more file-system dependencies need attention.'
-      : 'The monitor may not reflect current run state until the underlying dashboard wiring is restored.';
+      : health?.status === 'error'
+        ? 'The monitor may not reflect current run state until the underlying dashboard wiring is restored.'
+        : 'Dashboard API, file watcher, and runtime diagnostics are reporting normally.';
+  const socraticodeLabel =
+    !health?.socraticode
+      ? 'not checked'
+      : health.socraticode.backend === 'none'
+        ? health.socraticode.status
+        : `${health.socraticode.status} via ${health.socraticode.backend}`;
+  const socraticodeDetail =
+    health?.socraticode?.projectPath || health?.socraticode?.message || 'No project path reported';
 
   return (
     <div>
@@ -54,7 +64,7 @@ export function MonitorView({
         </div>
       )}
 
-      {health && health.status !== 'ok' && (
+      {health && (
         <div className="card health-banner" style={{ marginBottom: '24px', borderColor: healthAccent }}>
           <div className="health-banner-header">
             <div className="health-banner-title-row">
@@ -74,6 +84,11 @@ export function MonitorView({
             <span>Runs directory: {health.runsDirExists ? 'available' : 'missing'}</span>
             <span>Logs directory: {health.logsDirExists ? 'available' : 'missing'}</span>
             <span>Watcher: {health.watcherActive ? 'active' : 'inactive'}</span>
+          </div>
+          <div className="health-banner-runtime">
+            <Network size={14} />
+            <span>SocratiCode: {socraticodeLabel}</span>
+            <span className="health-banner-runtime-detail">{socraticodeDetail}</span>
           </div>
         </div>
       )}

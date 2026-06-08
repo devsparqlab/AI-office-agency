@@ -277,6 +277,17 @@ export interface AnalyticsResponse {
   topFailureReasons: FailureReasonStat[];
 }
 
+export type SocraticodeConnectionStatus = "active" | "unknown" | "unavailable" | "error" | "skipped";
+export type SocraticodeBackend = "remote" | "local-docker" | "none";
+
+export interface SocraticodeStatus {
+  status: SocraticodeConnectionStatus;
+  backend: SocraticodeBackend;
+  projectPath?: string;
+  checkedAt: string;
+  message?: string;
+}
+
 export interface HealthStatus {
   ok: boolean;
   status: "ok" | "warning" | "error";
@@ -300,6 +311,7 @@ export interface HealthStatus {
     active: boolean;
     debounceMs: number;
   };
+  socraticode: SocraticodeStatus;
   error?: string;
 }
 

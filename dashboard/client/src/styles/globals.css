@@ -403,6 +403,25 @@ body {
   vertical-align: middle;
 }
 
+.health-banner-runtime {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.health-banner-runtime-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
 .monitor-run-header {
   display: flex;
   align-items: flex-start;
