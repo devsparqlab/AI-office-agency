@@ -4,6 +4,7 @@ import type {
   AnalyticsResponse, HealthStatus, RunsTrendPoint, WatcherUpdate, RunDetail, RunFileResponse,
 } from '../../../shared/types';
 import { apiFetch, apiFetchJson } from '../api';
+import { formatLiveLogStamp } from './commandLogTime';
 
 // "Command Center": an AI-generated isometric office (public/office-bg.png) as a
 // live map with phase-zone status pins + animated flow lines, plus a data-rich
@@ -130,9 +131,7 @@ function statusOf(t: Task): { label: string; color: string } {
   }
 }
 function hhmmss(iso?: string): string {
-  if (!iso) return '--:--:--';
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? '--:--:--' : d.toTimeString().slice(0, 8);
+  return formatLiveLogStamp(iso, 'time');
 }
 function pathTail(p: string): string {
   const m = p.match(/(TASK-?[A-Za-z0-9_-]+[\/\\][^\/\\]+)$/);
@@ -206,7 +205,7 @@ export const CommandView: React.FC = () => {
             .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
             .slice(0, 10)
             .map((t) => ({
-              id: ++seq.current, time: hhmmss(t.updatedAt),
+              id: ++seq.current, time: formatLiveLogStamp(t.updatedAt, 'date'),
               text: `${AGENT_EMOJI[t.currentAgent || 'unknown']} ${t.taskId} → ${t.phase ?? '—'}`,
               color: statusOf(t).color,
             }));
