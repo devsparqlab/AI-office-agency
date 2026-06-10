@@ -17,30 +17,36 @@ Read-only monitoring dashboard for `ai-dev-office/runs`.
 ## Install
 
 ```bash
-cd dashboard/server && npm install
-cd ../client && npm install
+cd dashboard
+npm run install:all
 ```
 
 ## Run
 
-Server:
+One command (starts server and client together):
 
 ```bash
-cd dashboard/server
+cd dashboard
 npm run dev
 ```
 
-Client:
+Or separately:
 
 ```bash
-cd dashboard/client
-npm run dev
+# Terminal 1
+cd dashboard/server && npm run dev
+
+# Terminal 2
+cd dashboard/client && npm run dev
 ```
+
+The client proxies `/api/*` to the server, so the server must be running for
+the UI to show data.
 
 Default URLs:
 
 - server: `http://localhost:4310`
-- client: `http://localhost:5173`
+- client: `http://localhost:3000`
 
 ## Environment
 
