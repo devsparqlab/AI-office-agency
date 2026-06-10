@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'fs/promises';
+import path from 'path';
 import yaml from 'js-yaml';
 import { sortRunsByPriority, asObject, RunScanner, mapPhaseToRunStatus } from './runScanner';
 import type { RunSummary } from '@shared/types';
@@ -66,4 +68,41 @@ test('invalidate() clears the cache so the next listRuns re-scans', async () => 
   scanner.invalidate();
   const second = await scanner.listRuns();
   assert.ok(Array.isArray(second));
+});
+
+test('listRuns exposes task workstream from pm-output metadata', async () => {
+  const taskId = `TASK-${Date.now()}-WORKSTREAM`;
+  const runDir = path.resolve(__dirname, '../../../..', 'runs', taskId);
+
+  try {
+    await fs.mkdir(runDir, { recursive: true });
+    await fs.writeFile(path.join(runDir, 'status.yaml'), yaml.dump({
+      task_id: taskId,
+      phase: 'assigned',
+      state: 'assigned',
+      iteration: 1,
+      current_agent: 'dev',
+      task_label: 'Workstream test task',
+      updated_at: '2026-06-10',
+    }));
+    await fs.writeFile(path.join(runDir, 'pm-output.yaml'), yaml.dump({
+      task: {
+        id: taskId,
+        title: 'Workstream test task',
+        short_name: 'workstream-test',
+        type: 'feature',
+        workstream: 'frontend',
+        priority: 'medium',
+        created_at: '2026-06-10',
+      },
+    }));
+
+    const scanner = new RunScanner();
+    const runs = await scanner.listRuns(true);
+    const run = runs.find((candidate) => candidate.id === taskId);
+
+    assert.equal(run?.workstream, 'frontend');
+  } finally {
+    await fs.rm(runDir, { recursive: true, force: true });
+  }
 });

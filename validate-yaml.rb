@@ -10,6 +10,7 @@ PHASES = %w[
   debugging_complete devops_needed devops_complete escalated
   free_roam_complete validation_failed done aborted
 ].freeze
+WORKSTREAMS = %w[frontend backend devops framework docs general].freeze
 
 def load_yaml(path)
   YAML.safe_load(File.read(path), permitted_classes: [], permitted_symbols: [], aliases: false)
@@ -226,6 +227,7 @@ def validate_pm_output(data, label, errors)
     end
     expect_string(data["task"]["epic"], "#{label}.task.epic", errors) if data["task"].key?("epic")
     expect_enum(data["task"]["type"], %w[feature bugfix refactor investigation devops], "#{label}.task.type", errors)
+    expect_enum(data["task"]["workstream"], WORKSTREAMS, "#{label}.task.workstream", errors) if data["task"].key?("workstream")
     expect_enum(data["task"]["priority"], %w[low medium high critical], "#{label}.task.priority", errors)
   else
     errors << "#{label}.task must be a map"

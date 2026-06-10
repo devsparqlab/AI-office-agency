@@ -46,7 +46,7 @@ properties:
         description: Parent task id when this task is a child task or subtask.
       epic:
         type: string
-        description: Optional epic or workstream label for grouping related tasks.
+        description: Optional epic label for grouping related tasks.
       type:
         type: string
         enum:
@@ -55,6 +55,16 @@ properties:
           - refactor
           - investigation
           - devops
+      workstream:
+        type: string
+        description: Optional category for grouping, filtering, and reporting without changing the task id or folder name.
+        enum:
+          - frontend
+          - backend
+          - devops
+          - framework
+          - docs
+          - general
       priority:
         type: string
         enum:

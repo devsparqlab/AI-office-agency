@@ -120,7 +120,7 @@ ruby ai-dev-office/validate-yaml.rb TASK-NNN
 | `verification-evidence.md` | หลักฐาน build/test แบบ manual (optional) |
 | `.cursor-prompt.md` | prompt ที่ runner `cursor` สร้าง |
 
-Metadata งาน (id, title, short_name, parent, epic) อยู่ใน `pm-output.yaml` — ไม่ใช่ YAML ใน `task.md`
+Metadata งาน (id, title, short_name, parent, epic, workstream) อยู่ใน `pm-output.yaml` — ไม่ใช่ YAML ใน `task.md`
 
 ---
 

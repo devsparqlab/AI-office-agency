@@ -9,6 +9,7 @@ import type {
   RunStatus,
   RunPhase,
   AgentName,
+  TaskWorkstream,
   RunArtifact,
   AgentTimelineEvent
 } from '@shared/types';
@@ -67,6 +68,14 @@ export function asObject(value: unknown): Record<string, any> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, any>)
     : {};
+}
+
+const WORKSTREAMS = new Set<TaskWorkstream>(['frontend', 'backend', 'devops', 'framework', 'docs', 'general']);
+
+function normalizeWorkstream(value: unknown): TaskWorkstream {
+  return typeof value === 'string' && WORKSTREAMS.has(value as TaskWorkstream)
+    ? (value as TaskWorkstream)
+    : 'general';
 }
 
 export function sortRunsByPriority(runs: RunSummary[]): RunSummary[] {
@@ -265,6 +274,15 @@ export class RunScanner {
       // Missing or malformed status.yaml: still show the task with what we have.
     }
 
+    let pmData: Record<string, any> = {};
+    try {
+      const content = await fs.readFile(path.join(runPath, 'pm-output.yaml'), 'utf8');
+      pmData = asObject(yaml.load(content));
+    } catch (e) {
+      // PM output is optional for old or manually created runs.
+    }
+    const taskData = asObject(pmData.task);
+
     // A transient stat failure (dir being written/renamed) must not sink the
     // whole summary — fall back to status.yaml's own timestamp.
     let mtimeIso: string | undefined;
@@ -310,6 +328,7 @@ export class RunScanner {
       status,
       currentAgent: this.mapAgentName(statusData.current_agent),
       currentStep: statusData.phase,
+      workstream: normalizeWorkstream(taskData.workstream),
       updatedAt,
       startedAt,
       completedAt,
@@ -325,6 +344,7 @@ export class RunScanner {
       id: taskId,
       title: taskId,
       status: 'unknown',
+      workstream: 'general',
       runPath: path.join('runs', taskId)
     };
   }

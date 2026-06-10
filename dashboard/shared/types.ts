@@ -8,6 +8,14 @@ export type RunStatus =
   | "cancelled"
   | "unknown";
 
+export type TaskWorkstream =
+  | "frontend"
+  | "backend"
+  | "devops"
+  | "framework"
+  | "docs"
+  | "general";
+
 export type AgentName =
   | "pm"
   | "dev"
@@ -133,6 +141,7 @@ export interface RunSummary {
   status: RunStatus;
   currentAgent?: AgentName;
   currentStep?: string;
+  workstream?: TaskWorkstream;
   startedAt?: string;
   updatedAt?: string;
   /**

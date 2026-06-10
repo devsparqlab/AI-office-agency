@@ -39,8 +39,22 @@ const DECISION_ACTIONS: { action: DecisionAction; label: string }[] = [
   { action: 'approve', label: 'Approve' }, { action: 'request_changes', label: 'Changes' },
   { action: 'escalate', label: 'Escalate' }, { action: 'reject', label: 'Reject' },
 ];
+const WORKSTREAM_LABELS: Record<NonNullable<RunSummary['workstream']>, string> = {
+  frontend: 'FE',
+  backend: 'BE',
+  devops: 'DO',
+  framework: 'FW',
+  docs: 'DOC',
+  general: 'GEN',
+};
 
-interface Task extends ReviewSummary { title: string; status: RunSummary['status']; updatedAt?: string; currentAgent?: AgentName; }
+interface Task extends ReviewSummary {
+  title: string;
+  status: RunSummary['status'];
+  updatedAt?: string;
+  currentAgent?: AgentName;
+  workstream?: RunSummary['workstream'];
+}
 interface Flow { id: number; from: string; to: string; }
 interface LogLine { id: number; time: string; text: string; color: string; }
 type Filter = 'actionable' | 'needs' | 'running' | 'failed' | 'done' | 'all';
@@ -170,6 +184,7 @@ export const CommandView: React.FC = () => {
         status: runById.get(rv.taskId)?.status || 'unknown',
         updatedAt: runById.get(rv.taskId)?.updatedAt,
         currentAgent: runById.get(rv.taskId)?.currentAgent,
+        workstream: runById.get(rv.taskId)?.workstream || 'general',
       }));
 
       // Diff zones → spawn transient flow lines for tasks that changed phase.
@@ -442,6 +457,9 @@ export const CommandView: React.FC = () => {
                   <span className="dot" style={{ color: st.color, background: st.color }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <strong>{t.taskId.replace(/^TASK-?/, '#')}</strong> {t.title}
+                  </span>
+                  <span className="badge" style={{ background: '#16212e', color: '#9fb3c8', border: '1px solid #2a3744' }}>
+                    {WORKSTREAM_LABELS[t.workstream || 'general']}
                   </span>
                   <span className="badge" style={{ background: `${st.color}22`, color: st.color, border: `1px solid ${st.color}55` }}>{st.label}</span>
                 </div>

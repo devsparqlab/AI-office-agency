@@ -36,6 +36,7 @@ checks = [
   ["status.phase",          named(src, "PHASES"), schema_enum("schemas/status.schema.yaml", "properties", "phase", "enum")],
   ["status.state",          named(src, "PHASES"), schema_enum("schemas/status.schema.yaml", "properties", "state", "enum")],
   ["status.current_agent",  named(src, "AGENTS"), ca],
+  ["task.workstream",      named(src, "WORKSTREAMS"), schema_enum("schemas/task.schema.yaml", "properties", "task", "properties", "workstream", "enum")],
   ["reviewer.review_verdict", inline(src, 'data\["review_verdict"\]'), schema_enum("schemas/reviewer-output.schema.yaml", "properties", "review_verdict", "enum")],
   ["reviewer.from_phase",   inline(src, 'data\["transition"\]\["from_phase"\]'), schema_enum("schemas/reviewer-output.schema.yaml", "properties", "transition", "properties", "from_phase", "enum")],
 ]
