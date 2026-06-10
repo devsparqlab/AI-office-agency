@@ -384,12 +384,12 @@ export const CommandView: React.FC = () => {
             })}
           </svg>
           {ZONES.map((z) => {
-            const st = zoneStats.get(z.id);
-            if (!st || st.count === 0) return null;
-            const color = st.attention ? C.amber : st.active ? C.cyan : C.green;
+            const st = zoneStats.get(z.id) || { count: 0, attention: false, active: false };
+            const hasTasks = st.count > 0;
+            const color = !hasTasks ? C.gray : st.attention ? C.amber : st.active ? C.cyan : C.green;
             return (
               <div key={z.id} className={`pin ${zoneFilter === z.id ? 'sel' : ''}`}
-                style={{ left: `${z.left}%`, top: `${z.top}%` }}
+                style={{ left: `${z.left}%`, top: `${z.top}%`, opacity: hasTasks ? 1 : 0.68 }}
                 onClick={() => {
                   if (zoneFilter === z.id) { setZoneFilter(null); setFilter('actionable'); }
                   else { setZoneFilter(z.id); setFilter('all'); } // focus the zone → show everything in it
