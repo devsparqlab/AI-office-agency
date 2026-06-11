@@ -30,6 +30,16 @@ cd dashboard
 npm run dev
 ```
 
+The one-command dev script waits for `http://localhost:4310/api/health` before
+starting the Vite client, so initial `/api/events` proxy connections do not race
+the API server startup.
+
+To pass Vite dev-server flags to the client, put them after `--`:
+
+```bash
+npm run dev -- --host
+```
+
 Or separately:
 
 ```bash

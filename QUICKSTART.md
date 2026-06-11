@@ -47,6 +47,56 @@ TASK_ID="TASK-NNN"
 
 ลำดับ fallback อัตโนมัติ: `codex` → `cursor-agent` → `cursor`
 
+### ตัวอย่างแต่ละ Runner
+
+| Runner | ตัวอย่างคำสั่ง | หมายเหตุ |
+|--------|----------------|----------|
+| `codex` (default) | `./ai-dev-office/run-agent.sh TASK-NNN dev` | ไม่ต้องระบุ runner — ใช้ Codex อัตโนมัติ |
+| `codex` (explicit) | `./ai-dev-office/run-agent.sh TASK-NNN reviewer codex` | บังคับใช้ Codex |
+| `cursor-agent` | `./ai-dev-office/run-agent.sh TASK-NNN dev cursor-agent` | รัน Cursor CLI Agent ใน terminal |
+| `cursor` | `./ai-dev-office/run-agent.sh TASK-NNN dev cursor` | สร้าง `.cursor-prompt.md` แล้วรันใน IDE |
+
+### ตัวอย่างแต่ละ Agent × Runner
+
+แทน `TASK-NNN` ด้วย task id จริง (เช่น `TASK-015`, `TASK-PKG-001`)
+
+| Agent | `codex` | `cursor-agent` | `cursor` |
+|-------|---------|----------------|----------|
+| `pm` | `... pm` | `... pm cursor-agent` | `... pm cursor` |
+| `dev` | `... dev` | `... dev cursor-agent` | `... dev cursor` |
+| `dev-2` | `... dev-2` | `... dev-2 cursor-agent` | `... dev-2 cursor` |
+| `reviewer` | `... reviewer` | `... reviewer cursor-agent` | — |
+| `debugger` | `... debugger` | `... debugger cursor-agent` | — |
+| `devops` | `... devops` | — | — |
+| `free-roam` | `... free-roam` | — | `... free-roam cursor` |
+| `auto` | `... auto` | — | — |
+
+คำสั่งเต็มใช้ prefix `./ai-dev-office/run-agent.sh TASK-NNN` แทน `...`
+
+### ตัวอย่างผสม Runner
+
+```bash
+# PM ใน IDE → Dev ผ่าน CLI → Reviewer บน Codex
+./ai-dev-office/run-agent.sh TASK-NNN pm cursor
+./ai-dev-office/run-agent.sh TASK-NNN dev cursor-agent
+./ai-dev-office/run-agent.sh TASK-NNN reviewer codex
+
+# งานซับซ้อน + review (default Codex)
+./ai-dev-office/run-agent.sh TASK-NNN dev-2 && ./ai-dev-office/run-agent.sh TASK-NNN reviewer
+```
+
+รายละเอียด runner: [docs/codex.md](docs/codex.md) · [docs/cursor.md](docs/cursor.md)
+
+### Model routing (ไม่ใช่ runner)
+
+| ชั้น | รองรับ | ใช้เมื่อ |
+|------|--------|---------|
+| Runtime หลัก | Codex | ทุก role ที่รันผ่าน `run-agent.sh` |
+| Runner สำรอง | Cursor CLI Agent, Cursor IDE | Codex quota/auth fail หรือระบุ explicit |
+| Manual advisory | Claude, Gemini | second opinion / draft — ไม่แทน runner อัตโนมัติ |
+
+Claude/Gemini: [docs/claude.md](docs/claude.md) · [docs/gemini.md](docs/gemini.md) · policy: [model-routing-codex-first.md](model-routing-codex-first.md)
+
 ---
 
 ## Manual Prompt Mode (IDE)
@@ -96,6 +146,33 @@ Env ที่เกี่ยวข้อง: `SHARED_LIB_POLICY` (`aligned`|`lat
 ```
 
 Skill guides: [docs/skills/office-intake.md](docs/skills/office-intake.md) · [office-verify.md](docs/skills/office-verify.md) · [office-cleanup.md](docs/skills/office-cleanup.md)
+
+---
+
+## Dashboard
+
+```bash
+cd ai-dev-office/dashboard
+npm run install:all
+npm run dev
+```
+
+`npm run dev` จะ start dashboard server ก่อน แล้วรอ `http://localhost:4310/api/health` พร้อมก่อนค่อย start Vite client เพื่อลด proxy race ตอนเปิด `/api/events`
+
+Default URLs:
+
+- Server API: `http://localhost:4310`
+- Client UI: `http://localhost:3000`
+
+ถ้าต้อง expose Vite client ใน network เดียวกัน ให้ส่ง Vite args ผ่าน root dev script ได้:
+
+```bash
+npm run dev -- --host
+```
+
+Args หลัง `--` จะถูกส่งไปที่ client dev process เท่านั้น ส่วน server ยังใช้ config จาก `dashboard/server/.env` หรือ env vars เช่น `DASHBOARD_PORT`, `AI_OFFICE_ROOT`
+
+รายละเอียดเพิ่ม: [dashboard/README.md](dashboard/README.md)
 
 ---
 
