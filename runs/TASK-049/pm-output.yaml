@@ -1,0 +1,192 @@
+task:
+  id: "TASK-049"
+  title: "Mobile Missions API Ready"
+  short_name: "mobile-missions-api-ready"
+  epic: "Mobile Missions integration"
+  type: feature
+  priority: high
+  created_at: "2026-05-15"
+scope:
+  target_services:
+    - service: Games-Labs-Missions
+      reason: "Owns Daily Activity progress, Quest overview payloads, claim-daily behavior, admin activity configuration, and migrations."
+    - service: docs
+      reason: "Mobile and backoffice need documented endpoint roles, status mapping, staging QA flow, and Phase 2 exclusions."
+  affected_files:
+    - path: Games-Labs-Missions/README.md
+      action: modify
+      description: "Add Mobile Missions integration docs, status mapping, SPEND_AMOUNT THB guidance, staging QA checklist, and Phase 2 gaps."
+    - path: Games-Labs-Missions/internal/models/models.go
+      action: modify
+      description: "Extend DailyActivity and overview-facing condition metadata structs for description, condition type, threshold/unit, and scope."
+    - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+      action: modify
+      description: "Filter user-facing Daily Activities, select condition metadata, load claimability state, and persist admin condition fields."
+    - path: Games-Labs-Missions/internal/repositories/mission_repo_test.go
+      action: modify
+      description: "Add focused repository tests for Daily Activity filtering, metadata reads, and admin persistence."
+    - path: Games-Labs-Missions/internal/services/mission_service.go
+      action: modify
+      description: "Validate daily claimability before idempotency reservation and expand admin Daily Activity config validation/persistence."
+    - path: Games-Labs-Missions/internal/services/mission_service_test.go
+      action: modify
+      description: "Cover claim guard behavior, idempotency ordering, progress status behavior, and admin validation."
+    - path: Games-Labs-Missions/internal/services/quest_overview_service.go
+      action: modify
+      description: "Pass Daily Activity description, condition type, and scope through the Daily tab."
+    - path: Games-Labs-Missions/internal/services/quest_overview_service_test.go
+      action: modify
+      description: "Assert overview Daily items remain backward compatible and include condition metadata."
+    - path: Games-Labs-Missions/internal/handlers/mission_handler.go
+      action: modify
+      description: "Map claim-daily business errors to 409/410 and accept/return admin activity condition fields."
+    - path: Games-Labs-Missions/internal/handlers/mission_handler_test.go
+      action: modify
+      description: "Cover claim status codes and admin request validation/response behavior."
+    - path: Games-Labs-Missions/internal/routes/apiv1.go
+      action: modify
+      description: "Wire any missing admin Daily Activity config routes needed to match the README contract."
+    - path: Games-Labs-Missions/migrations/018_seed_daily_activities_v1.sql
+      action: create
+      description: "Seed Phase 1A mobile/staging Daily Activities for TURNOVER_AMOUNT and SPEND_AMOUNT in THB."
+    - path: Games-Labs-Missions/migrations/run.go
+      action: modify
+      description: "No manual generated migration list is expected, but verify embedded migration loading includes the new SQL file."
+description: |
+  Make Mobile Missions API Ready for Phase 1. Mobile should continue using GET /api/v1/quest/overview?user_id={id} as the primary screen API, may use GET /api/v1/missions/progress?user_id={id} for debug/integration, and should only call POST /api/v1/missions/claim-daily to claim rewards. Mobile must not update mission progress or status manually; progress comes from backend events and daily_activity_progress.
+
+  Phase 1A unblocks staging/mobile integration by filtering legacy Daily Activity rows, enriching Daily tab payloads, enforcing claim-daily claimability, adding turnover/spend seed activities, and documenting the end-to-end flow. Phase 1B adds production-ready admin/backoffice config support so ops can create and update the same condition fields dynamically instead of relying on SQL seeds.
+
+  Phase 2 remains explicit follow-up work for Games-Labs-Game SettleRound wiring, round-based missions, Diamonds spend missions, and complete-all-daily bonus behavior.
+acceptance_criteria:
+  - criterion: "GET /api/v1/quest/overview?user_id={id} remains the primary mobile API and keeps existing paths and fields backward compatible."
+  - criterion: "GET /api/v1/missions/progress?user_id={id} remains optional/debug and returns the same filtered Daily Activity set used by overview."
+  - criterion: "User-facing Daily Activity queries require active = TRUE and condition_type IS NOT NULL so legacy rows such as login, play_game, and share_fb are hidden."
+  - criterion: "Overview Daily tab items include description, condition_type, and condition scope metadata when configured."
+  - criterion: "POST /api/v1/missions/claim-daily loads current-day progress and validates active, complete, can_claim, and claim limit before reserving idempotency or crediting rewards."
+  - criterion: "Claim handler returns HTTP 409 for incomplete/already-claimed conflicts and HTTP 410 for inactive activities."
+  - criterion: "Phase 1A migration seeds TURNOVER_AMOUNT and SPEND_AMOUNT Daily Activities suitable for staging/mobile integration."
+  - criterion: "SPEND_AMOUNT is documented and labeled as THB spend, not Diamonds."
+  - criterion: "Phase 1B admin/backoffice create/update/list/detail behavior can persist and return description, condition_type, threshold, threshold_unit, game_id, game_type, and spend_currency."
+  - criterion: "Admin validation enforces condition-type requirements and does not allow misleading Diamonds labels for SPEND_AMOUNT."
+  - criterion: "README documents mobile flow, endpoint roles, status-to-button mapping, backend-event progress ownership, staging QA checklist, and Phase 2 exclusions."
+  - criterion: "Focused tests cover repository filtering/enrichment, overview pass-through, claim guard behavior, handler status codes, migration seed expectations where practical, and admin config persistence/validation."
+  - criterion: "go test ./... passes in Games-Labs-Missions, or any skipped verification is documented with a valid reason."
+plan:
+  approach: |
+    Work sequentially in Games-Labs-Missions because Phase 1A and Phase 1B share the same model, repository, service, handler, route, test, migration, and README files. Start by documenting the contract and fixing the user-facing read model, then enrich overview, harden claim-daily, add staging seed data, and finish with admin/backoffice dynamic config support. Keep all contract changes additive and do not touch Games-Labs-Game SettleRound or round mission wiring.
+  subtasks:
+    - order: 1
+      id: phase-1a-mobile-docs
+      description: "Update README with Mobile Missions integration: primary overview API, optional progress API, claim-daily role, status-to-button mapping, backend-event progress ownership, SPEND_AMOUNT THB wording, staging QA checklist, and Phase 2 gaps."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/README.md
+      parallel_safe: false
+    - order: 2
+      id: daily-activity-read-model
+      description: "Extend DailyActivity metadata and update ListDailyActivityProgress to filter active configured rows, select description/condition/scope fields, preserve progress and claims, and add repository tests."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/internal/models/models.go
+        - Games-Labs-Missions/internal/repositories/mission_repo.go
+        - Games-Labs-Missions/internal/repositories/mission_repo_test.go
+      parallel_safe: false
+    - order: 3
+      id: quest-overview-enrichment
+      description: "Pass Daily Activity description, condition_type, and condition scope through Quest overview Daily items while preserving existing fields and add overview tests."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/internal/services/quest_overview_service.go
+        - Games-Labs-Missions/internal/services/quest_overview_service_test.go
+      parallel_safe: false
+    - order: 4
+      id: claim-daily-guard
+      description: "Validate daily claimability from current-day progress before idempotency reservation and wallet credit; map inactive/incomplete/already-claimed outcomes to the required HTTP statuses with service and handler tests."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/internal/services/mission_service.go
+        - Games-Labs-Missions/internal/services/mission_service_test.go
+        - Games-Labs-Missions/internal/handlers/mission_handler.go
+        - Games-Labs-Missions/internal/handlers/mission_handler_test.go
+      parallel_safe: false
+    - order: 5
+      id: phase-1a-seed
+      description: "Add a Phase 1A migration seed for one TURNOVER_AMOUNT activity and one SPEND_AMOUNT THB activity; do not seed ROUND_COUNT_* or Diamonds spend missions."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/migrations/018_seed_daily_activities_v1.sql
+        - Games-Labs-Missions/migrations/run.go
+      parallel_safe: false
+    - order: 6
+      id: phase-1b-admin-config
+      description: "Expand admin/backoffice Daily Activity config to create/update/list/detail/activate/deactivate/delete configured activities with condition fields, validation, and tests matching the README contract."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/internal/models/models.go
+        - Games-Labs-Missions/internal/repositories/mission_repo.go
+        - Games-Labs-Missions/internal/repositories/mission_repo_test.go
+        - Games-Labs-Missions/internal/services/mission_service.go
+        - Games-Labs-Missions/internal/services/mission_service_test.go
+        - Games-Labs-Missions/internal/handlers/mission_handler.go
+        - Games-Labs-Missions/internal/handlers/mission_handler_test.go
+        - Games-Labs-Missions/internal/routes/apiv1.go
+        - Games-Labs-Missions/README.md
+      parallel_safe: false
+    - order: 7
+      id: final-verification
+      description: "Run formatting and go test ./... in Games-Labs-Missions, then confirm no Phase 2 product code was added."
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions
+      parallel_safe: false
+  risks:
+    - risk: "Phase 1A and Phase 1B both touch shared model, repository, service, handler, route, README, and test files."
+      mitigation: "Use a single sequential dev-2 lane instead of parallel agents."
+    - risk: "Claim idempotency could incorrectly reserve a key for an invalid claim."
+      mitigation: "Require claimability validation before markIdempotency and add a regression test for ordering."
+    - risk: "Current README documents richer admin activity routes than the current route table exposes."
+      mitigation: "Phase 1B should reconcile implementation with the documented contract or explicitly document any intentionally deferred route."
+    - risk: "Mobile or ops may confuse SPEND_AMOUNT with Diamonds spend."
+      mitigation: "Use THB labels in seed data, validation messages, and docs; leave Diamonds spend as a follow-up condition type."
+    - risk: "Round-count condition templates can appear production-ready before Game SettleRound is wired."
+      mitigation: "Do not seed round missions and document SettleRound/ROUND_COUNT_* as Phase 2 follow-up."
+  estimated_complexity: high
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "The task is cross-cutting within Games-Labs-Missions and needs coordinated changes across persistence, service logic, HTTP handlers, migrations, tests, and docs."
+summary: |
+  TASK-049 is ready for implementation as a sequential dev-2 task. The split covers Phase 1A mobile integration readiness first, then Phase 1B admin/backoffice dynamic Daily Activity configuration, with Game SettleRound and round-based missions kept in Phase 2.
+artifacts:
+  - path: runs/TASK-049/task.md
+    action: modified
+    description: "Expanded the source request into a complete implementation blueprint with scope, acceptance criteria, subtasks, risks, and assignment."
+  - path: runs/TASK-049/status.yaml
+    action: modified
+    description: "Updated PM handoff and assignment metadata for dev-2 implementation."
+  - path: runs/TASK-049/pm-output.yaml
+    action: created
+    description: "Created PM output contract for TASK-049."
+next_action:
+  agent: dev-2
+  reason: "Implementation is ready and should be handled by dev-2 because it is complex and cross-cutting inside Games-Labs-Missions."
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "codebase_status projectPath d:\\llm"
+      - "Mobile Missions API daily activity progress quest overview claim daily admin upsert condition_type"
+    relevant_symbols:
+      - Games-Labs-Missions/internal/repositories/mission_repo.go:ListDailyActivityProgress
+      - Games-Labs-Missions/internal/repositories/mission_repo.go:ListActiveDailyActivityRules
+      - Games-Labs-Missions/internal/services/mission_service.go:ClaimDailyMission
+      - Games-Labs-Missions/internal/services/mission_service.go:GetProgress
+      - Games-Labs-Missions/internal/services/quest_overview_service.go:buildDailyTab
+      - Games-Labs-Missions/internal/handlers/mission_handler.go:ClaimDaily
+      - Games-Labs-Missions/internal/handlers/mission_handler.go:UpsertDailyActivity
+    notes: "SocratiCode index for d:\\llm was green; local files were then checked as source of truth."
+blockers: []

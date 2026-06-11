@@ -1,0 +1,91 @@
+task_id: TASK-081
+phase: done
+state: done
+current_agent: done
+iteration: 1
+assigned_to: dev
+created_at: '2026-06-08'
+updated_at: '2026-06-11'
+ready: true
+blocked_on: []
+waiting_for:
+- user commits and pushes Games-Labs-backoffice (items/edit wiring)
+assignment:
+  primary: dev
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-081/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: >
+    TASK-080 gates the redemption item edit Save action because the admin order
+    API has create/list/get but no update endpoint. TASK-081 opens the required
+    cross-service contract work: add UpdateRedemptionItem in shared-lib,
+    implement it in Games-Labs-Order, expose it through api-gateway, and wire
+    Games-Labs-backoffice items/edit/:id to persist real updates. Work is
+    sequential because it touches shared-lib proto/generated files and consumer
+    go.mod/go.sum files.
+- phase: pending -> assigned
+  agent: dev
+  reason: User reassigned execution to dev (dev-2 had not started). Backend done
+    locally - shared-lib adds the UpdateRedemptionItem rpc (POST
+    /api/v1/admin/redemption-items/{id}; request mirrors create plus id; code list
+    replaced transactionally) with regenerated pb/gw/swagger, committed locally as
+    c43ef49; the agent's direct push to shared-lib main was policy-denied, so the
+    user must push. Order implements model/ports/service/repo/handler with a shared
+    create/update normalizer, preserves sort_order, swaps codes in one tx; three
+    focused service tests pass and the full suite is green after hardening the
+    inactive-package assertions to errors.Is (message text changed in shared-lib
+    main). Committed as 47d03f2 with go.mod/go.sum left dirty under a TEMPORARY
+    uncommitted local replace pending the shared-lib publish. Remaining - publish
+    shared-lib, drop replace + bump Order and api-gateway go.mod, wire backoffice
+    items/edit/[id].vue (load via GET /redemption-items/{id}, save via the new
+    endpoint, reuse /admin/uploads/redemption-items).
+- phase: assigned (publish + bumps done)
+  agent: dev
+  reason: shared-lib published - the user pushed c43ef49, but the merged main
+    (b428e3a) had inconsistent generated artifacts (gw/grpc referenced
+    UpdateRedemptionItem symbols missing from the merged pb.go), so the agent
+    regenerated with make buf and the fix landed as 63ce30d (pushed). Order was
+    then bumped to 63ce30d (commit 7be0ea3, build/vet/full tests green - this also
+    fixes Order main, which was broken because the handler landed while go.mod
+    still pinned dc8ed7c). api-gateway bumped to 63ce30d (commit 397ba2d,
+    build/vet/test green) which exposes POST /api/v1/admin/redemption-items/{id}.
+    Both commits await the user's push. Backoffice items/edit/[id].vue is mid-wire -
+    API load + per-kind image upload are in, but the Save handler still references
+    removed localStorage helpers, so the page does NOT typecheck until the Save
+    rewire lands (next step).
+- phase: assigned (backoffice items/edit wired + verified)
+  agent: dev
+  reason: >
+    Order and api-gateway pushed by the user. Wired items/edit/[id].vue end to end -
+    loads via GET /api/v1/admin/redemption-items/{id}, saves via POST
+    /api/v1/admin/redemption-items/{id}, images go through /admin/uploads/redemption-items
+    with instant local preview. A background adversarial review workflow stalled in its
+    verify phase (infra, not code) but its review phase corroborated the findings; the
+    agent cross-checked manually and fixed: (1) details/conditions now produced as
+    per-language Structs identical to the create flow, with a tolerant merge-read so
+    items created either way load both languages; (2) tag chips recover known ids
+    instead of being silently dropped on save; (3) removed three dead localStorage-era
+    functions and the unused ItemStatus import. nuxi typecheck is clean for the page
+    (18 pre-existing errors elsewhere unchanged). Known/deferred - the brand <select>
+    still uses 3 hardcoded options (a fix to source it from the API was rejected by the
+    user); save still resolves the real redemptionId via the brand map with a
+    raw.redemptionId fallback, so data is preserved even when the dropdown cannot
+    display the current brand. Remaining - user commits/pushes backoffice, then live
+    smoke (open an item, edit, save, reload).
+- phase: assigned -> done
+  agent: reviewer
+  reason: >
+    Approved. shared-lib (63ce30d), Order (7be0ea3), and api-gateway are all on
+    origin/main with the bumped shared-lib, so POST /api/v1/admin/redemption-items/{id}
+    is live through the gateway. Backoffice items/edit is wired and typecheck-clean
+    (per-language Struct details matching create, tolerant merge-read, tag-id recovery,
+    dead code removed). Remaining is operational - the user commits/pushes the one
+    items/edit file and runs live smoke. Note - the agent's local api-gateway commit
+    397ba2d is a redundant duplicate of the bump already on origin; it should be
+    discarded (git reset --hard origin/main) rather than pushed.
+

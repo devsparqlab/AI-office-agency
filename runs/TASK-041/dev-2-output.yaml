@@ -1,0 +1,63 @@
+summary: |
+  Implemented production mission event read APIs across shared-lib and Games-Labs-Missions.
+  I added additive missionspb list/detail RPCs with grpc-gateway mappings, regenerated the missions protobuf artifacts, and wired new HTTP + gRPC dispatch for:
+  - GET /api/v1/missions/events?user_id=...
+  - GET /api/v1/missions/events/{event_id}?user_id=...
+
+  On the Missions service side I introduced a DB-backed mission_events read model plus a small in-memory fallback seed, then added a dedicated EventService and EventHandler. Event list now returns only active-window events by default, while event detail returns a predictable payload for active, upcoming, expired, or inactive events. Status includes claimable, claimed, progress, reward, and state. Window evaluation is deterministic with start_at inclusive and end_at exclusive comparisons against absolute timestamps, and focused tests cover active/inactive/expired cases plus timezone normalization.
+
+  I also added a migration/seed for the minimal read config path and updated the Postman collection with event list/detail requests. I intentionally did not add event claim in this task because there is not yet a verified duplicate-safe claim persistence flow for event rewards; the read API exposes claimed using the reserved mission_logs mission type so Phase 2.1 can add claim without changing the read contract.
+artifacts:
+  - path: shared-lib/proto/missionspb/missions.proto
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.pb.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.pb.gw.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions_grpc.pb.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.swagger.json
+    action: modified
+  - path: shared-lib/proto/missionspb/swagger.pb.go
+    action: modified
+  - path: Games-Labs-Missions/migrations/016_create_mission_events.sql
+    action: created
+  - path: Games-Labs-Missions/internal/models/event.go
+    action: created
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/event_service.go
+    action: created
+  - path: Games-Labs-Missions/internal/services/event_service_test.go
+    action: created
+  - path: Games-Labs-Missions/internal/handlers/event_handler.go
+    action: created
+  - path: Games-Labs-Missions/internal/handlers/event_handler_test.go
+    action: created
+  - path: Games-Labs-Missions/internal/routes/apiv1.go
+    action: modified
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+    action: modified
+  - path: Games-Labs-Missions/cmd/main.go
+    action: modified
+  - path: docs/Games-Labs-APIs.postman_collection.json
+    action: modified
+next_action:
+  agent: reviewer
+  reason: The event read APIs, migration, generated contracts, and focused service/handler coverage are in place and ready for review against the acceptance criteria.
+context_sources:
+  github:
+    branch: "Games-Labs-Missions:fix/debugged-go-mod-tidy, shared-lib:main"
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "dev-2 TASK-041 event production APIs"
+    relevant_symbols:
+      - "shared-lib/proto/missionspb/missions.proto"
+      - "Games-Labs-Missions/internal/repositories/mission_repo.go"
+      - "Games-Labs-Missions/internal/services/weekly_service.go"
+      - "Games-Labs-Missions/internal/services/quest_overview_service.go"
+    notes: "SocratiCode was unavailable, so I used local repo inspection and existing weekly/time-window patterns as the source of truth."
+blockers:
+  - "Event claim is intentionally deferred to Phase 2.1. The read API surfaces claimed state, but this task does not introduce a duplicate-safe event reward claim write path or persistence model."

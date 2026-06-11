@@ -1,0 +1,37 @@
+---
+task_id: TASK-040
+phase: done
+state: done
+current_agent: done
+iteration: 3
+assigned_to: dev-2
+created_at: '2026-05-06'
+updated_at: '2026-05-07'
+ready: false
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-040/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: Scoped Quest phase 2 Card A as production Weekly mission APIs with progress,
+    claim, reset boundary, and idempotency tests.
+- phase: pending -> in_review
+  agent: dev-2
+  reason: Weekly APIs, storage, transport wiring, generated proto artifacts, and focused
+    tests are in place and ready for review.
+- phase: in_review -> devops_needed
+  agent: reviewer
+  reason: Dependency guard failed because Games-Labs-Missions references new Weekly
+    missionspb symbols that are not yet available in the published shared-lib dependency.
+- phase: devops_needed -> in_review
+  agent: devops
+  reason: User published shared-lib with Weekly missionspb symbols; all guarded services
+    now use v0.0.0-20260507065339-680bf7e4bbea and dependency guard passes.
+- phase: in_review -> done
+  agent: reviewer
+  reason: Review passed with clean build, tests, and dependency guard evidence.

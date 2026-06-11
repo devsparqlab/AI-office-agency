@@ -1,0 +1,41 @@
+task_id: TASK-084
+phase: done
+state: done
+current_agent: devops
+iteration: 1
+assigned_to: devops
+created_at: '2026-06-10'
+updated_at: '2026-06-10'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: devops
+  parallel: false
+history:
+- phase: created -> in_progress
+  agent: pm
+  reason: >
+    First real use of the Delivery / Infra skills. Review the Games-Labs-Wallet
+    delivery surface and apply the user-approved SHA-pin GitOps fix.
+- phase: in_progress -> done
+  agent: devops
+  reason: >
+    Reviewed Wallet with all six delivery skills (see findings.md): 3 high, 4
+    medium, 2 low findings. Applied the requested fix to the working tree:
+    k3s/kustomization.yaml now declares the image via the kustomize images
+    transformer, and deploy.yml builds, pushes, yq-pins the sha-<short> tag into
+    git, and commits it back so ArgoCD drives the rollout; the imperative
+    rollout-restart job became a best-effort sync-secret job. All YAML validated.
+    Edits left uncommitted for user review per commit policy.
+notes:
+  pr: https://github.com/SparqLab/Games-Labs-Wallet/pull/5
+  branch: devops/wallet-sha-pin-gitops
+  applied_files:
+  - Games-Labs-Wallet/k3s/kustomization.yaml
+  - Games-Labs-Wallet/.github/workflows/deploy.yml
+  not_applied_findings:
+  - dockerfile-non-root-and-pinned-base-images
+  - pin-actions-to-commit-sha
+  - oidc-instead-of-kubeconfig-and-pat
+  - sealed-or-external-secrets

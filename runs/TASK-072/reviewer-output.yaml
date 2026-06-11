@@ -1,0 +1,54 @@
+summary: |
+  Approved. VP gameplay turnover now has focused validation around the existing
+  `betnsettle` settlement flow: forward `SettleRound` is asserted only after
+  wallet-success net delta, turnover uses `validBetAmt` first with
+  `actualBetAmt` fallback, and `balance` / `rollback` remain intentionally
+  forward-settlement-free.
+
+  I rechecked the new VP service seam, mapper tests, README verification table,
+  and task evidence on disk. Local Provider verification passed, including the
+  focused VP package tests, the full `Games-Labs-Provider` suite, and
+  `git diff --check`.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    In `Games-Labs-Provider`:
+    - `go test ./internal/core/services/vp ./internal/handlers/vphdl`
+    - `go test ./...`
+    - `git diff --check`
+artifacts:
+  - path: Games-Labs-Provider/internal/core/services/vp/seamless.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/vp/seamless_test.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/vp/turnover.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/vp/turnover_test.go
+    issues: []
+  - path: Games-Labs-Provider/README.md
+    issues: []
+  - path: ai-dev-office/runs/TASK-072/verification-evidence.md
+    issues: []
+next_action:
+  agent: done
+  reason: Acceptance criteria are satisfied and local Provider verification passed.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "TASK-072 VP betnsettle validBetAmt actualBetAmt rollback SettleRound Games-Labs-Provider"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/vp/seamless.go"
+      - "Games-Labs-Provider/internal/core/services/vp/turnover.go"
+      - "Games-Labs-Provider/internal/adapters/gameadt/settle_round.go"
+      - "ai-dev-office/runs/TASK-072/verification-evidence.md"
+    notes: SocratiCode was used for discovery; final approval is based on current source files and fresh local verification.
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

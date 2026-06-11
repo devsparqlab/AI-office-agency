@@ -1,0 +1,65 @@
+task_id: TASK-079
+phase: done
+state: done
+current_agent: done
+iteration: 1
+assigned_to: dev
+created_at: '2026-06-08'
+updated_at: '2026-06-08'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: dev
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-079/reviewer-output.yaml
+history:
+- phase: created -> assigned
+  agent: pm
+  reason: Redemption library admin page rendered from mock/localStorage while the
+    Order redemption/tag endpoints already exist; scoped an API-first wiring plus a
+    net-new S3-compatible image upload vertical (MinIO now, S3 later via config).
+- phase: assigned (phase1-backoffice done)
+  agent: dev
+  reason: Wired Brand and Collection Tag tabs to the Order admin API, moved
+    Collection Tag create/update onto the tags API, reduced localStorage to the
+    arrange order, and added pending/error states. Frontend typecheck shows zero
+    errors in the page; Brand create/update left gated on the upload chain.
+- phase: assigned (order-upload done)
+  agent: dev
+  reason: Added an S3-compatible uploader (aws-sdk-go-v2, configurable
+    endpoint/path-style, key-in-DB + public-base URL) and a multipart UploadHTTP
+    endpoint with sniff/size validation returning { key, url }. Order service
+    build, vet, gofmt, and 5 focused upload tests pass.
+- phase: assigned (gateway-upload-route done)
+  agent: dev
+  reason: Added an authed /uploads group in the api-gateway (Auth +
+    RequireAdminAPIAccess + identity injection) reverse-proxied to OrderHTTPURL,
+    plus order-http-url in the configmap and ORDER_HTTP_URL in the deployment.
+    Gateway build, vet, gofmt, and middleware tests pass.
+- phase: assigned -> in_review
+  agent: dev
+  reason: Added useImageUpload (multipart POST to the gateway /uploads) wired into
+    the brand modal (real URL only, no data URL) and wired submitBrand to
+    create/update redemptions with the uploaded thumbnailUrl. Corrected the gateway
+    order-http-url to the real Order HTTP port 8087. Frontend typecheck is clean for
+    the page and composable. Code-complete across all 5 subtasks; live smoke is
+    pending MinIO and credentials (user ops).
+- phase: in_review (order-deploy-wiring done)
+  agent: dev
+  reason: Wired S3_* end to end in Order deploy at the user's request to fill the
+    real values via GitHub Secrets - deployment env (configMap + secret refs,
+    optional), configmap S3 keys, and the deploy workflow now create the S3 config
+    and access/secret keys from GitHub Secrets. All three YAML files parse. Uploads
+    stay disabled until S3_BUCKET is set. Remaining is MinIO provisioning + secrets
+    (user) and live smoke.
+- phase: in_review -> done
+  agent: reviewer
+  reason: Approved. Fresh verification green across all three repos - Order
+    build/vet/upload-tests, api-gateway build/vet, backoffice typecheck (0 errors in
+    the changed files), and the deploy YAML parses. All acceptance criteria met. Live
+    operational smoke (deployed backoffice + real S3/CloudFront) is the user's ops
+    confirmation, not a code deliverable of this task.

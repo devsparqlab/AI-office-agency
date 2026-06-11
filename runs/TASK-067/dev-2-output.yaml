@@ -1,0 +1,62 @@
+summary: |
+  Implemented the Games-Labs-Missions check-in calendar runtime against the published TASK-066 shared-lib contract.
+  Added durable check-in campaign, milestone, day ledger, milestone claim, and restore ledger persistence with unique constraints for idempotency.
+  Added a focused check-in calendar service for calendar day status derivation, milestone eligibility/claiming, restore quote pricing, and restore debit recording.
+  Wired Mobile HTTP routes, Backoffice config routes, typed gRPC methods, and quest overview's compact calendar endpoint reference while preserving existing monthly check-in behavior.
+  The shared-lib dependency is pinned to v0.0.0-20260525172513-2504f03eefbc with no committed replace directive.
+artifacts:
+  - path: Games-Labs-Missions/go.mod
+    action: modified
+  - path: Games-Labs-Missions/go.sum
+    action: modified
+  - path: Games-Labs-Missions/migrations/023_check_in_calendar.sql
+    action: created
+  - path: Games-Labs-Missions/internal/models/models.go
+    action: modified
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    action: modified
+  - path: Games-Labs-Missions/internal/repositories/mission_repo_test.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/check_in_calendar_service.go
+    action: created
+  - path: Games-Labs-Missions/internal/services/check_in_calendar_service_test.go
+    action: created
+  - path: Games-Labs-Missions/internal/services/mission_service.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/quest_overview_service.go
+    action: modified
+  - path: Games-Labs-Missions/internal/handlers/mission_handler.go
+    action: modified
+  - path: Games-Labs-Missions/internal/handlers/mission_handler_test.go
+    action: modified
+  - path: Games-Labs-Missions/internal/handlers/adminhdl/admin_handler.go
+    action: modified
+  - path: Games-Labs-Missions/internal/handlers/adminhdl/admin_handler_test.go
+    action: modified
+  - path: Games-Labs-Missions/internal/routes/apiv1.go
+    action: modified
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+    action: modified
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server_test.go
+    action: modified
+next_action:
+  agent: reviewer
+  reason: Runtime implementation is wired and verified locally; reviewer should validate contract semantics, restore edge cases, and persistence migration shape.
+context_sources:
+  github:
+    branch: "main"
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "codebase_status projectPath=d:\\llm"
+      - "TASK-067 check-in calendar Missions runtime MonthlyChallenge UserStreak restore ledger shared-lib contract"
+    relevant_symbols:
+      - Games-Labs-Missions/internal/services/mission_service.go
+      - Games-Labs-Missions/internal/repositories/mission_repo.go
+      - Games-Labs-Missions/internal/routes/apiv1.go
+      - shared-lib/proto/missionspb/missions.proto
+    notes: "Remote SocratiCode was green; all implementation claims were verified against local source files."
+blockers:
+  - "Restore behavior intentionally repairs the earliest missed/broken day in the current month only; arbitrary day repair remains out of scope per PM risk notes."
+  - "Readonly build required GOCACHE and GOMODCACHE redirected to /private/tmp because the sandbox cannot write the default Go caches under the home directory."

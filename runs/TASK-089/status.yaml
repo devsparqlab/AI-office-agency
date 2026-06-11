@@ -1,0 +1,77 @@
+task_id: TASK-089
+phase: in_progress
+state: in_progress
+current_agent: dev
+iteration: 1
+assigned_to: dev
+created_at: '2026-06-11'
+updated_at: '2026-06-11'
+ready: true
+blocked_on: []
+waiting_for:
+- user reviews component structure before wiring into items.vue
+assignment:
+  primary: dev
+  parallel: false
+history:
+- phase: created -> in_progress
+  agent: dev
+  reason: >
+    User agreed to one parameterized create wizard (kind: evoucher | gift) rather
+    than two separate modals. Building the component scaffold first
+    (RedemptionItemCreateModal.vue): gift = 2 steps (Basic Info incl. inline manual
+    quota, Condition); evoucher = 4 steps (Basic Info, Condition, Code import with
+    dedupe modal + code list, Setting with display type + time limit + quota computed
+    from code count). Shared markup (basic-info core, condition, quota field group)
+    written once. Submits to existing POST /redemption-item. Wiring into items.vue
+    (remove inline modal, add E-Voucher/Gift tabs) deferred to a follow-up since the
+    list page work is on hold per the user. Flagged backend gaps: no `type` field
+    (kind not persisted), no `total_quota` field (gift quota), no separate
+    limit-per-player field.
+- phase: in_progress (component scaffold built + typecheck-clean)
+  agent: dev
+  reason: >
+    Added app/components/RedemptionItemCreateModal.vue — one parameterized wizard.
+    Props: open (v-model), kind ('evoucher'|'gift'), brandOptions/tagOptions/vipOptions
+    (parent owns fetching). Emits update:open + created. Steps driven by STEPS_BY_KIND
+    (gift: Basic Info + Condition; evoucher: + Code + Setting). Shared quota section
+    rendered once via showQuota (gift→Basic Info manual counter; evoucher→Setting,
+    Total Quota read-only = codes.length). Code step: demo .csv/.txt import parser +
+    manual add + dedupe Confirm modal + code list with Clear all. Basic Info has a
+    real Collection Tag multi-select (chips + checkbox dropdown, onClickOutside), brand
+    & VIP selects, thumbnail/banner upload via /uploads. Submits to POST
+    /redemption-item with the existing snake_case contract; total_quota/type not sent
+    (no API field). onClickOutside imported from @vueuse/core (no @vueuse/nuxt module).
+    nuxi typecheck clean for the component. NOT yet wired into items.vue — list-page
+    work (remove inline modal, add E-Voucher/Gift tabs) deferred per the user; awaiting
+    review of the structure before wiring.
+- phase: in_progress (wired into items.vue)
+  agent: dev
+  reason: >
+    User approved wiring. items.vue: removed the entire inline create modal (~600
+    lines of template) plus all create-only script (createItemForm, steps, image
+    upload, code import, validation, submit, and the onClickOutside/uploadImage/toast/
+    StoreSaleDatePicker imports + CREATE_ITEM_* constants). Added E-Voucher/Gift tabs
+    (activeItemTab) where the "Item List" heading was; the Create button is now
+    "Create New {E-Voucher|Gift}" and opens <RedemptionItemCreateModal :kind="createKind">
+    (evoucher/gift by tab). Brand/tag options now exposed as {id,name}[] (tagNameToId
+    replaced by tagOptions) and passed as props; @created reloads the list. First
+    column header follows the tab; the type pill is hidden when typeLabel is blank.
+    Tab filter is interim (visibleRows): items with a blank typeLabel show under BOTH
+    tabs until the API returns a real `type` (B6) — flagged. nuxi typecheck clean for
+    items.vue + the component; no new errors elsewhere. Remaining: user commits/pushes
+    + live smoke (open both create flows; confirm create reloads the list).
+- phase: in_progress (live-verified + date-picker tweak)
+  agent: dev
+  reason: >
+    Ran the app (nuxt dev on :3013 via .claude/launch.json + Claude_Preview; bypassed
+    the /admin auth guard with a dummy localStorage backoffice-auth token — API 401s as
+    expected, list shows "Invalid or expired token"). Verified in-browser: E-Voucher/Gift
+    tabs render, Create button + first column header follow the active tab, E-Voucher
+    opens the 4-step wizard (Basic Info·Condition·Code·Setting) and Gift the 2-step
+    (Basic Info incl. Total Quota/Player Quota · Condition); Next is disabled until valid.
+    Then, on user request, swapped Start Date/End Date from plain text inputs to
+    StoreSaleDatePicker (project's @vuepic/vue-datepicker wrapper, centered mode for the
+    scrollable modal); loosened dmyToIso to accept "dd/MM/yyyy HH:mm[:ss]" since the
+    picker emits HH:mm. Calendar opens cleanly inside the modal; typecheck clean.
+    User is continuing manual review on the running preview.

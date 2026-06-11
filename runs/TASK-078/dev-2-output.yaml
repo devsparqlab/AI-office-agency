@@ -1,0 +1,111 @@
+task_id: TASK-078
+agent: dev-2
+status: done
+iteration: 3
+summary: |
+  Added `days[].is_restored` end to end for the Missions check-in calendar.
+  Shared-lib contract work passed subagent implementation/spec/quality review,
+  then downstream Missions/api-gateway were bumped to the published shared-lib
+  version and updated with runtime mapping, focused tests, and docs/Postman
+  examples.
+completed:
+- Added `bool is_restored = 7;` to `CheckInCalendarDay`.
+- Regenerated shared-lib proto/swagger artifacts.
+- Verified shared-lib with `go test ./...` via worker.
+- Completed subagent spec compliance review with approval.
+- Completed subagent code quality review with approval.
+- Bumped Games-Labs-Missions and api-gateway to shared-lib
+  v0.0.0-20260608082044-b8a073833ca9.
+- Added `models.CheckInCalendarDay.IsRestored`.
+- Populated `IsRestored` only from `check_in_day_ledgers.source == "restore"`.
+- Mapped the flag through `missionCheckInCalendarToPB`.
+- Added focused service and gRPC tests.
+- Updated Missions README and both Postman collection copies.
+changed_files:
+- shared-lib/proto/missionspb/missions.proto
+- shared-lib/proto/missionspb/missions.pb.go
+- shared-lib/proto/missionspb/missions.swagger.json
+- shared-lib/proto/missionspb/swagger.pb.go
+- Games-Labs-Missions/go.mod
+- Games-Labs-Missions/go.sum
+- Games-Labs-Missions/internal/models/models.go
+- Games-Labs-Missions/internal/services/check_in_calendar_service.go
+- Games-Labs-Missions/internal/services/check_in_calendar_service_test.go
+- Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+- Games-Labs-Missions/internal/grpc/missiongrpc/server_test.go
+- Games-Labs-Missions/README.md
+- api-gateway/go.mod
+- api-gateway/go.sum
+- api-gateway/docs/Games-Labs-APIs.postman_collection.json
+- docs/Games-Labs-APIs.postman_collection.json
+artifacts:
+- path: runs/TASK-078/task.md
+  action: unchanged
+  description: PM task plan for restored check-in day flag.
+- path: runs/TASK-078/status.yaml
+  action: modified
+  description: Updated task state from blocked to in_review after downstream implementation.
+- path: runs/TASK-078/dev-2-output.yaml
+  action: modified
+  description: Dev-2 implementation handoff and verification summary.
+- path: runs/TASK-078/verification-evidence.md
+  action: modified
+  description: Shared-lib, downstream, TDD, and verification evidence.
+- path: shared-lib/proto/missionspb/missions.proto
+  action: modified
+  description: Added `bool is_restored = 7` to `CheckInCalendarDay`.
+- path: Games-Labs-Missions/internal/services/check_in_calendar_service.go
+  action: modified
+  description: Populates restored-day flag from check-in ledger source.
+- path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+  action: modified
+  description: Maps restored-day flag to typed protobuf response.
+- path: Games-Labs-Missions/README.md
+  action: modified
+  description: Documents `days[].is_restored`.
+- path: api-gateway/docs/Games-Labs-APIs.postman_collection.json
+  action: modified
+  description: Updates gateway Postman example.
+- path: docs/Games-Labs-APIs.postman_collection.json
+  action: modified
+  description: Updates duplicate Postman example.
+blocked_on: []
+blockers: []
+next_action:
+  agent: reviewer
+  reason: Implementation is ready for final reviewer approval; spec compliance
+    and code-quality reviews have already approved.
+verification:
+- command: make buf
+  cwd: shared-lib
+  result: passed after worker reran with approved escalation due sandbox Go cache trim error
+- command: go test ./...
+  cwd: shared-lib
+  result: passed
+- command: git diff --check
+  cwd: shared-lib
+  result: passed in reviewer
+- command: go test ./internal/services -run 'TestGetCheckInCalendarMarksRestoredLedgerDays'
+  cwd: Games-Labs-Missions
+  result: failed before implementation because `IsRestored` did not exist
+- command: go test ./internal/grpc/missiongrpc -run 'TestMissionCheckInCalendarToPBMapsRestoredDayFlag'
+  cwd: Games-Labs-Missions
+  result: failed before implementation because `IsRestored` did not exist
+- command: go test ./internal/services ./internal/grpc/missiongrpc
+  cwd: Games-Labs-Missions
+  result: passed
+- command: go test ./...
+  cwd: Games-Labs-Missions
+  result: passed
+- command: GOWORK=off go build -mod=readonly ./...
+  cwd: Games-Labs-Missions
+  result: passed
+- command: go test ./...
+  cwd: api-gateway
+  result: passed
+- command: GOWORK=off go build -mod=readonly ./...
+  cwd: api-gateway
+  result: passed
+- command: node JSON parse for both Postman collections
+  cwd: /Users/earth/Documents/GitHub
+  result: passed

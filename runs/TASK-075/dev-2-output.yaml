@@ -1,0 +1,51 @@
+summary: |
+  Validated and tightened AFB as the reference gameplay turnover lane without
+  changing its payout-time semantics. The service now exposes a small test seam
+  so focused tests can assert that Game `TrySettleRound` runs only after payout
+  wallet transactions succeed.
+
+  Added AFB service-level coverage for payout-time `SettleRound` after wallet
+  success and wallet-failure skip. Turnover mapper tests now also cover top-
+  level `valid_turnover` primary, transaction `valid_turnover` fallback, debit
+  magnitude fallback, and zero/no-turnover behavior.
+
+  README and verification evidence now include AFB-specific log grep patterns,
+  wallet SQL, Game `round_lifecycles` SQL, Missions `turnover.settled`
+  downstream checks, and a QA warning that `afb:bet:*` wallet rows alone do not
+  progress Daily turnover until payout arrives.
+
+  Verification:
+  - `go test ./internal/core/services/afb`
+  - `go test ./...`
+  - `git diff --check`
+artifacts:
+  - path: Games-Labs-Provider/internal/core/services/afb/service.go
+    action: modified
+  - path: Games-Labs-Provider/internal/core/services/afb/service_test.go
+    action: created
+  - path: Games-Labs-Provider/internal/core/services/afb/turnover_test.go
+    action: modified
+  - path: Games-Labs-Provider/README.md
+    action: modified
+  - path: ai-dev-office/runs/TASK-075/verification-evidence.md
+    action: created
+  - path: ai-dev-office/runs/TASK-075/dev-2-output.yaml
+    action: created
+next_action:
+  agent: reviewer
+  reason: AFB reference turnover validation now has focused test coverage, Provider-wide tests pass, and the runtime evidence checklist is recorded.
+context_sources:
+  github:
+    branch: "main"
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "AFB payout valid_turnover SettleRound fallback debit magnitude Games-Labs-Provider"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/afb/service.go"
+      - "Games-Labs-Provider/internal/core/models/providers/afb/afb.go"
+      - "Games-Labs-Provider/internal/adapters/gameadt/settle_round.go"
+      - "ai-dev-office/runs/TASK-070/verification-evidence.md"
+    notes: "Remote d:\\llm index was available; implementation details were verified against local source and fresh local tests."
+blockers: []

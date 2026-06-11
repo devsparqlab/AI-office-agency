@@ -36,8 +36,23 @@ office.config.local.yaml
 profiles/*.local.yaml
 .socraticode.local.yaml
 .worktrees/
+
+# runs/ — team-synced task state (allowlist; logs and generated files stay local)
 runs/*
+!runs/*/
+runs/*/*
+!runs/*/task.md
+!runs/*/status.yaml
+!runs/*/*-output.yaml
+!runs/*/decision.yaml
+!runs/*/verification-evidence.md
+!runs/*/findings.md
 !runs/.gitkeep
+
+runs/*/*.log
+runs/*/.cursor-prompt.md
+runs/*/meta.yaml
+runs/*/status.yaml.corrupt.*
 
 # Editor/IDE
 # .idea/

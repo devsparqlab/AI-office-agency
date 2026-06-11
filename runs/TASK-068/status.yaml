@@ -1,0 +1,41 @@
+---
+task_id: TASK-068
+phase: done
+state: done
+current_agent: done
+iteration: 3
+assigned_to: dev-2
+created_at: '2026-05-25'
+updated_at: '2026-05-26'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-068/reviewer-output.yaml
+history:
+- phase: created -> blocked
+  agent: pm
+  reason: Docs and consumer handoff must be based on the implemented runtime API shape
+    from TASK-067, so this task is opened now for tracking but remains blocked until
+    runtime behavior is complete.
+- phase: blocked -> pending
+  agent: codex
+  reason: TASK-067 is done and reviewer approved the runtime implementation, so docs
+    and consumer handoff can now be synchronized.
+- phase: pending -> in_review
+  agent: dev-2
+  reason: README, both Postman collection copies, and verification evidence are synchronized
+    to TASK-067 runtime endpoints and consumer handoff guidance.
+- phase: in_review -> in_review
+  agent: dev-2
+  reason: Docs and duplicate Postman collections are synchronized to the approved
+    TASK-067 runtime endpoints and JSON validation passed.
+- phase: in_review -> done
+  agent: reviewer
+  reason: Reviewer approved docs/README/Postman sync against TASK-067 runtime endpoints;
+    acceptance criteria met; Games-Labs-Missions build and tests pass.

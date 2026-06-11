@@ -1,0 +1,50 @@
+summary: |
+  Approved. TASK-074 now does exactly what its scope called for: Sigma's
+  end-round settlement hooks are locally validated, turnover mapping is covered,
+  `Cancel` remains non-settling, and the docs/evidence explicitly say that full
+  staging E2E is deferred because the current Sigma wallet path is still a stub.
+
+  I rechecked the new Sigma service seam, mapper tests, README QA note, and the
+  verification evidence on disk. Local Provider verification passed, including
+  the focused Sigma package check, the full `Games-Labs-Provider` suite, and
+  `git diff --check`.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    In `Games-Labs-Provider`:
+    - `go test ./internal/core/services/sigma ./internal/handlers/sigmahdl`
+    - `go test ./...`
+    - `git diff --check`
+artifacts:
+  - path: Games-Labs-Provider/internal/core/services/sigma/service.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/sigma/service_test.go
+    issues: []
+  - path: Games-Labs-Provider/internal/core/services/sigma/turnover_test.go
+    issues: []
+  - path: Games-Labs-Provider/README.md
+    issues: []
+  - path: ai-dev-office/runs/TASK-074/verification-evidence.md
+    issues: []
+next_action:
+  agent: done
+  reason: Acceptance criteria are satisfied for Sigma local validation and explicit E2E deferral.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: unavailable
+    queries:
+      - "TASK-074 Sigma turnover validation stub wallet path"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/sigma/service.go"
+      - "Games-Labs-Provider/internal/core/services/sigma/turnover.go"
+      - "ai-dev-office/runs/TASK-074/verification-evidence.md"
+    notes: Review approval is based on current source files and fresh local verification.
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

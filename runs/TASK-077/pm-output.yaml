@@ -1,0 +1,130 @@
+task:
+  id: "TASK-077"
+  title: "Turnover Rollout Runtime Hardening"
+  short_name: "turnover-rollout-hardening"
+  parent: "TASK-069"
+  epic: "Quest Daily Turnover / Provider Gameplay Settlement"
+  type: devops
+  priority: high
+  created_at: "2026-06-01"
+scope:
+  target_services:
+    - service: Games-Labs-Provider
+      reason: "Owns GAME_API_URL usage, provider runtime logs, and VPS-side deploy guidance."
+    - service: Games-Labs-Game
+      reason: "Owns NodePort/runtime contract and RabbitMQ fail-fast behavior."
+    - service: Games-Labs-Missions
+      reason: "Must stay broker-aligned with Game for turnover event consumption."
+    - service: repo-local deploy workflows
+      reason: "Deploy workflows should reflect the canonical env source of truth."
+    - service: ai-dev-office
+      reason: "Should own the shared rollout runbook and verification checklist."
+  affected_files:
+    - path: "Games-Labs-Provider/README.md"
+      action: modify
+      description: "Keep provider runtime guidance aligned with the canonical rollout runbook."
+    - path: "Games-Labs-Game/README.md"
+      action: modify
+      description: "Clarify Game NodePort and RabbitMQ runtime expectations."
+    - path: "Games-Labs-Missions/README.md"
+      action: modify
+      description: "Clarify shared RabbitMQ alignment expectations for player activity consumption."
+    - path: "Games-Labs-Provider/.github/workflows/dev.yml"
+      action: modify
+      description: "Document or align turnover runtime env propagation in the deploy workflow."
+    - path: "Games-Labs-Game/.github/workflows/deploy.yml"
+      action: modify
+      description: "Document or align Game runtime env propagation and broker requirement."
+    - path: "Games-Labs-Missions/.github/workflows/deploy.yml"
+      action: modify
+      description: "Document or align Missions runtime broker requirement."
+    - path: "ai-dev-office/docs/turnover-rollout-runbook.md"
+      action: create
+      description: "Create the canonical turnover rollout hardening runbook."
+    - path: "ai-dev-office/scripts/verify-turnover-rollout.sh"
+      action: create
+      description: "Add a repeatable verification helper for the standard runtime checks."
+    - path: "ai-dev-office/runs/TASK-077/verification-evidence.md"
+      action: create
+      description: "Record the exact commands, env checks, and deferred items for the runtime hardening pass."
+description: |
+  Convert the lessons from the provider validation wave into a stable rollout/runtime discipline for the Daily turnover rails. The business logic is already in place; the failure modes now come from environment drift, fragmented operator knowledge, and inconsistent post-deploy verification across Provider, Game, and Missions.
+
+  This task should centralize canonical runtime values and ownership, add a repeatable verification runbook/script, and document the still-deferred items so future work can branch into Sigma real-wallet rollout and monitoring without re-triaging the same drift incidents.
+acceptance_criteria:
+  - criterion: "Canonical staging/runtime ownership for GAME_API_URL and RABBITMQ_URL is documented consistently across Provider/Game/Missions."
+  - criterion: "A single turnover rollout runbook covers SettleRound, ReverseRound, round_lifecycles, daily_activity_consumer_events, and quest/overview verification."
+  - criterion: "Deploy workflow guidance clearly indicates where the turnover runtime env values originate."
+  - criterion: "The runbook includes the full IDG cancel reverse proof path from bet through turnover.reversed."
+  - criterion: "Shared-lib contract release/bump guardrails are documented, including go mod tidy and GOWORK=off go build -mod=readonly ./... checks."
+  - criterion: "Deferred runtime items, including Sigma real-wallet E2E and monitoring/alerts, are explicitly called out."
+plan:
+  approach: |
+    Treat this as a rollout hardening/documentation-plus-verification task, not new domain logic. Consolidate the current runtime truth from service READMEs, recent task evidence, and deploy workflow files into one canonical runbook, then backfill concise service-specific references and an operator-friendly verification helper.
+  subtasks:
+    - order: 1
+      id: "runtime-truth-audit"
+      description: "Audit current Provider/Game/Missions docs and workflows for GAME_API_URL, NodePort, and RabbitMQ ownership."
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Provider/README.md"
+        - "Games-Labs-Game/README.md"
+        - "Games-Labs-Missions/README.md"
+        - ".github/workflows/dev.yml"
+        - ".github/workflows/staging.yml"
+      parallel_safe: false
+    - order: 2
+      id: "canonical-runbook"
+      description: "Create the canonical turnover rollout runbook and verification helper script."
+      agent: dev-2
+      owned_files:
+        - "ai-dev-office/docs/turnover-rollout-runbook.md"
+        - "ai-dev-office/scripts/verify-turnover-rollout.sh"
+        - "ai-dev-office/runs/TASK-077/verification-evidence.md"
+      parallel_safe: false
+    - order: 3
+      id: "deferred-runtime-boundaries"
+      description: "Document what remains intentionally deferred after runtime hardening."
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Provider/README.md"
+        - "ai-dev-office/runs/TASK-077/verification-evidence.md"
+      parallel_safe: false
+  risks:
+    - risk: "Runtime docs may accidentally drift from the actual deploy path."
+      mitigation: "Validate every documented command and env source against the current workflow files and existing staging evidence."
+    - risk: "Task scope may sprawl into Sigma implementation or observability platform changes."
+      mitigation: "Keep those explicitly deferred in acceptance criteria and evidence."
+  estimated_complexity: medium
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "This is cross-service rollout hardening work touching runtime docs, workflows, and verification guidance."
+summary: |
+  TASK-077 is the first post-validation runtime hardening task for the gameplay turnover rollout. It should turn recent staging lessons into one canonical runbook, one verification flow, and one env/source-of-truth story before we branch into Sigma real-wallet rollout or monitoring.
+artifacts:
+  - path: runs/TASK-077/task.md
+    action: created
+  - path: runs/TASK-077/status.yaml
+    action: created
+  - path: runs/TASK-077/pm-output.yaml
+    action: created
+next_action:
+  agent: dev-2
+  reason: "The provider validation wave is complete, so runtime hardening can proceed now."
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: unavailable
+    queries:
+      - "GAME_API_URL RABBITMQ_URL turnover rollout runbook ReverseRound"
+    relevant_symbols:
+      - "Games-Labs-Provider/README.md"
+      - "Games-Labs-Game/README.md"
+      - "Games-Labs-Missions/README.md"
+      - "ai-dev-office/runs/TASK-070/verification-evidence.md"
+      - "ai-dev-office/runs/TASK-076/verification-evidence.md"
+    notes: "Session did not expose SocratiCode tools, so scope was verified by direct source inspection and existing task evidence."
+blockers: []

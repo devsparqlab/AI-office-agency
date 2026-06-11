@@ -1,0 +1,76 @@
+summary: |
+  Resolved the TASK-043 shared-lib publish blocker after the user published the Event claim contract. All guarded services now depend on github.com/SparqLab/shared-lib v0.0.0-20260508044342-171a210815f8, which includes missionspb.MissionEventClaimRequest, ClaimMissionEvent, and the generated /api/v1/missions/events/{event_id}/claim route.
+artifacts:
+  - path: "Games-Labs-Auth/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260508044342-171a210815f8."
+  - path: "Games-Labs-Auth/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Game/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260508044342-171a210815f8."
+  - path: "Games-Labs-Game/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Logs/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260508044342-171a210815f8."
+  - path: "Games-Labs-Logs/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Missions/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260508044342-171a210815f8 so Event claim missionspb symbols are available with GOWORK=off."
+  - path: "Games-Labs-Missions/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Order/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260508044342-171a210815f8."
+  - path: "Games-Labs-Order/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-User/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260508044342-171a210815f8."
+  - path: "Games-Labs-User/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Wallet/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260508044342-171a210815f8."
+  - path: "Games-Labs-Wallet/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "api-gateway/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260508044342-171a210815f8."
+  - path: "api-gateway/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+infra_checks:
+  - check: "shared-lib published contract"
+    result: pass
+    details: "Module cache for github.com/SparqLab/shared-lib@v0.0.0-20260508044342-171a210815f8 contains missionspb.MissionEventClaimRequest, ClaimMissionEvent, and /api/v1/missions/events/{event_id}/claim."
+  - check: "dependency guard"
+    result: pass
+    details: "GOPRIVATE=\"github.com/SparqLab/*\" GONOSUMDB=\"github.com/SparqLab/*\" ./ai-dev-office/scripts/check-service-dependencies.sh passed for Games-Labs-Logs, Games-Labs-Auth, api-gateway, Games-Labs-Wallet, Games-Labs-Game, Games-Labs-Missions, Games-Labs-Order, and Games-Labs-User."
+next_action:
+  agent: reviewer
+  reason: "The shared-lib versioning blocker is resolved and CI-parity dependency guard now passes."
+blockers: []
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - "github.com/SparqLab/shared-lib@v0.0.0-20260508044342-171a210815f8"
+      - "missionspb.MissionEventClaimRequest"
+      - "missionspb.ClaimMissionEvent"
+      - "/api/v1/missions/events/{event_id}/claim"
+      - "ai-dev-office/scripts/check-service-dependencies.sh"
+    notes: "DevOps verification used Go module cache inspection and local dependency guard output."

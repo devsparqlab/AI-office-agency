@@ -1,0 +1,43 @@
+---
+task_id: TASK-047
+phase: done
+state: done
+current_agent: done
+iteration: 4
+assigned_to: dev-2
+created_at: '2026-05-11'
+updated_at: '2026-05-11'
+ready: false
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-047/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: Scoped a DEV-only Daily reset override after the narrower admin reset path,
+    so Mobile QA can test accelerated rollover without changing product-default reset
+    semantics.
+- phase: pending -> pending
+  agent: pm
+  reason: Reprioritized to start first after Mobile explicitly preferred option 1,
+    the DEV-only time-window override via config or feature flag.
+- phase: pending -> in_review
+  agent: dev-2
+  reason: The DEV-only Daily reset override is wired, documented, and covered with
+    focused tests for default mode, interval mode, rollover, and non-DEV guarding.
+- phase: in_review -> done
+  agent: reviewer
+  reason: The DEV-only Daily reset override meets the acceptance criteria, preserves
+    Mission Boost's daily cadence, and passed build plus test verification.
+- phase: debugging -> in_review
+  agent: debugger
+  reason: The blocker is fixed in code with a focused regression test, so the reviewer
+    can re-run validation and approve if no other issues remain.
+- phase: in_review -> debugging
+  agent: reviewer
+  reason: Mission Boost cadence changed with the DEV interval bucket and needs a targeted
+    fix before approval.

@@ -1,0 +1,58 @@
+summary: |
+  Final review for TASK-032 closure. Runtime settlement ownership hooks for Order
+  turnover and Game rounds are approved based on the latest debugger and
+  adjudication evidence.
+
+  The repeated earlier review finding said Game `SettleRound` and `ReverseRound`
+  were helper-only wrappers. The current debugger output documents that this is
+  stale against HEAD: `SettleRound` writes canonical persisted state through
+  `UpsertRoundSettlement`, while `ReverseRound` loads an already-settled lifecycle
+  and persists distinct reversal state through `ReverseRoundSettlement`. The
+  repository layer stores separate settlement and reversal timestamps, and focused
+  tests cover canonical settle state, reversal anchored to persisted settlement,
+  missing-settlement rejection, and idempotent reversal behavior.
+
+  The Order turnover hook is also recorded as attached to the real fulfillment
+  transition. The task is already `phase: done` by manual adjudication, and no
+  fresh blocker remains.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: >-
+    The debugger/adjudication artifacts record passing `go build ./...` and
+    `go test ./...` for Games-Labs-Game and Games-Labs-Order after the persisted
+    round lifecycle implementation was present. This closure review introduces no
+    source-code change.
+artifacts:
+  - path: Games-Labs-Game/internal/core/services/gamesvc/service.go
+    action: unchanged
+    description: Settle and reverse paths are distinct persisted runtime lifecycle transitions.
+    issues: []
+  - path: Games-Labs-Game/internal/core/repositories/game.go
+    action: unchanged
+    description: Persists round lifecycle settlement and reversal state.
+    issues: []
+  - path: Games-Labs-Game/internal/core/services/gamesvc/service_test.go
+    action: unchanged
+    description: Covers settlement, stored-state reversal, missing settlement, and idempotent reversal behavior.
+    issues: []
+  - path: Games-Labs-Order/internal/core/services/ordersvc/service.go
+    action: unchanged
+    description: Turnover settlement ownership remains attached to the final fulfillment transition.
+    issues: []
+  - path: ai-dev-office/runs/TASK-032/adjudication-note.yaml
+    action: unchanged
+    description: Records direct evidence that the repeated reviewer blocker was stale.
+    issues: []
+  - path: ai-dev-office/runs/TASK-032/reviewer-output.yaml
+    action: modified
+    description: Replaced stale changes-requested verdict with final approval after adjudication.
+    issues: []
+next_action:
+  agent: done
+  reason: Runtime ownership hooks are reviewed as complete and TASK-032 is closed.
+transition:
+  from_phase: in_review
+  to_phase: done
+blockers: []

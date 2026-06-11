@@ -1,0 +1,43 @@
+---
+task_id: TASK-037
+phase: done
+state: done
+current_agent: done
+iteration: 3
+assigned_to: dev
+created_at: '2026-05-06'
+updated_at: '2026-05-06'
+ready: true
+assignment:
+  primary: dev
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-037/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: Scoped Card A from the quest-vip-overview phase 1 plan as a User-owned VIP
+    tiers API. Ready for dev implementation.
+- phase: pending -> in_review
+  agent: dev
+  reason: Review the cross-repo VIP tiers implementation and confirm the shared-lib
+    publish/bump follow-up needed for standalone `Games-Labs-User` builds.
+- phase: in_review -> devops_needed
+  agent: reviewer
+  reason: Dependency guard failed because the TASK-037 shared-lib contract exists
+    only locally and is not available as a published shared-lib version for GOWORK=off
+    service builds.
+- phase: devops_needed -> in_review
+  agent: devops
+  reason: Aligned guarded services to shared-lib v0.0.0-20260506090359-677913680a16
+    and dependency guard passed.
+- phase: in_review -> devops_needed
+  agent: reviewer
+  reason: Publish or otherwise make the local shared-lib TASK-037 contract available
+    as a versioned dependency, then align guarded services to a shared-lib version
+    that contains both the Auth event fields and the new ListVipTiers userpb symbols.
+- phase: in_review -> done
+  agent: reviewer
+  reason: "Reviewer approved TASK-037 after shared-lib v0.0.0-20260506090359-677913680a16 alignment; build, tests, and dependency guard passed."

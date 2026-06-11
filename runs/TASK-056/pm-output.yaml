@@ -1,0 +1,175 @@
+task:
+  id: TASK-056
+  title: Complete All Daily Bonus
+  short_name: daily-completion-bonus
+  parent: TASK-049
+  epic: Mobile Missions integration
+  type: feature
+  priority: medium
+  created_at: '2026-05-18'
+
+scope:
+  target_services:
+    - service: Games-Labs-Missions
+      reason: >-
+        Owns daily activities, Bangkok-day progress, quest overview JSON, mission_config,
+        claim flows, PostgreSQL migrations, and HTTP routes consumed via grpc-gateway.
+    - service: shared-lib
+      reason: >-
+        missions.proto RPC + HTTP annotations and regenerated missionspb artifacts for the new claim endpoint.
+    - service: api-gateway
+      reason: >-
+        Pins shared-lib; requires version bump when protobuf surface changes so gateway compiles against new stubs.
+  affected_files:
+    - path: Games-Labs-Missions/migrations/*.sql
+      action: create
+      description: mission_config columns for daily-completion bonus; claim ledger table with unique (user_id, bangkok_day).
+    - path: Games-Labs-Missions/internal/models/models.go
+      action: modify
+      description: MissionConfig fields; optional small types for overview bonus DTOs if not inlined.
+    - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+      action: modify
+      description: Load/update config; insert/select claim rows with conflict handling.
+    - path: Games-Labs-Missions/internal/services/mission_service.go
+      action: modify
+      description: ClaimDailyCompletionBonus + wallet/idempotency aligned with existing daily/monthly claims.
+    - path: Games-Labs-Missions/internal/services/quest_overview_service.go
+      action: modify
+      description: New top-level overview field separate from bonus_reward (monthly).
+    - path: Games-Labs-Missions/internal/services/quest_overview_service_test.go
+      action: modify
+      description: Coverage for new field and eligibility edge cases.
+    - path: Games-Labs-Missions/internal/handlers/mission_handler.go
+      action: modify
+      description: HTTP handler for new POST claim route.
+    - path: Games-Labs-Missions/internal/routes/apiv1.go
+      action: modify
+      description: Register mux route for claim endpoint.
+    - path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+      action: modify
+      description: Dispatch new RPC to same HTTP path as service mux.
+    - path: shared-lib/proto/missionspb/missions.proto
+      action: modify
+      description: New rpc + google.api.http POST mapping (Struct bodies consistent with ClaimDaily).
+    - path: shared-lib/proto/missionspb/*.pb.go
+      action: modify
+      description: Regenerated via repo proto toolchain (do not hand-edit).
+    - path: Games-Labs-Missions/go.mod
+      action: modify
+      description: Bump github.com/SparqLab/shared-lib replace/version after proto publish pattern used in repo.
+    - path: api-gateway/go.mod
+      action: modify
+      description: Bump shared-lib pin if missions service bumps force alignment.
+    - path: Games-Labs-Missions/README.md
+      action: modify
+      description: Mobile contract — monthly bonus_reward vs daily_completion_bonus + claim API.
+    - path: api-gateway/docs/Games-Labs-APIs.postman_collection.json
+      action: modify
+      description: Examples for overview JSON and new claim call.
+
+description: |
+  Implement a configurable “complete all daily” bonus: when every eligible Daily Activity for the Bangkok day
+  has progress reaching its target (independent of whether child rewards were claimed), the user may claim
+  a dedicated reward once per Bangkok calendar day. The feature must not overload the existing quest/overview
+  field bonus_reward, which remains the monthly login/check-in aggregate driven by MonthlyChallenge.
+
+acceptance_criteria:
+  - criterion: mission_config (or equivalent) stores daily-completion bonus parameters separately from monthly challenge reward fields.
+  - criterion: Eligible activities match Daily-tab DailyActivity-backed rows at overview time (active standalone + active children under active groups); synthetic rows like watch-ad/streak are excluded unless scope explicitly expands.
+  - criterion: Completion uses progress CurrentValue >= TargetValue / existing IsComplete semantics; child claim state does not affect eligibility.
+  - criterion: GET /api/v1/quest/overview exposes a new object distinct from bonus_reward with total/completed/claimable/claimed/reward semantics documented in README.
+  - criterion: POST claim credits wallet at most once per (user, Bangkok day); duplicate attempts are idempotent-safe without double credit.
+  - criterion: shared-lib missions.proto and generated code updated; Games-Labs-Missions grpc server dispatches the new RPC; module pins updated as required.
+  - criterion: Automated tests cover eligibility, overview payload, and claim idempotency; README and Postman updated.
+
+plan:
+  approach: |
+    Add schema + repository accessors, implement eligibility enumeration mirroring buildDailyTab filters,
+    add MissionService claim with unique constraint idempotency and wallet credit consistent with ClaimDaily,
+    extend QuestOverview JSON additively, register HTTP + grpc-gateway RPC with Struct payloads,
+    regenerate protobufs and bump shared-lib consumers, finish README/Postman.
+  subtasks:
+    - order: 1
+      id: '056-schema-config'
+      description: Migrations, MissionConfig fields, repository methods for config + daily-completion claim ledger.
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/migrations/
+        - Games-Labs-Missions/internal/models/models.go
+        - Games-Labs-Missions/internal/repositories/mission_repo.go
+      parallel_safe: false
+    - order: 2
+      id: '056-eligibility-claim'
+      description: Eligibility helper; ClaimDailyCompletionBonus in MissionService; HTTP handler + route wiring.
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/internal/services/mission_service.go
+        - Games-Labs-Missions/internal/handlers/mission_handler.go
+        - Games-Labs-Missions/internal/routes/apiv1.go
+      parallel_safe: false
+    - order: 3
+      id: '056-overview-json'
+      description: QuestOverview struct + GetOverview population + unit tests for new field vs monthly bonus_reward.
+      agent: dev-2
+      owned_files:
+        - Games-Labs-Missions/internal/services/quest_overview_service.go
+        - Games-Labs-Missions/internal/services/quest_overview_service_test.go
+      parallel_safe: false
+    - order: 4
+      id: '056-proto-gateway-docs'
+      description: missions.proto RPC + codegen; missiongrpc dispatch; go.mod bumps; README + Postman.
+      agent: dev-2
+      owned_files:
+        - shared-lib/proto/missionspb/missions.proto
+        - Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+        - Games-Labs-Missions/go.mod
+        - api-gateway/go.mod
+        - Games-Labs-Missions/README.md
+        - api-gateway/docs/Games-Labs-APIs.postman_collection.json
+      parallel_safe: false
+  risks:
+    - risk: Misalignment between overview eligibility and Daily tab rows confuses Mobile
+      mitigation: Share one helper or strictly duplicate buildDailyTab filters with regression tests.
+    - risk: Proto regeneration / shared-lib version drift breaks gateway build
+      mitigation: Single subtask owns codegen + tidy + pinned bumps across missions and gateway.
+    - risk: Zero eligible configured dailies
+      mitigation: Document non-claimable behavior and assert in tests.
+  estimated_complexity: high
+
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: >-
+    Touches migrations, service logic, overview contract, new claim HTTP/proto surface, and multi-module shared-lib alignment.
+
+summary: |
+  TASK-056 adds a Bangkok-day “complete all configured Daily Activities” bonus separate from the monthly
+  bonus_reward already on quest/overview. Work proceeds schema-first, then claim/idempotency, overview JSON,
+  then protobuf + documentation so gateway and Mobile share one contract.
+
+artifacts:
+  - path: runs/TASK-056/task.md
+    action: modified
+  - path: runs/TASK-056/status.yaml
+    action: modified
+  - path: runs/TASK-056/pm-output.yaml
+    action: created
+
+next_action:
+  agent: dev-2
+  reason: Product rules are confirmed; blueprint lists concrete files, acceptance tests, and ordered subtasks.
+
+context_sources:
+  github:
+    branch: ''
+    pr: ''
+  socraticode:
+    status: used
+    queries:
+      - pm TASK-056 Complete All Daily Bonus
+    relevant_symbols:
+      - 'Games-Labs-Missions/internal/services/quest_overview_service.go (QuestOverview, buildDailyTab)'
+      - shared-lib/proto/missionspb/missions.proto (GetQuestOverview)
+    notes: Verified bonus_reward maps to MonthlyChallenge in GetOverview; daily completion bonus is net-new.
+
+blockers: []

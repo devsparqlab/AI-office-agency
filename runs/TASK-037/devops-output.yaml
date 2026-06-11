@@ -1,0 +1,73 @@
+summary: |
+  Resolved the TASK-037 dependency guard blocker after the user published shared-lib. All guarded services now depend on github.com/SparqLab/shared-lib v0.0.0-20260506090359-677913680a16, which includes both the Auth UserRegisteredEvent fields and the new userpb ListVipTiers/VipTier contract required by Games-Labs-User.
+artifacts:
+  - path: "Games-Labs-Auth/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260506090359-677913680a16."
+  - path: "Games-Labs-Auth/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Game/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260506090359-677913680a16."
+  - path: "Games-Labs-Game/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Logs/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260506090359-677913680a16."
+  - path: "Games-Labs-Logs/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Missions/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260506090359-677913680a16."
+  - path: "Games-Labs-Missions/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Order/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260506090359-677913680a16."
+  - path: "Games-Labs-Order/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-User/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260506090359-677913680a16 so userpb.ListVipTiers is available with GOWORK=off."
+  - path: "Games-Labs-User/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "Games-Labs-Wallet/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260506090359-677913680a16."
+  - path: "Games-Labs-Wallet/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+  - path: "api-gateway/go.mod"
+    action: modified
+    description: "Aligned shared-lib dependency to v0.0.0-20260506090359-677913680a16."
+  - path: "api-gateway/go.sum"
+    action: modified
+    description: "Regenerated checksums after shared-lib alignment."
+infra_checks:
+  - check: "shared-lib published contract"
+    result: pass
+    details: "Module cache for github.com/SparqLab/shared-lib@v0.0.0-20260506090359-677913680a16 contains userpb.ListVipTiers/VipTier and events.UserRegisteredEvent GoogleID/FacebookID/AppleSub."
+  - check: "dependency guard"
+    result: pass
+    details: "GOPRIVATE=\"github.com/SparqLab/*\" GONOSUMDB=\"github.com/SparqLab/*\" ./ai-dev-office/scripts/check-service-dependencies.sh passed for Games-Labs-Logs, Games-Labs-Order, Games-Labs-User, Games-Labs-Auth, Games-Labs-Game, api-gateway, Games-Labs-Missions, and Games-Labs-Wallet."
+next_action:
+  agent: reviewer
+  reason: "The shared-lib versioning blocker is resolved and CI-parity dependency guard now passes."
+blockers: []
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - "github.com/SparqLab/shared-lib@v0.0.0-20260506090359-677913680a16"
+      - "ai-dev-office/scripts/check-service-dependencies.sh"
+    notes: "DevOps verification used Go module cache inspection and local dependency guard output."

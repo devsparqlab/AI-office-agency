@@ -1,0 +1,28 @@
+task_id: TASK-029
+decisions:
+  - decision: approve
+    actor: dashboard-user
+    decided_at: '2026-06-05T09:59:08.566Z'
+    note: test
+    against_verdict: changes_requested
+    against_phase: done
+  - decision: reject
+    actor: dashboard-user
+    decided_at: '2026-06-05T09:59:20.874Z'
+    against_verdict: changes_requested
+    against_phase: done
+  - decision: approve
+    actor: dashboard-user
+    decided_at: '2026-06-05T09:59:23.297Z'
+    against_verdict: changes_requested
+    against_phase: done
+  - decision: request_changes
+    actor: dashboard-user
+    decided_at: '2026-06-05T09:59:25.752Z'
+    against_verdict: changes_requested
+    against_phase: done
+  - decision: approve
+    actor: dashboard-user
+    decided_at: '2026-06-05T09:59:29.386Z'
+    against_verdict: changes_requested
+    against_phase: done

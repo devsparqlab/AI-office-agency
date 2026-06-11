@@ -1,0 +1,174 @@
+task:
+  id: TASK-078
+  title: Add Restored Check-In Day Flag
+  short_name: check-in-restored-day-flag
+  parent: TASK-067
+  epic: Check-In Calendar and Consecutive Bonus
+  type: feature
+  priority: medium
+  created_at: '2026-06-08'
+scope:
+  target_services:
+  - service: shared-lib
+    reason: Owns the Missions proto contract and generated gateway/swagger artifacts.
+  - service: Games-Labs-Missions
+    reason: Builds calendar day responses and has persisted ledger source data.
+  - service: api-gateway
+    reason: External API docs/Postman examples must stay aligned.
+  - service: docs
+    reason: Duplicate top-level Postman collection must stay aligned when present.
+  affected_files:
+  - path: shared-lib/proto/missionspb/missions.proto
+    action: modify
+    description: Add `bool is_restored` to `CheckInCalendarDay`.
+  - path: shared-lib/proto/missionspb/missions.pb.go
+    action: modify
+    description: Regenerate from proto.
+  - path: shared-lib/proto/missionspb/missions.pb.gw.go
+    action: modify
+    description: Regenerate from proto.
+  - path: shared-lib/proto/missionspb/missions_grpc.pb.go
+    action: modify
+    description: Regenerate from proto if generator output changes.
+  - path: shared-lib/proto/missionspb/missions.swagger.json
+    action: modify
+    description: Regenerate swagger schema with `is_restored`.
+  - path: Games-Labs-Missions/internal/models/models.go
+    action: modify
+    description: Add the JSON response field to `CheckInCalendarDay`.
+  - path: Games-Labs-Missions/internal/services/check_in_calendar_service.go
+    action: modify
+    description: Populate `is_restored` from ledger source.
+  - path: Games-Labs-Missions/internal/services/check_in_calendar_service_test.go
+    action: modify
+    description: Cover restored and normal completed days.
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+    action: modify
+    description: Map `IsRestored` to protobuf response.
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server_test.go
+    action: modify
+    description: Cover gRPC mapping.
+  - path: Games-Labs-Missions/README.md
+    action: modify
+    description: Document restored day UI flag.
+  - path: api-gateway/docs/Games-Labs-APIs.postman_collection.json
+    action: modify
+    description: Update external API examples.
+  - path: docs/Games-Labs-APIs.postman_collection.json
+    action: modify
+    description: Update duplicate API examples.
+description: |
+  Mobile confirmed that `days[].is_restored` is suitable for recently restored
+  streak UI. Add this boolean to the check-in calendar response while keeping
+  restored dates as `status: "completed"`. The field must be backward-compatible
+  and sourced from the existing `check_in_day_ledgers.source = "restore"` data.
+acceptance_criteria:
+- criterion: '`CheckInCalendarDay` in shared-lib proto includes a new backward-compatible `bool is_restored` field.'
+- criterion: 'Generated shared-lib protobuf/gateway/swagger artifacts are regenerated from proto.'
+- criterion: 'Restored ledger days return `status: "completed"` and `is_restored: true`.'
+- criterion: 'Normal completed, missed, broken, today, and upcoming days return `is_restored: false`.'
+- criterion: 'gRPC mapping preserves `is_restored` in `missionspb.CheckInCalendarDay`.'
+- criterion: 'Focused service and gRPC tests cover restored and normal completed day behavior.'
+- criterion: 'README and both Postman collection copies document the new field and parse successfully.'
+- criterion: 'No downstream module commits a local `replace github.com/SparqLab/shared-lib => ../shared-lib` directive.'
+plan:
+  approach: |
+    Start with the shared-lib proto contract and generated artifacts, then
+    publish or select the updated shared-lib version before downstream service
+    changes. In Missions, carry the existing ledger source into the calendar day
+    response and map it through gRPC. Finish with focused tests and docs/Postman
+    sync.
+  subtasks:
+  - order: 1
+    id: shared-lib-contract
+    description: Add `is_restored` to the shared Missions proto and regenerate shared-lib artifacts.
+    agent: dev-2
+    owned_files:
+    - shared-lib/proto/missionspb/missions.proto
+    - shared-lib/proto/missionspb/missions.pb.go
+    - shared-lib/proto/missionspb/missions.pb.gw.go
+    - shared-lib/proto/missionspb/missions_grpc.pb.go
+    - shared-lib/proto/missionspb/missions.swagger.json
+    parallel_safe: false
+  - order: 2
+    id: publish-and-bump-shared-lib
+    description: Publish/select updated shared-lib and bump downstream modules without local replace directives.
+    agent: dev-2
+    owned_files:
+    - Games-Labs-Missions/go.mod
+    - Games-Labs-Missions/go.sum
+    - api-gateway/go.mod
+    - api-gateway/go.sum
+    parallel_safe: false
+  - order: 3
+    id: missions-runtime
+    description: Populate and map `is_restored` from `check_in_day_ledgers.source`.
+    agent: dev-2
+    owned_files:
+    - Games-Labs-Missions/internal/models/models.go
+    - Games-Labs-Missions/internal/services/check_in_calendar_service.go
+    - Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+    parallel_safe: false
+  - order: 4
+    id: tests
+    description: Add focused service and gRPC tests.
+    agent: dev-2
+    owned_files:
+    - Games-Labs-Missions/internal/services/check_in_calendar_service_test.go
+    - Games-Labs-Missions/internal/grpc/missiongrpc/server_test.go
+    parallel_safe: false
+  - order: 5
+    id: docs-handoff
+    description: Update README/Postman examples and record verification.
+    agent: dev-2
+    owned_files:
+    - Games-Labs-Missions/README.md
+    - api-gateway/docs/Games-Labs-APIs.postman_collection.json
+    - docs/Games-Labs-APIs.postman_collection.json
+    - ai-dev-office/runs/TASK-078/verification-evidence.md
+    - ai-dev-office/runs/TASK-078/dev-2-output.yaml
+    parallel_safe: false
+  risks:
+  - risk: Downstream service changes happen before shared-lib contract publication.
+    mitigation: Keep shared-lib contract and publish/bump as ordered first subtasks, and stop downstream work until the updated version is available.
+  - risk: Client treats `is_restored` as a replacement for `status`.
+    mitigation: Document that the boolean is only a display hint and status remains `completed`.
+  - risk: Older/in-memory ledger paths lack source.
+    mitigation: Default to false unless source is exactly `restore`.
+  estimated_complexity: medium
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: Cross-service contract, generated artifact, dependency, runtime, test, and docs work must be ordered.
+summary: |
+  TASK-078 is ready as a PM-scoped feature task to add a backward-compatible
+  `days[].is_restored` boolean for Mobile restored streak UI. It is sourced from
+  existing ledger `source` data and keeps `status: "completed"` unchanged.
+artifacts:
+- path: runs/TASK-078/task.md
+  action: created
+- path: runs/TASK-078/status.yaml
+  action: created
+- path: runs/TASK-078/pm-output.yaml
+  action: created
+next_action:
+  agent: dev-2
+  reason: Task is ready for ordered shared-lib contract work, followed by downstream implementation after publish/bump confirmation.
+context_sources:
+  github:
+    branch: ''
+    pr: ''
+  socraticode:
+    status: fallback
+    queries:
+    - codebase_status projectPath d:\llm
+    - codebase_search check-in calendar restored source fields
+    - codebase_status projectPath /Users/earth/Documents/GitHub
+    relevant_symbols:
+    - Games-Labs-Missions/internal/services/check_in_calendar_service.go
+    - Games-Labs-Missions/internal/models/models.go
+    - Games-Labs-Missions/internal/repositories/mission_repo.go
+    - shared-lib/proto/missionspb/missions.proto
+    notes: SocratiCode status succeeded but search did not locate relevant files, so source inspection was used for final scope.
+blockers:
+- Downstream service implementation must wait for the shared-lib contract update to be published or otherwise made available for dependency bumping.

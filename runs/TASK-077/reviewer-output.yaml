@@ -1,0 +1,64 @@
+summary: |
+  Approved. TASK-077 now gives the turnover rollout one consistent runtime story
+  instead of three drifting ones. The canonical runbook covers the NodePort,
+  broker alignment, SQL/log/API proof chain, IDG cancel reverse verification,
+  and shared-lib release discipline, while the repo-local workflows and READMEs
+  now point back to the same runtime truth.
+
+  I rechecked the new helper script, the updated Provider/Game/Missions docs and
+  workflow notes, and the verification evidence on disk. The script parses
+  cleanly, help output is correct, and diff hygiene is clean across all touched
+  repos.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    Verified:
+    - `bash -n ai-dev-office/scripts/verify-turnover-rollout.sh`
+    - `./ai-dev-office/scripts/verify-turnover-rollout.sh --help`
+    - `git -C Games-Labs-Provider diff --check`
+    - `git -C Games-Labs-Game diff --check`
+    - `git -C Games-Labs-Missions diff --check`
+    - `git -C ai-dev-office diff --check -- docs/turnover-rollout-runbook.md scripts/verify-turnover-rollout.sh runs/TASK-077`
+artifacts:
+  - path: Games-Labs-Provider/.github/workflows/dev.yml
+    issues: []
+  - path: Games-Labs-Game/.github/workflows/deploy.yml
+    issues: []
+  - path: Games-Labs-Missions/.github/workflows/deploy.yml
+    issues: []
+  - path: Games-Labs-Provider/README.md
+    issues: []
+  - path: Games-Labs-Game/README.md
+    issues: []
+  - path: Games-Labs-Missions/README.md
+    issues: []
+  - path: ai-dev-office/docs/turnover-rollout-runbook.md
+    issues: []
+  - path: ai-dev-office/scripts/verify-turnover-rollout.sh
+    issues: []
+  - path: ai-dev-office/runs/TASK-077/verification-evidence.md
+    issues: []
+next_action:
+  agent: done
+  reason: Runtime hardening acceptance criteria are satisfied and deferred items are documented explicitly.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: unavailable
+    queries:
+      - "TASK-077 turnover rollout hardening runbook workflow"
+    relevant_symbols:
+      - "ai-dev-office/docs/turnover-rollout-runbook.md"
+      - "ai-dev-office/scripts/verify-turnover-rollout.sh"
+      - "Games-Labs-Provider/.github/workflows/dev.yml"
+      - "Games-Labs-Game/.github/workflows/deploy.yml"
+      - "Games-Labs-Missions/.github/workflows/deploy.yml"
+    notes: Approval is based on current source plus fresh script/diff verification.
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

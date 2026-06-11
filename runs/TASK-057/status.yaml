@@ -1,0 +1,83 @@
+---
+task_id: TASK-057
+phase: done
+state: done
+current_agent: done
+iteration: 6
+assigned_to: dev-2
+created_at: '2026-05-18'
+updated_at: '2026-05-19'
+ready: false
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-057/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: user
+  reason: Roadmap P3; add Diamonds spend missions only after product/economy confirmation.
+- phase: pending -> blocked
+  agent: pm
+  reason: Needs a new condition/event design and confirmed Diamonds spend source.
+- phase: blocked -> pending
+  agent: user
+  reason: Product confirmed Diamond spend scope, economy/wallet authoritative source,
+    settled net spend amount semantics, reverse/refund subtraction, and new condition
+    type separate from THB SPEND_AMOUNT.
+- phase: pending -> assigned
+  agent: pm
+  reason: PM blueprint complete — optional spend_currency on player.activity spend
+    events, wallet publisher scope, SPEND_DIAMOND_AMOUNT mapping, tests, and docs
+    in task.md and pm-output.yaml.
+- phase: assigned -> assigned
+  agent: pm
+  reason: Product rules confirmed; contract direction and file-level scope verified
+    — ready for implementation.
+- phase: assigned -> assigned
+  agent: user
+  reason: Confirmed spend classification decision — Diamond spend can include broad
+    settled net consumption debits, but exchange is excluded by default; future Coin/Points
+    spend must be separate settled-only conditions with category/source reference
+    filtering.
+- phase: assigned -> in_review
+  agent: dev-2
+  reason: Contract, wallet producer, missions mapping/tests, Order THB tagging, and
+    operator docs are implemented; reviewer should verify go.sum refresh, full integration
+    tests, and any additional wallet debit paths that bypass Debit().
+- phase: in_review -> blocked
+  agent: reviewer
+  reason: Dependency guard failed before review because Wallet/Missions/Order/Game
+    point to placeholder shared-lib version v0.0.0-20260519120000-10df05705705, while
+    the shared-lib contract change is still local/unmerged and aligned services remain
+    on v0.0.0-20260518144528-bf3855d1592d.
+- phase: blocked -> in_review
+  agent: codex
+  reason: Shared-lib contract commit ba6f85de79c23c5c08a1a8bedfc46099ef08cc57 was
+    merged; all guarded services were bumped to v0.0.0-20260519035946-ba6f85de79c2,
+    go mod tidy completed, and dependency guard passed.
+- phase: in_review -> debugging
+  agent: reviewer
+  reason: Fix occurred_at sourcing for wallet player.activity events (and optionally
+    publish observability). Then rerun full go test for touched modules; return to
+    reviewer once build/tests pass with evidence.
+- phase: debugging -> in_review
+  agent: debugger
+  reason: Code fix for reviewer blockers is applied; reviewer should run go test for
+    shared-lib, Wallet, Missions, Order, Game and approve or request follow-ups.
+- phase: in_review -> escalated
+  agent: reviewer
+  reason: Obtain runnable verification (local go test/go build or CI workflow artifacts)
+    for all touched modules; then rerun reviewer or attach evidence so orchestration
+    can close review deterministically without guessing test outcomes.
+- phase: escalated -> in_review
+  agent: codex
+  reason: Manual session recorded verification evidence in runs/TASK-057/verification-evidence.md;
+    dependency guard passed, go test ./... passed for shared-lib, Wallet, Missions,
+    Order, and Game, and go build ./... passed for those touched modules.
+- phase: in_review -> done
+  agent: reviewer
+  reason: Acceptance criteria met on disk; dependency guard and full-module tests/builds
+    recorded as passing; no error-severity findings.

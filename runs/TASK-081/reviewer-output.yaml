@@ -1,0 +1,46 @@
+task_id: TASK-081
+agent: reviewer
+review_verdict: approved
+summary: |
+  Reviewed the full UpdateRedemptionItem vertical end to end. shared-lib adds the rpc
+  (POST /api/v1/admin/redemption-items/{id}) with regenerated artifacts (63ce30d,
+  pushed). Order implements model/ports/service/repo/handler with a shared
+  create/update normalizer, preserves sort_order, and replaces the code list in one
+  transaction; three focused tests plus the full suite pass (7be0ea3, pushed).
+  api-gateway pins the same shared-lib so the route is exposed (origin/main pins
+  63ce30d). Backoffice items/edit/[id].vue is wired - loads via GET, saves via POST,
+  images via /admin/uploads/redemption-items with instant local preview; the
+  details/conditions write now matches the create flow (per-language Structs) with a
+  tolerant merge-read, tag chips recover known ids instead of being dropped, and the
+  dead localStorage-era code is removed. nuxi typecheck is clean for the page. A
+  background adversarial workflow stalled in its verify phase (infra, not code) - its
+  review phase corroborated the findings and the agent cross-checked each manually.
+  Approving. Known/deferred - the brand <select> still uses hardcoded options (a fix
+  to source them from the API was declined by the user); save preserves the real
+  redemptionId via the brand map + raw fallback, so no data loss.
+build_check:
+  compile: pass
+  tests: pass
+  details: >
+    shared-lib make buf + go build + go test passed. Order go build ./..., go vet
+    ./..., and go test ./... all green (incl. 3 new UpdateRedemptionItem service
+    tests). api-gateway go build/vet/test green; origin/main pins shared-lib
+    63ce30d. backoffice nuxi typecheck - 0 errors across the changed redemption
+    files (18 pre-existing errors elsewhere unchanged). All three backend repos are
+    on origin/main with the bumped shared-lib.
+transition:
+  from_phase: in_review
+  to_phase: done
+artifacts:
+- path: runs/TASK-081/reviewer-output.yaml
+  action: created
+  description: Reviewer approval for the UpdateRedemptionItem vertical.
+- path: runs/TASK-081/status.yaml
+  action: modified
+  description: Task moved to done.
+blockers: []
+next_action:
+  agent: done
+  reason: Backend is pushed and verified; the route is live through the gateway. The
+    user commits/pushes the one remaining backoffice file (items/edit) and runs live
+    smoke - operational steps, not code deliverables.

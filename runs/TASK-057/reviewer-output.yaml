@@ -1,0 +1,91 @@
+summary: |
+  Implementation satisfies TASK-057: shared-lib adds optional spend_currency (THB default), spend_category
+  constants, and games-labs-wallet source; Wallet publishes spend.settled / spend.reversed for Diamond
+  debits/refunds with ledger-backed occurred_at and idempotent event IDs; Missions adds SPEND_DIAMOND_AMOUNT
+  with validation, THB-only SPEND_AMOUNT mapping, exchange exclusion via spend_category, and consumer tests;
+  Order tags explicit THB on spend events. No forbidden shared-lib replace directives; go.mod pins align to
+  v0.0.0-20260519035946-ba6f85de79c2. Recorded verification (dependency guard, go test/go build) is in
+  verification-evidence.md. Residual risk: any future Diamond debit that bypasses walletsvc.Debit would
+  not emit activity events—current exchange path correctly bypasses publish.
+
+review_verdict: approved
+
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    Per ai-dev-office/runs/TASK-057/verification-evidence.md (2026-05-19): ./ai-dev-office/scripts/check-service-dependencies.sh PASS;
+    go test ./... and go build ./... exit 0 for shared-lib, Games-Labs-Wallet, Games-Labs-Missions, Games-Labs-Order, Games-Labs-Game
+    (after sqlmock expectation updates in daily_activity_consumer_test.go). This reviewer run did not re-execute the Go toolchain in-shell;
+    static review of artifacts cross-checked against that evidence.
+
+artifacts:
+  - path: shared-lib/events/player_activity.go
+    issues: []
+  - path: Games-Labs-Wallet/internal/core/ports/player_activity.go
+    issues: []
+  - path: Games-Labs-Wallet/infrastructure/player_activity_publisher.go
+    issues: []
+  - path: Games-Labs-Wallet/internal/core/services/walletsvc/service.go
+    issues:
+      - line: 208-210
+        severity: suggestion
+        description: >-
+          All Diamond debits routed through Debit publish consumption-tagged spend.settled. If non-mission
+          Diamond debits are introduced later, ensure callers pass skip_player_activity metadata or a
+          dedicated path so internal debits are not miscounted.
+  - path: Games-Labs-Wallet/internal/core/services/walletsvc/player_activity_publish.go
+    issues: []
+  - path: Games-Labs-Wallet/cmd/main.go
+    issues: []
+  - path: Games-Labs-Wallet/README.md
+    issues: []
+  - path: Games-Labs-Wallet/go.mod
+    issues: []
+  - path: Games-Labs-Wallet/internal/models/transaction.go
+    issues: []
+  - path: Games-Labs-Wallet/internal/repositories/wallet.go
+    issues: []
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    issues: []
+  - path: Games-Labs-Missions/internal/services/mission_service.go
+    issues: []
+  - path: Games-Labs-Missions/internal/services/daily_activity_consumer_test.go
+    issues: []
+  - path: Games-Labs-Missions/README.md
+    issues: []
+  - path: Games-Labs-Missions/go.mod
+    issues: []
+  - path: Games-Labs-Order/internal/core/services/ordersvc/player_activity.go
+    issues: []
+  - path: Games-Labs-Order/go.mod
+    issues: []
+  - path: Games-Labs-Game/go.mod
+    issues: []
+
+next_action:
+  agent: done
+  reason: >-
+    Acceptance criteria met on disk; dependency guard and full-module tests/builds recorded as passing;
+    no error-severity findings.
+
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - reviewer TASK-057 Spend Diamonds Mission (SPEND_DIAMOND_AMOUNT)
+    relevant_symbols:
+      - shared-lib/events/player_activity.go
+      - Games-Labs-Missions/internal/services/mission_service.go (mapPlayerActivityEventToDailyProgress)
+      - Games-Labs-Wallet/internal/core/services/walletsvc/player_activity_publish.go
+    notes: >-
+      Cross-checked identifiers with repo grep; final verdict uses files on disk and verification-evidence.md.
+
+transition:
+  from_phase: review
+  to_phase: done
+
+blockers: []

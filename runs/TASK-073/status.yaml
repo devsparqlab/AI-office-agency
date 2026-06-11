@@ -1,0 +1,32 @@
+---
+task_id: TASK-073
+phase: done
+state: done
+current_agent: reviewer
+iteration: 0
+assigned_to: done
+created_at: '2026-06-01'
+updated_at: '2026-06-01'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-073/reviewer-output.yaml
+history:
+- phase: created -> blocked
+  agent: pm
+  reason: GGSoft turnover validation should reuse the IDG provider-specific verification pattern after TASK-070 lands.
+- phase: blocked -> assigned
+  agent: codex
+  reason: TASK-070 through TASK-072 established the provider verification pattern; GGSoft is ready for implementation.
+- phase: assigned -> review
+  agent: dev-2
+  reason: GGSoft type 4 turnover now has focused service coverage, fallback validation, updated docs/evidence, and passing Provider tests.
+- phase: review -> done
+  agent: reviewer
+  reason: Re-verified GGSoft package tests, Provider-wide tests, docs/evidence, and approved TASK-073.

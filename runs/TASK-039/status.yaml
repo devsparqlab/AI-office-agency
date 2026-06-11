@@ -1,0 +1,30 @@
+---
+task_id: TASK-039
+phase: done
+state: done
+current_agent: done
+iteration: 2
+assigned_to: dev
+created_at: '2026-05-06'
+updated_at: '2026-05-07'
+ready: false
+assignment:
+  primary: dev
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-039/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: Scoped Quest phase 2 Card C as an Invite read-only API with stable response
+    shape and no referral flow.
+- phase: pending -> in_review
+  agent: dev
+  reason: Invite overview is implemented end-to-end in scoped services, generated
+    artifacts are updated, and focused tests are green.
+- phase: in_review -> done
+  agent: reviewer
+  reason: The implementation satisfies the scoped contract, stable fallback behavior,
+    transport wiring, generated artifacts, and documentation requirements.

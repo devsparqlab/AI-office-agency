@@ -1,0 +1,47 @@
+task_id: TASK-080
+agent: reviewer
+review_verdict: approved
+summary: |
+  Reviewed the frontend wiring of the remaining redemption pages plus the smoke-phase
+  fixes that landed during live verification. All four dev subtasks are complete:
+  items list reads /redemption-items with client-side brand/tag name joins, the create
+  modal posts /redemption-item with images through /admin/uploads/{kind} (real URLs
+  only), brand detail + Basic Info edit are wired to /redemptions, and brand edit is
+  reachable from the list. Smoke-phase additions: error-variant toast (failures no
+  longer render as green success), fail-fast upload (retry 0 + 30s timeout), per-kind
+  upload destinations matching the backend's restructured routes, instant local
+  object-URL previews at all four upload spots, and a typed-input sweep for stepper
+  controls (item Point/quota/limit + leaderboard 1st/2nd/3rd; exchange and VIP wizard
+  already supported typing). Upload was verified working end to end by the user
+  against the dev gateway; everything is committed and pushed (HEAD == origin/main).
+  Remaining scope deliberately lives elsewhere: item edit is TASK-081 (dev-2) and
+  backend gaps B1-B7 are recorded in task.md for the backend owner. Approving.
+build_check:
+  compile: pass
+  tests: pass
+  details: >
+    backoffice: nuxi typecheck — 0 errors in all changed files (items.vue,
+    library/index.vue, library/brand/[id].vue, leaderboard/edit/[id].vue,
+    useImageUpload.ts, useAdminSaveFeedback.ts, AdminSuccessToast.vue); 18
+    pre-existing errors remain in unrelated files. git status clean and HEAD ==
+    origin/main (9996906). Order storage endpoint hardening verified earlier with
+    go build/vet on infrastructures. Live: POST /admin/uploads upload confirmed
+    working by the user; library list confirmed reading GET /redemptions.
+transition:
+  from_phase: in_review
+  to_phase: done
+artifacts:
+- path: runs/TASK-080/reviewer-output.yaml
+  action: created
+  description: Reviewer approval for the redemption items + brand detail wiring.
+- path: runs/TASK-080/dev-output.yaml
+  action: unchanged
+  description: Dev handoff covering subtasks 1-4 and smoke-phase fixes.
+- path: runs/TASK-080/task.md
+  action: unchanged
+  description: Scope, acceptance criteria, and backend handoff list B1-B7.
+blockers: []
+next_action:
+  agent: done
+  reason: All in-scope criteria met and verified; uploads confirmed live. Item edit
+    continues separately as TASK-081 (dev-2); backend gaps B1-B7 are handed off.

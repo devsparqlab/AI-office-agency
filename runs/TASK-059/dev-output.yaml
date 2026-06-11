@@ -1,0 +1,17 @@
+summary: Aligned the documented Daily claim contract so Mobile Daily Activities use `POST /api/v1/missions/claim-daily` canonically, while `POST /api/v1/missions/{mission_id}/claim-reward` stays as a generic or legacy mission path.
+artifacts:
+  - path: Games-Labs-Missions/README.md
+    action: modified
+    description: Clarified endpoint strategy, replaced the Daily example section to use claim-daily, and documented claim-reward as non-Daily.
+  - path: api-gateway/docs/Games-Labs-APIs.postman_collection.json
+    action: modified
+    description: Updated claim-daily request body and descriptions, and marked claim-reward as generic or legacy only.
+next_action:
+  agent: reviewer
+  reason: Verify the contract cleanup and ensure docs and collection JSON remain valid.
+blockers: []
+context_sources:
+  socraticode:
+    status: skipped
+    queries: []
+    notes: Local route, README, and Postman docs were sufficient for this documentation alignment task.

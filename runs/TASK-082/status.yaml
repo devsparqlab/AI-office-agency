@@ -1,0 +1,30 @@
+task_id: TASK-082
+phase: done
+state: done
+current_agent: devops
+iteration: 1
+assigned_to: devops
+created_at: '2026-06-10'
+updated_at: '2026-06-10'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: devops
+  parallel: false
+history:
+- phase: created -> in_progress
+  agent: pm
+  reason: >
+    The devops agent had no thinking-layer skills to reason with, unlike reviewer
+    which routes into code-review/tech-lead-review. This task adds the Tier-1
+    delivery skills (container-build-review, cicd-pipeline-review,
+    k8s-deploy-review) matched to the real GHCR + GitHub Actions + k3s + Kustomize
+    + ArgoCD stack, and wires the devops agent to route into them.
+- phase: in_progress -> done
+  agent: devops
+  reason: >
+    Created container-build-review, cicd-pipeline-review, and k8s-deploy-review
+    under ai-skills/skills/; added the Delivery / Infra layer to VERSION.md and
+    README.md; wired agents/devops.md to route into the three skills. Validator
+    passed for 21 skills.

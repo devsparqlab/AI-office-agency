@@ -1,0 +1,55 @@
+task_id: TASK-080
+agent: dev
+status: in_review
+iteration: 1
+summary: |
+  Frontend-only wiring of the remaining redemption pages against existing endpoints.
+  items.vue list reads /redemption-items (brand/tag names joined client-side from
+  /redemptions and /redemptions-tags). The create modal posts /redemption-item with
+  images uploaded via /uploads and a real redemption_id from the brand dropdown.
+  library/brand/[id].vue now loads the brand + its items from the API and edits via
+  POST /redemptions/{id}. Subtask 5 (item edit) was handed to TASK-081 (dev-2), who
+  owns the new UpdateRedemptionItem endpoint (B1). Interim/dropped fields and new
+  backend gaps (B6 type/total_quota, B7 multi-tier quota) are recorded in task.md.
+completed:
+- items.vue list wired to GET /redemption-items with client-side brand/tag name join.
+- Create modal -> POST /redemption-item; thumbnail + logo via /uploads (no data URL).
+- Brand dropdown populated from real /redemptions (sends redemption_id).
+- Collection-tag names resolved to tag ids best-effort.
+- library/brand/[id].vue loads brand from /redemptions (find-by-id) + items from
+  /redemption-items filtered client-side by redemption_id.
+- Brand Basic Info edit -> POST /redemptions/{id}; logo upload via /uploads.
+- Removed the stale localStorage path the brand detail page depended on.
+changed_files:
+- Games-Labs-backoffice/app/pages/admin/manage/redemption/items.vue
+- Games-Labs-backoffice/app/pages/admin/manage/redemption/library/brand/[id].vue
+- Games-Labs-backoffice/app/pages/admin/manage/redemption/library/index.vue
+- Games-Labs-backoffice/app/composables/useAdminSaveFeedback.ts
+- Games-Labs-backoffice/app/components/AdminSuccessToast.vue
+- Games-Labs-backoffice/app/composables/useImageUpload.ts
+- Games-Labs-Order/infrastructures/storage.go
+artifacts:
+- path: runs/TASK-080/task.md
+  action: modified
+  description: Subtasks 1-4 done; subtask 5 moved to TASK-081; backend gaps B6/B7 added.
+- path: runs/TASK-080/status.yaml
+  action: modified
+  description: Dev phase complete; moved to in_review.
+- path: runs/TASK-080/dev-output.yaml
+  action: created
+  description: Dev handoff for the redemption items + brand detail wiring.
+- path: Games-Labs-backoffice/app/pages/admin/manage/redemption/items.vue
+  action: modified
+  description: List read + create modal wired to the redemption-items API and /uploads.
+- path: Games-Labs-backoffice/app/pages/admin/manage/redemption/library/brand/[id].vue
+  action: modified
+  description: Brand detail + Basic Info edit wired to the redemptions/items API.
+blockers: []
+next_action:
+  agent: reviewer
+  reason: All four dev subtasks implemented and typecheck-clean. Ready for review;
+    live smoke (deployed backoffice + create/edit against the API) is user ops.
+verification:
+- command: nuxi typecheck
+  cwd: Games-Labs-backoffice
+  result: 0 errors in redemption/items.vue and redemption/library/brand/[id].vue (18 pre-existing errors elsewhere)

@@ -1,0 +1,45 @@
+summary: |
+  Synchronized the TASK-068 consumer documentation against the approved TASK-067
+  runtime contract. Updated the Missions README with Mobile calendar read,
+  check-in, D3/D7/D15/D31 milestone claim, restore quote/action, and Backoffice
+  config examples. Updated both Postman collection copies with the same Mobile
+  and Backoffice endpoint examples and explicit handoff text that Mobile must
+  render from backend status/reward fields instead of inferring calendar,
+  milestone, or restore state client-side.
+
+  No runtime, shared-lib, proto, or Mobile code was changed. The compatibility
+  assumption is that TASK-067 remains the approved runtime shape: the docs are
+  intentionally matched to the current source files and generated swagger.
+artifacts:
+  - path: Games-Labs-Missions/README.md
+    action: modified
+  - path: api-gateway/docs/Games-Labs-APIs.postman_collection.json
+    action: modified
+  - path: docs/Games-Labs-APIs.postman_collection.json
+    action: modified
+  - path: ai-dev-office/runs/TASK-068/verification-evidence.md
+    action: created
+  - path: ai-dev-office/runs/TASK-068/dev-2-output.yaml
+    action: created
+next_action:
+  agent: reviewer
+  reason: Docs and duplicate Postman collections are synchronized to the approved TASK-067 runtime endpoints and JSON validation passed.
+context_sources:
+  github:
+    branch: "main"
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "codebase_status projectPath=d:\\llm"
+      - "TASK-067 check-in calendar milestone restore quote endpoint Missions runtime swagger"
+      - "Missions check-in calendar API endpoints calendar check-in milestone restore backoffice config"
+    relevant_symbols:
+      - "shared-lib/proto/missionspb/missions.proto"
+      - "shared-lib/proto/missionspb/missions.swagger.json"
+      - "Games-Labs-Missions/internal/routes/apiv1.go"
+      - "Games-Labs-Missions/internal/handlers/mission_handler.go"
+      - "Games-Labs-Missions/internal/handlers/adminhdl/admin_handler.go"
+      - "Games-Labs-Missions/internal/services/check_in_calendar_service.go"
+    notes: "SocratiCode primary d:\\llm was green and used for navigation; all implementation claims were verified against local source and TASK-067 reviewer evidence."
+blockers: []

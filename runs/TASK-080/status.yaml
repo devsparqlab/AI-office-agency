@@ -1,0 +1,120 @@
+task_id: TASK-080
+phase: done
+state: done
+current_agent: done
+iteration: 1
+assigned_to: dev
+created_at: '2026-06-08'
+updated_at: '2026-06-10'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: dev
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-080/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: Library Brand/Tag is wired (TASK-079). Scoped frontend-only wiring of the
+    remaining redemption pages (items list/create, brand detail, brand edit entry,
+    item edit prefill) against endpoints that already exist, with client-side
+    workarounds where filters are missing. Backend-dependent work (B1-B5 — item
+    update/delete, redemption_id filter, arrange sort_order, total_redeem source)
+    is explicitly out of scope and handed off to the backend owner.
+- phase: pending (items-list done)
+  agent: dev
+  reason: Wired items.vue list to GET /redemption-items; brand/tag NAMES joined
+    client-side from /redemptions and /redemptions-tags (API returns ids). typeLabel
+    has no API source (new gap B6) and VIP shows level_id raw. Added pending/error.
+    items.vue typecheck clean. Subtask 5 (item edit) dropped here — the backend owner
+    took B1 + edit wiring as TASK-081 (dev-2).
+- phase: assigned (item-create done)
+  agent: dev
+  reason: Wired the create modal in items.vue to POST /redemption-item. Thumbnail +
+    logo banner upload via /uploads (real URLs, no data URL); the brand dropdown is
+    populated from real /redemptions (sends redemption_id); collection-tag names
+    resolve to tag ids best-effort; the list refreshes from the API on success.
+    Interim/dropped (no proto field) — typeLabel and totalQuota; level_id carries the
+    VIP label; only quota tier 1 is mapped. items.vue typecheck clean. (items/create.vue
+    is a dead, unrouted page — left untouched.)
+- phase: assigned (brand-detail + brand-edit-entry done)
+  agent: dev
+  reason: Wired library/brand/[id].vue to the API — it was reading a localStorage key
+    the new library no longer writes (so it redirected away). Now loads the brand from
+    /redemptions (no GetById endpoint, so find-by-id in the list) and its items from
+    /redemption-items filtered client-side by redemption_id; Basic Info edit saves via
+    POST /redemptions/{id} with the logo uploaded through /uploads. Brand edit is
+    reachable via the existing list Manage link. typecheck clean.
+- phase: assigned -> in_review
+  agent: dev
+  reason: All four dev subtasks done (items list, item create, brand detail, brand edit);
+    subtask 5 moved to TASK-081 (dev-2). Backoffice typecheck clean for all changed
+    redemption files. Ready for review and live smoke once deployed.
+- phase: in_review (smoke fix - error toast variant)
+  agent: dev
+  reason: Smoke surfaced two things. (1) POST /uploads returns 404 because the
+    api-gateway was not redeployed with the new /uploads route (ops - deploy gateway;
+    not a code change). (2) Failures showed a green "Success!" toast because
+    openAdminSaveToast is success-only. Added an error variant (openAdminErrorToast +
+    a red error style in AdminSuccessToast.vue) and routed all failure paths in the
+    three redemption pages to it. Typecheck clean.
+- phase: in_review (smoke fix - upload hang)
+  agent: dev
+  reason: After the gateway deploy, upload hung on "Uploading…" for ~1 min — the
+    gateway 30s proxy timeout plus an ofetch POST retry. Added retry 0 + a 30s timeout
+    to uploadImage so it fails fast with the error toast. Root cause is server-side
+    (Order S3 PutObject not completing — likely S3_ENDPOINT not empty / pod egress /
+    region) and is ops, tracked for live smoke.
+- phase: in_review (upload endpoints split per kind)
+  agent: dev
+  reason: Backend owner restructured upload routes — canonical POST
+    /admin/uploads/redemptions and /admin/uploads/redemption-items (legacy /uploads
+    aliases to redemptions), with per-kind S3 prefixes. Updated uploadImage to take a
+    kind param targeting /admin/uploads/{kind}; brand logo call sites send
+    redemptions, item thumbnail/banner send redemption-items. Typecheck clean.
+- phase: in_review -> done
+  agent: reviewer
+  reason: Approved. All four dev subtasks plus smoke-phase fixes are complete,
+    typecheck-clean, committed, and pushed (HEAD == origin/main). Upload verified
+    working end to end by the user against the dev gateway; the library list is
+    confirmed reading the API. Item edit continues as TASK-081 (dev-2); backend gaps
+    B1-B7 are handed off in task.md. Residual ops note - confirm CloudFront serves
+    uploaded objects in the list view after reload (bucket policy), tracked outside
+    this task.
+- phase: in_review (stepper typed-input sweep)
+  agent: dev
+  reason: User asked to fix every stepper-only numeric control. Swept the app —
+    store/exchange and VipLevelWizard already accept typed input (codebase
+    convention); the real stragglers were the item-create Point stepper and the
+    leaderboard edit 1st/2nd/3rd reward steppers. Both now take typed input
+    normalized to non-negative integers (items via stepNumber, leaderboard via a
+    setSlotVal helper honoring formReadOnly). Skipped items/create.vue (dead page)
+    and items/edit/[id].vue (owned by dev-2 in TASK-081). Typecheck clean.
+- phase: in_review (quota steppers accept typed input)
+  agent: dev
+  reason: UX feedback — Total Quota and Limit claims per day in the item create modal
+    were stepper-only (-/+). Replaced the center display with a typed number input
+    (spin buttons hidden, -/+ kept) normalized through a stepNumber helper on blur and
+    on the buttons, so a transiently empty value can never string-concatenate or go
+    negative. Typecheck clean.
+- phase: in_review (upload preview decoupled from CDN)
+  agent: dev
+  reason: Upload now succeeds end to end, but the picked image did not appear in the
+    upload box — the preview bound the CloudFront URL directly, so it stays blank
+    whenever the CDN path cannot serve yet. Added instant local object-URL previews
+    (with revocation) at all four upload spots (brand modal, brand detail, item
+    thumbnail, item banner); the form still submits the real uploaded URL. CloudFront
+    GET on the uploaded key still needs user verification (probe shows CF->S3 wired;
+    403 on a nonexistent key is ambiguous without ListBucket). Typecheck clean.
+- phase: in_review (smoke fix - endpoint placeholder)
+  agent: dev
+  reason: Root cause of the hang found — S3_ENDPOINT was set to a backslash because
+    GitHub Secrets reject empty values, and TrimSpace left it non-empty so the SDK used
+    "\" as a bogus endpoint and PutObject hung. Hardened infrastructures/storage.go to
+    only treat a real http(s):// value as an endpoint, so any placeholder (space, "-",
+    "\") is ignored and AWS uses the regional endpoint. Build/vet/gofmt OK. User to set
+    the secret to a single space and redeploy Order.

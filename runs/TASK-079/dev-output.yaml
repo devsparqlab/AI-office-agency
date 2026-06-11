@@ -1,0 +1,150 @@
+task_id: TASK-079
+agent: dev
+status: in_review
+iteration: 1
+summary: |
+  Phase 1 wired the redemption library admin page to the Order admin API (Brand
+  and Collection Tag reads, Collection Tag create/update, pending/error states,
+  localStorage reduced to arrange order). Order service then gained an
+  S3-compatible image upload endpoint (MinIO now, AWS S3 later by config only):
+  configurable storage client, multipart UploadHTTP with type/size validation,
+  and focused tests. Remaining work is the gateway upload route, the frontend
+  uploader, and Phase 2 brand create/update.
+completed:
+- Added API helper/types/mappers for redemptions and tags (camelCase, status.code check).
+- redemptionToBrandRow / tagToCollectionRow map status as `=== true ? Active : Inactive`.
+- refreshRedemptionsFromApi + retargeted refreshCollectionTagsFromApi; parallel on mount.
+- Collection Tag create/update + quick-add now call the tags API and keep redemptionIds.
+- Dropped the unsupported brandName requirement from the collection form.
+- Reduced localStorage to the manual arrange order only (new key, seeds removed).
+- Server-side search/date via the Search button; pending/error UI added.
+- Gated submitBrand with a toast until the upload chain exists.
+- Added Order config struct `storage` with S3_* env (default ForcePathStyle=true).
+- Added infrastructures/storage.go S3-compatible Uploader (aws-sdk-go-v2).
+- Added adminorderhdl.UploadHTTP (auth, content sniff, 5MB, key redemptions/{uuid}.{ext}).
+- Registered POST /uploads on the Order HTTP mux; injected uploader via New(os, uploader).
+- Added 5 focused upload tests (OK, 403, 503, 415, 400).
+- Added an authed /uploads group in the api-gateway proxied to OrderHTTPURL (separate
+  top-level group to avoid the /api catch-all conflict).
+- Added order-http-url to the gateway configmap and ORDER_HTTP_URL to the deployment.
+- Corrected the gateway order-http-url to the real Order HTTP port 8087 (deployment
+  override of the Go default 8086); the Order Service already exposes 8087.
+- Added composables/useImageUpload.ts (multipart POST to the gateway /uploads, no
+  Content-Type so the browser sets the multipart boundary).
+- Replaced the brand modal FileReader->data URL flow with a real upload; logoUrl is
+  always a real URL, with upload pending/error UI.
+- Wired submitBrand to create/update redemptions (POST /redemptions[/{id}]), sending
+  the uploaded thumbnailUrl, preserving tagIds on update, mapping the singular
+  redemptions object from the response.
+- Wired S3_* through the Order deployment (configMap refs for endpoint/region/bucket/
+  force-path-style/public-base-url, secret refs for access/secret keys; all optional),
+  added the S3 keys to the Order configmap, and extended the deploy workflow to create
+  them from GitHub Secrets. All three YAML files parse; key names match end to end.
+changed_files:
+- Games-Labs-backoffice/app/pages/admin/manage/redemption/library/index.vue
+- Games-Labs-backoffice/app/composables/useImageUpload.ts
+- Games-Labs-Order/k3s/deployment.yaml
+- Games-Labs-Order/k3s/configmap.yaml
+- Games-Labs-Order/.github/workflows/deploy.yml
+- Games-Labs-Order/configs/config.go
+- Games-Labs-Order/infrastructures/storage.go
+- Games-Labs-Order/internal/core/handlers/adminorderhdl/adminorderhdl.go
+- Games-Labs-Order/internal/core/handlers/adminorderhdl/upload_test.go
+- Games-Labs-Order/cmd/main.go
+- Games-Labs-Order/go.mod
+- Games-Labs-Order/go.sum
+- api-gateway/gateway/http.go
+- api-gateway/k3s/configmap.yaml
+- api-gateway/k3s/deployment.yaml
+artifacts:
+- path: runs/TASK-079/task.md
+  action: created
+  description: PM task plan for redemption library API wiring + image upload.
+- path: runs/TASK-079/status.yaml
+  action: created
+  description: Task state — assigned to dev, Phase 1 and Order upload done.
+- path: runs/TASK-079/dev-output.yaml
+  action: created
+  description: Dev implementation log and handoff for remaining subtasks.
+- path: runs/TASK-079/verification-evidence.md
+  action: created
+  description: Frontend typecheck and Order build/vet/test evidence.
+- path: Games-Labs-backoffice/app/pages/admin/manage/redemption/library/index.vue
+  action: modified
+  description: API-first reads, Collection Tag CRUD via API, arrange-only localStorage.
+- path: Games-Labs-Order/infrastructures/storage.go
+  action: created
+  description: S3-compatible uploader; key-in-DB + configurable endpoint/path-style.
+- path: Games-Labs-Order/internal/core/handlers/adminorderhdl/adminorderhdl.go
+  action: modified
+  description: Uploader interface + multipart UploadHTTP with validation.
+- path: Games-Labs-Order/internal/core/handlers/adminorderhdl/upload_test.go
+  action: created
+  description: Five focused UploadHTTP tests.
+- path: Games-Labs-Order/cmd/main.go
+  action: modified
+  description: Init uploader and register POST /uploads.
+- path: api-gateway/gateway/http.go
+  action: modified
+  description: Authed /uploads group reverse-proxied to the Order HTTP handler.
+- path: api-gateway/k3s/configmap.yaml
+  action: modified
+  description: Added order-http-url pointing at the Order HTTP port 8086.
+- path: api-gateway/k3s/deployment.yaml
+  action: modified
+  description: Mapped ORDER_HTTP_URL from the order-http-url configmap key.
+- path: api-gateway/k3s/configmap.yaml
+  action: modified
+  description: Corrected order-http-url to port 8087 (the real Order HTTP port).
+- path: Games-Labs-backoffice/app/composables/useImageUpload.ts
+  action: created
+  description: Multipart image upload to the gateway /uploads route.
+- path: Games-Labs-backoffice/app/pages/admin/manage/redemption/library/index.vue
+  action: modified
+  description: Real upload in the brand modal + submitBrand wired to the redemptions API.
+- path: Games-Labs-Order/k3s/deployment.yaml
+  action: modified
+  description: S3_* env from configmap (5) and secret (2), all optional.
+- path: Games-Labs-Order/k3s/configmap.yaml
+  action: modified
+  description: Added S3 config keys (endpoint/region/bucket/force-path-style/public-base-url).
+- path: Games-Labs-Order/.github/workflows/deploy.yml
+  action: modified
+  description: Inject S3 config + access/secret keys into configmap/secret from GitHub Secrets.
+blockers: []
+next_action:
+  agent: reviewer
+  reason: All five subtasks are implemented and locally verified (frontend typecheck,
+    Order/gateway build+vet+test). Remaining is live smoke against MinIO + the dev
+    gateway, which needs storage provisioning and credentials (user ops).
+verification:
+- command: npx nuxi typecheck
+  cwd: Games-Labs-backoffice
+  result: 0 errors in redemption/library/index.vue (remaining errors are pre-existing in other files)
+- command: go build ./...
+  cwd: Games-Labs-Order
+  result: passed
+- command: go vet ./...
+  cwd: Games-Labs-Order
+  result: passed (exit 0)
+- command: gofmt -l (changed files)
+  cwd: Games-Labs-Order
+  result: passed (no output)
+- command: go test ./internal/core/handlers/adminorderhdl/... -run TestUploadHTTP
+  cwd: Games-Labs-Order
+  result: passed (5/5)
+- command: go build ./...
+  cwd: api-gateway
+  result: passed
+- command: go vet ./gateway/...
+  cwd: api-gateway
+  result: passed
+- command: go test ./gateway/... ./middleware/...
+  cwd: api-gateway
+  result: passed (gateway has no test files; middleware ok)
+- command: nuxi typecheck
+  cwd: Games-Labs-backoffice
+  result: 0 errors in redemption/library/index.vue and composables/useImageUpload.ts (18 pre-existing errors elsewhere)
+- command: ruby -ryaml YAML.load_file (deployment.yaml, configmap.yaml, .github/workflows/deploy.yml)
+  cwd: Games-Labs-Order
+  result: all three parse OK; S3 key names match across deployment/configmap/secret/workflow/config struct

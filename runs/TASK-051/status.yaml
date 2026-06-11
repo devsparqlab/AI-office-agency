@@ -1,0 +1,30 @@
+---
+task_id: TASK-051
+phase: done
+state: done
+current_agent: done
+iteration: 2
+assigned_to: done
+created_at: '2026-05-18'
+updated_at: '2026-05-18'
+ready: true
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-051/reviewer-output.yaml
+history:
+  - phase: created -> pending
+    agent: user
+    reason: Roadmap follow-up after TASK-049; verify backoffice dynamic Daily Activity configuration.
+  - phase: pending -> assigned
+    agent: pm
+    reason: PM output created; TASK-050 is done so backoffice smoke-test implementation can start.
+  - phase: assigned -> in_review
+    agent: dev-2
+    reason: Implemented backoffice contract verification, docs, and focused tests; ready for reviewer.
+  - phase: in_review -> done
+    agent: reviewer
+    reason: Reviewer approved TASK-051 with passing build/tests and all acceptance criteria satisfied.

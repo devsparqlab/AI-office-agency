@@ -219,16 +219,35 @@ abort "[FAIL] workflow loop guard should reference office.config.yaml -> loop_gu
 puts "[OK] workflow loop guard references config"
 RUBY
 
-echo "== Scenario 10: runtime runs stay out of version control =="
+echo "== Scenario 10: runs/ team-sync allowlist is enforced =="
 ruby - "$ROOT_DIR" <<'RUBY'
 root = ARGV[0]
 tracked = Dir.chdir(root) { `git ls-files runs`.lines.map(&:strip).reject(&:empty?) }
-allowed = ["runs/.gitkeep"]
-unexpected = tracked - allowed
 
-abort "[FAIL] tracked runtime files found under runs/: #{unexpected.join(', ')}" unless unexpected.empty?
+allowed_patterns = [
+  %r{\Aruns/\.gitkeep\z},
+  %r{\Aruns/TASK(?:-PKG)?-\d+/task\.md\z},
+  %r{\Aruns/TASK(?:-PKG)?-\d+/status\.yaml\z},
+  %r{\Aruns/TASK(?:-PKG)?-\d+/[a-z0-9-]+-output\.yaml\z},
+  %r{\Aruns/TASK(?:-PKG)?-\d+/decision\.yaml\z},
+  %r{\Aruns/TASK(?:-PKG)?-\d+/verification-evidence\.md\z},
+  %r{\Aruns/TASK(?:-PKG)?-\d+/findings\.md\z}
+]
 
-puts "[OK] only runs/.gitkeep is tracked"
+disallowed_patterns = [
+  %r{\.log\z},
+  %r{/\.cursor-prompt\.md\z},
+  %r{/meta\.yaml\z},
+  %r{status\.yaml\.corrupt}
+]
+
+unexpected = tracked.reject { |path| allowed_patterns.any? { |pattern| path.match?(pattern) } }
+abort "[FAIL] tracked runs files outside allowlist: #{unexpected.join(', ')}" unless unexpected.empty?
+
+blocked = tracked.select { |path| disallowed_patterns.any? { |pattern| path.match?(pattern) } }
+abort "[FAIL] disallowed runs files are tracked: #{blocked.join(', ')}" unless blocked.empty?
+
+puts "[OK] runs/ allowlist enforced (#{tracked.size} tracked path(s))"
 RUBY
 
 echo "== Scenario 11: legacy v1 agent docs are moved out of active agents/ =="

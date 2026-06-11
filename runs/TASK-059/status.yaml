@@ -1,0 +1,39 @@
+---
+task_id: TASK-059
+phase: done
+state: done
+current_agent: done
+iteration: 4
+assigned_to: done
+created_at: '2026-05-18'
+updated_at: '2026-05-18'
+ready: true
+assignment:
+  primary: dev
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-059/reviewer-output.yaml
+history:
+  - phase: created -> pending
+    agent: user
+    reason: Roadmap P3 cleanup; align daily claim endpoint strategy after core flows stabilize.
+  - phase: pending -> blocked
+    agent: pm
+    reason: Endpoint alignment should wait until Mobile integration is stable and current usage is observed.
+  - phase: blocked -> in_review
+    agent: dev
+    reason: Documentation alignment completed; claim-daily canonical, claim-reward generic/legacy.
+  - phase: in_review -> debugging
+    agent: reviewer
+    reason: Fix Postman Claim daily example body and description to match canonical contract.
+  - phase: debugging -> in_review
+    agent: debugger
+    reason: Fixed Postman Claim daily entry, restored First register, reran build/test.
+  - phase: in_review -> escalated
+    agent: reviewer
+    reason: Docs aligned but prior reviewer session could not run go build/test empirically.
+  - phase: escalated -> done
+    agent: reviewer
+    reason: Re-review passed scoped dependency guard, build/test, and Postman JSON validation.

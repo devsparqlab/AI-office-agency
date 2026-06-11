@@ -1,0 +1,34 @@
+---
+task_id: TASK-046
+phase: done
+state: done
+current_agent: done
+iteration: 1
+assigned_to: dev-2
+created_at: '2026-05-11'
+updated_at: '2026-05-11'
+ready: false
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-046/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: Scoped admin force-reset for one user's Daily mission state to unblock fast
+    Mobile QA loops on DEV without waiting for Bangkok midnight.
+- phase: pending -> pending
+  agent: pm
+  reason: Reprioritized behind TASK-047 after Mobile preferred a DEV-only time-window
+    override via config/feature flag first.
+- phase: pending -> in_review
+  agent: dev-2
+  reason: The admin daily-reset contract, implementation, generated artifacts, docs,
+    and focused regression coverage are in place and ready for review.
+- phase: in_review -> done
+  agent: reviewer
+  reason: The admin daily-reset endpoint meets the acceptance criteria and passed
+    build plus test verification.

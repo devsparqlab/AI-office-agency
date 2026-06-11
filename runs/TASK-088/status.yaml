@@ -1,0 +1,55 @@
+task_id: TASK-088
+phase: in_progress
+state: in_progress
+current_agent: dev
+iteration: 1
+assigned_to: dev
+created_at: '2026-06-11'
+updated_at: '2026-06-11'
+ready: true
+blocked_on: []
+waiting_for:
+- user commits and pushes Games-Labs-backoffice (library collection-tag column)
+assignment:
+  primary: dev
+  parallel: false
+history:
+- phase: created -> in_progress
+  agent: dev
+  reason: >
+    User added a "Collection Tag" column to the redemption library list
+    (admin/manage/redemption/library/index.vue) but the body cell was a copy of the
+    Status cell (rendering row.status) with a leftover console.log debug expression,
+    and the colgroup still had 7 cols for 8 columns. Wiring the column to real data:
+    resolve brand.tagIds -> tag names from the already-loaded redemptions-tags list
+    and render chips matching the items list (tagChipClass cycling palette); on the
+    Collection Tag tab render the row's own name chip. Also fixing colgroup (8 cols
+    + min-width), empty-state colspan (7 -> 8), and removing the debug log. No new
+    API request — data comes from the existing onMounted fetches.
+- phase: in_progress (wired + typecheck-clean)
+  agent: dev
+  reason: >
+    Done locally. library/index.vue now resolves collection-tag chips:
+    tagIdToName computed (from collectionRows) + collectionTagsForRow() — Brand rows
+    map tagIds -> names (unresolved dropped, empty renders an em dash), Collection Tag
+    rows render their own name. Chips use the items-list tagChipClass cycling palette.
+    Structural fixes: colgroup now 8 cols (added 200px Collection Tag, min-w 1080 ->
+    1280), empty-state colspan 7 -> 8; the leftover Status-cell console.log was dropped
+    (formatter). nuxi typecheck reports 0 errors for the page (pre-existing errors
+    elsewhere unchanged). Remaining — user commits/pushes the one backoffice file and
+    runs live smoke. Note — during search the tags list narrows too, so a brand's chip
+    names may not all resolve while a query is active; acceptable for now.
+- phase: in_progress (column reworked to a cross-link)
+  agent: dev
+  reason: >
+    User clarified: the new column is a CROSS-LINK, not the row's own tag. Reworked
+    so the header and data flip per tab — Brand tab keeps "Collection Tag" (brand
+    tagIds -> tag-name chips, yellow); Collection Tag tab now reads "Brand" and shows
+    the brands tagged to each tag (tag redemptionIds -> brand-name chips, blue
+    bg-info-100/text-info-700 per the user's screenshot). This also removes the
+    duplicate "Collection Tag" header that previously showed on the Collection Tag
+    tab (col 2 + col 4). Added brandIdToName computed (from brandRows); renamed
+    collectionTagsForRow -> relationChipsForRow; column-4 th is now
+    activeTab==='Brand' ? 'Collection Tag' : 'Brand'. nuxi typecheck still 0 errors
+    for the page. Depends on the API populating tag.redemptionIds — empty renders an
+    em dash.

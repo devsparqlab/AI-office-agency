@@ -1,0 +1,72 @@
+task:
+  id: "TASK-042"
+  title: "Integrate Quest overview v2 tabs"
+  short_name: "quest-overview-v2-integration"
+  parent: "TASK-038"
+  epic: "Quest overview phase 2"
+  type: feature
+  priority: high
+  created_at: "2026-05-06"
+scope:
+  target_services:
+    - service: shared-lib
+      reason: "Only if additive overview response contract changes are required."
+    - service: Games-Labs-Missions
+      reason: "Owner of Quest overview composition."
+    - service: docs
+      reason: "Postman collection should document v2 overview response."
+description: |
+  Integrate Daily, Weekly, Monthly, Event, and Invite into GET /api/v1/quest/overview as ordered tabs. This card is composition-only and must avoid new Weekly/Event/Invite business logic.
+acceptance_criteria:
+  - criterion: "Overview returns ordered tabs: daily, weekly, monthly, event, invite."
+  - criterion: "Weekly, Event, and Invite are populated from TASK-040, TASK-041, and TASK-039 behavior."
+  - criterion: "Daily and Monthly remain based on existing logic."
+  - criterion: "No new business logic is introduced beyond composition/mapping."
+  - criterion: "Tests cover exact order and partial section fallback."
+plan:
+  approach: |
+    Reuse completed domain services and map them into Quest overview v2. Keep domain behavior in the upstream cards.
+  subtasks:
+    - order: 1
+      description: "Inspect completed Invite, Weekly, and Event services."
+      agent: dev-2
+    - order: 2
+      description: "Update overview composition tests for populated ordered tabs and fallback."
+      agent: dev-2
+    - order: 3
+      description: "Implement minimal composition/mapping changes and update Postman example."
+      agent: dev-2
+  risks:
+    - risk: "Overview v2 may duplicate domain logic from upstream services."
+      mitigation: "Task explicitly restricts implementation to composition/mapping."
+  estimated_complexity: medium
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "Integration across three prior cards."
+summary: |
+  Created TASK-042 for Quest phase 2 Overview v2 integration.
+artifacts:
+  - path: "runs/TASK-042/task.md"
+    action: created
+  - path: "runs/TASK-042/status.yaml"
+    action: created
+next_action:
+  agent: dev-2
+  reason: "Run after TASK-039, TASK-040, and TASK-041 are done."
+blockers:
+  - "TASK-039 must be done so Invite can be composed from a real API/service."
+  - "TASK-040 must be done so Weekly can be composed from production behavior."
+  - "TASK-041 must be done so Event can be composed from production behavior."
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - "Games-Labs-Missions/internal/services/quest_overview_service.go"
+      - "Games-Labs-Missions/internal/services"
+      - "shared-lib/proto/missionspb/missions.proto"
+    notes: "PM card created from user-approved Phase 2 scope."

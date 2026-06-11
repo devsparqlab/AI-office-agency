@@ -1,0 +1,30 @@
+task_id: TASK-083
+phase: done
+state: done
+current_agent: devops
+iteration: 1
+assigned_to: devops
+created_at: '2026-06-10'
+updated_at: '2026-06-10'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: devops
+  parallel: false
+history:
+- phase: created -> in_progress
+  agent: pm
+  reason: >
+    Follow-up to TASK-082, which added Tier-1 delivery skills and excluded
+    Tier 2. This task adds gitops-deploy-review, incident-response, and
+    secrets-management, grounded in the real stack: ArgoCD automated+selfHeal
+    sync against a :latest image tag (drift), manually-created k3s secrets, and
+    long-lived KUBECONFIG/GH_PAT credentials.
+- phase: in_progress -> done
+  agent: devops
+  reason: >
+    Created gitops-deploy-review, incident-response, and secrets-management under
+    ai-skills/skills/; promoted them in VERSION.md, added them to the README
+    Delivery / Infra table, and routed agents/devops.md into all three. Validator
+    passed for 24 skills.

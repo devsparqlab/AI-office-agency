@@ -1,0 +1,156 @@
+task:
+  id: "TASK-061"
+  title: "Missions Scoped Turnover Consumer"
+  short_name: "missions-scoped-turnover"
+  parent: "TASK-058"
+  epic: "Mobile Missions integration"
+  type: feature
+  priority: medium
+  created_at: "2026-05-20"
+scope:
+  target_services:
+    - service: Games-Labs-Missions
+      reason: >
+        Owns Daily Activity rules, Rabbit consumer mapping from player.activity.v1 into Bangkok-day
+        progress, admin validation for daily activities, and service/repository tests/docs. Implements
+        TURNOVER_GAME and TURNOVER_GAME_TYPE consuming TASK-060 scoped turnover.settled events.
+  affected_files:
+    - path: "Games-Labs-Missions/internal/repositories/mission_repo.go"
+      action: modify
+      description: "Add DailyActivityConditionType values TURNOVER_GAME and TURNOVER_GAME_TYPE; extend populateDailyActivityDerivedFields for threshold_unit defaults."
+    - path: "Games-Labs-Missions/internal/services/mission_service.go"
+      action: modify
+      description: "Extend validateDailyActivityConfig (scope exclusivity) and mapPlayerActivityEventToDailyProgress (scoped turnover.settled matching; reversal inherits ApplyDailyActivityReverse)."
+    - path: "Games-Labs-Missions/internal/services/mission_service_test.go"
+      action: modify
+      description: "Table tests for validation (dual-scope, missing scope) and any helper coverage."
+    - path: "Games-Labs-Missions/internal/services/daily_activity_consumer_test.go"
+      action: modify
+      description: "Consumer tests for match/non-match game scopes, missing metadata, reversal deltas."
+    - path: "Games-Labs-Missions/internal/handlers/mission_handler_test.go"
+      action: modify
+      description: "Optional 400-path coverage for admin UpsertDailyActivity with invalid scoped turnover configs."
+    - path: "Games-Labs-Missions/README.md"
+      action: modify
+      description: "Document producer to consumer to overview to claim; note TASK-060 dependency and fail-closed scope rules."
+description: |
+  Implement Missions-side support for game-scoped turnover daily activities after TASK-060 proves producers
+  emit trustworthy turnover.settled (and reversals) with settled_amount and game metadata on shared-lib
+  PlayerActivityEvent.
+
+  Verified in repo (2026-05-20): unscoped TURNOVER_AMOUNT and round-scoped ROUND_COUNT_GAME / ROUND_COUNT_GAME_TYPE
+  already pattern-match on game_id and game_type in mapPlayerActivityEventToDailyProgress; validation in
+  validateDailyActivityConfig enforces required scope fields for round types. Scoped turnover should mirror
+  those patterns for turnover.settled / turnover.reversed without inferring game_type from game_id.
+
+  shared-lib/events/player_activity.go already includes GameID, GameType, TurnoverSettled, TurnoverReverse —
+  no contract change expected in Missions scope.
+
+acceptance_criteria:
+  - criterion: "TURNOVER_GAME and TURNOVER_GAME_TYPE exist as recognized DailyActivityConditionType values and persist/load with existing daily_activities game_id and game_type columns."
+  - criterion: "validateDailyActivityConfig requires game_id and forbids game_type for TURNOVER_GAME; requires game_type and forbids game_id for TURNOVER_GAME_TYPE; threshold_unit defaults align with amount-based missions."
+  - criterion: "For turnover.settled with settled_amount > 0, mapper credits progress only when the event field required by the rule matches; empty or non-matching scope produces no delta for that rule (fail closed)."
+  - criterion: "turnover.reversed reduces progress for scoped turnover rules using existing reverse/application infrastructure and idempotency semantics."
+  - criterion: "Automated tests cover matching and non-matching game_id and game_type, missing metadata, admin dual-scope rejection, and reversal behavior."
+  - criterion: "README (or missions docs) explains end-to-end flow from producer through consumer to claim, referencing TASK-060."
+
+plan:
+  approach: |
+    (1) Add repository-level condition type constants and derived-field defaults so new types behave like
+        amount-based thresholds (same family as TURNOVER_AMOUNT).
+
+    (2) Extend validateDailyActivityConfig with mutual-exclusion rules parallel to ROUND_COUNT_GAME vs
+        ROUND_COUNT_GAME_TYPE, ensuring backoffice cannot configure both game_id and game_type for scoped turnover.
+
+    (3) Extend mapPlayerActivityEventToDailyProgress: for TURNOVER_GAME and TURNOVER_GAME_TYPE, gate on
+        turnover.settled, positive settled_amount, and game scope match; rely on existing pipeline for
+        turnover.reversed.
+
+    (4) Expand service and consumer tests; update README for operators/QA.
+  subtasks:
+    - order: 1
+      id: "missions-repo-scoped-turnover-types"
+      description: >
+        Add TURNOVER_GAME and TURNOVER_GAME_TYPE to DailyActivityConditionType; update
+        populateDailyActivityDerivedFields for consistent threshold_unit defaults.
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Missions/internal/repositories/mission_repo.go"
+      parallel_safe: false
+    - order: 2
+      id: "missions-service-scoped-turnover-validate-map"
+      description: >
+        Extend validateDailyActivityConfig for scoped turnover scope exclusivity; implement mapper branches
+        for turnover.settled scoped matching and ensure fail-closed behavior when metadata is missing.
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Missions/internal/services/mission_service.go"
+      parallel_safe: false
+    - order: 3
+      id: "missions-scoped-turnover-tests"
+      description: >
+        Add table-driven and consumer tests for match/mismatch, missing metadata, dual-scope admin validation,
+        and turnover.reversed; extend handler tests if HTTP coverage adds confidence.
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Missions/internal/services/mission_service_test.go"
+        - "Games-Labs-Missions/internal/services/daily_activity_consumer_test.go"
+        - "Games-Labs-Missions/internal/handlers/mission_handler_test.go"
+      parallel_safe: false
+    - order: 4
+      id: "missions-scoped-turnover-readme"
+      description: "Document producer dependency (TASK-060), consumer rules, fail-closed scope, and user-visible flow through overview/claim."
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Missions/README.md"
+      parallel_safe: false
+  risks:
+    - risk: "game_type casing differs between admin normalized rule and producer JSON; mismatches could yield no progress."
+      mitigation: "Reuse the same normalization and comparison approach as ROUND_COUNT_GAME_TYPE (e.g. EqualFold on event vs rule)."
+    - risk: "Legacy turnover.settled events without game scope could confuse operators if missions are misconfigured."
+      mitigation: "Document fail-closed behavior; scoped rules never advance without the required field match."
+  estimated_complexity: medium
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: >
+    Touches validation, consumer mapper, and multiple test files in one service; patterns are established
+    but scoped turnover and reversal edge cases warrant dev-2 depth.
+
+summary: |
+  TASK-061 gives Games-Labs-Missions first-class TURNOVER_GAME and TURNOVER_GAME_TYPE daily activities that
+  consume TASK-060 scoped turnover player.activity events, with strict admin validation, fail-closed mapping,
+  reversal parity, tests, and README handoff for QA.
+
+artifacts:
+  - path: "runs/TASK-061/task.md"
+    action: modified
+    description: "Full blueprint, file list, risks, and ordered plan for scoped turnover consumer."
+  - path: "runs/TASK-061/status.yaml"
+    action: modified
+    description: "Assigned to dev-2 after PM completion; history records orchestrator unblock and PM handoff."
+  - path: "runs/TASK-061/pm-output.yaml"
+    action: created
+    description: "Structured PM output for validate-yaml and dev-2 execution."
+
+next_action:
+  agent: dev-2
+  reason: "TASK-060 complete; Missions consumer scope is defined with concrete files and test expectations — ready for implementation."
+
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "pm TASK-061: Missions Scoped Turnover Consumer"
+      - "Where is turnover settled event mapped for mission progress?"
+    relevant_symbols:
+      - "Games-Labs-Missions/internal/repositories/mission_repo.go:DailyActivityConditionType"
+      - "Games-Labs-Missions/internal/services/mission_service.go:mapPlayerActivityEventToDailyProgress"
+      - "Games-Labs-Missions/internal/services/mission_service.go:validateDailyActivityConfig"
+      - "shared-lib/events/player_activity.go:PlayerActivityEvent"
+    notes: "Semantic search plus ripgrep; verified mission_service turnover and round scope patterns on disk."
+
+blockers: []

@@ -1,0 +1,56 @@
+task_id: TASK-078
+agent: reviewer
+status: approved
+review_verdict: approved
+summary: |
+  TASK-078 is approved. The check-in calendar now exposes `days[].is_restored`
+  end to end while preserving restored dates as `status: "completed"`.
+  The flag is source-based, only true for `check_in_day_ledgers.source ==
+  "restore"`, and false for normal completed and non-completed days.
+artifacts:
+- path: runs/TASK-078/status.yaml
+  action: modified
+  description: Marked task done after reviews and verification.
+- path: runs/TASK-078/dev-2-output.yaml
+  action: modified
+  description: Updated final implementation status.
+- path: runs/TASK-078/reviewer-output.yaml
+  action: created
+  description: Final review approval.
+- path: runs/TASK-078/verification-evidence.md
+  action: modified
+  description: Verification evidence for shared-lib and downstream changes.
+findings: []
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    `GOWORK=off go build -mod=readonly ./...` passed in Games-Labs-Missions and
+    api-gateway. `go test ./...` passed in both repos. TASK YAML validation and
+    both Postman JSON parses also passed.
+transition:
+  from_phase: in_review
+  to_phase: done
+verification:
+- command: go test ./...
+  cwd: Games-Labs-Missions
+  result: passed
+- command: GOWORK=off go build -mod=readonly ./...
+  cwd: Games-Labs-Missions
+  result: passed
+- command: go test ./...
+  cwd: api-gateway
+  result: passed
+- command: GOWORK=off go build -mod=readonly ./...
+  cwd: api-gateway
+  result: passed
+- command: ruby validate-yaml.rb TASK-078
+  cwd: ai-dev-office
+  result: passed
+- command: node JSON parse for both Postman collections
+  cwd: /Users/earth/Documents/GitHub
+  result: passed
+next_action:
+  agent: done
+  reason: Task implementation and review are complete.
+blockers: []

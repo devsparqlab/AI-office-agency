@@ -1,0 +1,50 @@
+summary: |
+  Moved IDG gameplay turnover production from win-time Redis stake lookup to bet-debit
+  settlement. IntegratorBet now calls Game SettleRound via trySettleRoundHook only after
+  IDGDebitWallet succeeds, using wagerId, userId, gameId, provider_code=idg, and parsed
+  Amount as settled_amount. IntegratorWin no longer calls SettleRound (Game round_lifecycles
+  insert gate prevents double-count if a legacy path retried). Removed Redis wager/txn stake
+  cache and idgWinTurnover; turnover.go now exposes idgBetSettledAmount only.
+
+  IDGCancel refunds wallet when amount > 0 but cannot reverse bet-time turnover: Game
+  gamesvc.ReverseRound exists internally but shared-lib gamepb has no ReverseRound RPC and
+  Provider gameadt has no reverse helper. Cancel logs an explicit staging blocker message;
+  verification-evidence.md documents SQL/log checks and the staging gate.
+
+  Unit tests cover bet success settle, debit failure skip, win no double-settle, cancel no
+  settle, and amount mapping. go test ./internal/core/services/idg ./internal/handlers/idghdl
+  and go test ./... pass in Games-Labs-Provider.
+artifacts:
+  - path: Games-Labs-Provider/internal/core/services/idg/callback.go
+    action: modified
+  - path: Games-Labs-Provider/internal/core/services/idg/turnover.go
+    action: modified
+  - path: Games-Labs-Provider/internal/core/services/idg/callback_test.go
+    action: modified
+  - path: Games-Labs-Provider/internal/core/services/idg/turnover_test.go
+    action: modified
+  - path: Games-Labs-Provider/README.md
+    action: modified
+  - path: ai-dev-office/runs/TASK-070/verification-evidence.md
+    action: created
+  - path: ai-dev-office/runs/TASK-070/dev-2-output.yaml
+    action: created
+next_action:
+  agent: reviewer
+  reason: IDG bet-debit SettleRound path implemented with tests and docs; cancel reverse documented as staging blocker pending Game ReverseRound gRPC.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "IDG wallet_transactions idempotency_key idg:bet debit SettleRound"
+      - "IDGBet IDGWin turnover SettleRound cache"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/idg/callback.go"
+      - "Games-Labs-Provider/internal/adapters/gameadt/settle_round.go"
+      - "Games-Labs-Game/internal/core/services/gamesvc/service.go"
+    notes: "Primary d:\\llm index unavailable; verified via local repo read including Game ReverseRound without gRPC exposure."
+blockers:
+  - "Staging/production enablement blocked until IDGCancel can call Game ReverseRound (requires gamepb ReverseRound RPC + Provider gameadt.TryReverseRound); canceled wagers retain bet-time turnover until then."

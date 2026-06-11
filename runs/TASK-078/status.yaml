@@ -1,0 +1,45 @@
+---
+task_id: TASK-078
+phase: done
+state: done
+current_agent: done
+iteration: 3
+assigned_to: dev-2
+created_at: '2026-06-08'
+updated_at: '2026-06-08'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-078/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: Mobile confirmed a backward-compatible `days[].is_restored` boolean
+    works for recently restored streak UI; source review shows existing
+    check-in ledger source data can support the flag, with shared-lib contract
+    update required first.
+- phase: pending -> blocked
+  agent: dev-2
+  reason: Shared-lib proto contract and generated artifacts were updated and
+    approved by spec and code-quality subagent reviews. Downstream Missions and
+    api-gateway work is blocked until the updated shared-lib contract is
+    published or otherwise available for a proper dependency bump without a
+    local replace directive.
+- phase: blocked -> in_review
+  agent: dev-2
+  reason: User confirmed shared-lib publish/bump. Games-Labs-Missions and
+    api-gateway now use shared-lib v0.0.0-20260608082044-b8a073833ca9 without a
+    local replace directive. Runtime, gRPC mapping, focused tests, README, and
+    both Postman collection copies were updated and verification passed.
+- phase: in_review -> done
+  agent: reviewer
+  reason: Spec compliance and code quality subagent reviews approved. Fresh
+    verification passed for Games-Labs-Missions tests/build, api-gateway
+    tests/build, TASK-078 YAML validation, and both Postman collection JSON
+    parses.

@@ -1,0 +1,57 @@
+summary: |
+  Added an additive admin missions RPC and HTTP route for `POST /api/v1/admin/missions/daily/reset`, regenerated the `missionspb` artifacts, and wired the Missions gRPC dispatcher and HTTP admin handler to it.
+
+  In `Games-Labs-Missions`, I implemented a repository-backed reset path that deletes only the current Bangkok-day `daily_mission` and `watch_ad` mission logs plus current-day `daily_activity_progress`, while intentionally preserving weekly/monthly/invite/event state and the daily activity consumer event history. Preserving the consumer event history is the safer rollback-compatible choice here because late reverse events can still reconcile cleanly without us erasing the source event ledger.
+
+  I also clear the in-memory daily counters/claim markers used by fallback mode so repeat calls stay stable, then added focused tests for missing `user_id`, repeat-safe reset behavior, Bangkok-day windowing, and non-impact on monthly state. No direct `api-gateway` source edit was needed because the existing gateway registration already serves the regenerated Missions grpc-gateway bindings and Swagger output.
+artifacts:
+  - path: shared-lib/proto/missionspb/missions.proto
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.pb.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.pb.gw.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions_grpc.pb.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.swagger.json
+    action: modified
+  - path: shared-lib/proto/missionspb/swagger.pb.go
+    action: modified
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+    action: modified
+  - path: Games-Labs-Missions/internal/handlers/admin_handler.go
+    action: modified
+  - path: Games-Labs-Missions/internal/handlers/admin_handler_test.go
+    action: created
+  - path: Games-Labs-Missions/internal/models/models.go
+    action: modified
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    action: modified
+  - path: Games-Labs-Missions/internal/repositories/mission_repo_test.go
+    action: modified
+  - path: Games-Labs-Missions/internal/routes/apiv1.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/mission_service.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/mission_service_test.go
+    action: modified
+  - path: docs/Games-Labs-APIs.postman_collection.json
+    action: modified
+next_action:
+  agent: reviewer
+  reason: The admin daily-reset contract, implementation, generated artifacts, docs, and focused regression coverage are in place and ready for review.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: fallback
+    queries:
+      - "dev-2 TASK-046 admin force-reset daily missions per user"
+    relevant_symbols:
+      - "shared-lib/proto/missionspb/missions.proto"
+      - "Games-Labs-Missions/internal/services/mission_service.go"
+      - "Games-Labs-Missions/internal/repositories/mission_repo.go"
+      - "Games-Labs-Missions/internal/handlers/admin_handler.go"
+    notes: "SocratiCode had no usable context, so implementation was verified from local repo inspection, regenerated proto output, and repo/service/handler tests."
+blockers: []

@@ -1,0 +1,20 @@
+summary: |
+  Refactored Missions level redemption to enforce service ownership boundaries: redeeming points now delegates to Wallet's `/wallets/redeem` API and no longer mutates Missions progression fields (`points`, `total_points`, level state). Updated progression terminology to use EXP-first response fields (`progress_exp`, `lifetime_progress_exp`, `next_level_exp`, `exp_added`, `current_exp`) while preserving point-based aliases for backward compatibility, and kept regression tests proving redemption leaves progression unchanged and turnover progression does not call wallet mutation endpoints.
+artifacts:
+  - path: Games-Labs-Missions/internal/clients/wallet/client.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/level_service.go
+    action: modified
+  - path: Games-Labs-Missions/internal/models/models.go
+    action: modified
+  - path: Games-Labs-Missions/internal/handlers/level_handler.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/level_service_test.go
+    action: created
+  - path: Games-Labs-Missions/README.md
+    action: modified
+next_action:
+  agent: reviewer
+  reason: |
+    Requested terminology change to EXP-first naming is now implemented with compatibility aliases; ready for reviewer verification while PM has been notified in run status history.
+blockers: []

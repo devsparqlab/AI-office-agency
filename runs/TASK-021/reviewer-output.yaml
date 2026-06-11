@@ -1,0 +1,117 @@
+summary: |
+  Re-review (round 2) after debugger pass. All three error-severity blockers from
+  round 1 are resolved with focused, test-only changes in three packages.
+
+  Debugger additions verified:
+  - 4 Wallet handler tests: TestListActiveRateCatalogHTTPHandlerSuccess,
+    TestGetActiveRateByKeyHTTPHandlerSuccess, TestUpsertRateCatalogHTTPHandlerSuccess,
+    TestDeactivateRateCatalogHTTPHandlerSuccess — all PASS.
+  - TestStoreServiceExchangeUsesWalletRateCatalog (Missions) — fake wallet HTTP server,
+    USE_WALLET_RATE_CATALOG enabled, asserts catalog-based debit/credit payloads — PASS.
+  - TestConfirmPaymentUsesWalletRateCatalogWhenEnabled (Order) — catalog Numerator
+    overrides package snapshot RewardCoins — PASS.
+  No regressions. No replace directives. All three services build and test clean.
+  Pre-existing advisory notes (admin handler auth, Numerator-as-absolute assumption)
+  carry forward as non-blocking observations for follow-up tasks.
+
+review_verdict: approved
+
+build_check:
+  compile: pass
+  tests: pass
+  details: >
+    Games-Labs-Wallet go test ./internal/core/handlers/wallethdl — 17/17 PASS
+    (new: TestListActiveRateCatalogHTTPHandlerSuccess,
+    TestGetActiveRateByKeyHTTPHandlerSuccess, TestUpsertRateCatalogHTTPHandlerSuccess,
+    TestDeactivateRateCatalogHTTPHandlerSuccess).
+    Games-Labs-Missions go test ./internal/services — 16/16 PASS
+    (new: TestStoreServiceExchangeUsesWalletRateCatalog).
+    Games-Labs-Order go test ./internal/core/services/ordersvc — 22/22 PASS
+    (new: TestConfirmPaymentUsesWalletRateCatalogWhenEnabled).
+
+artifacts:
+  - path: Games-Labs-Wallet/internal/core/handlers/wallethdl/wallet_handler_test.go
+    issues: []
+
+  - path: Games-Labs-Missions/internal/services/store_service_test.go
+    issues: []
+
+  - path: Games-Labs-Order/internal/core/services/ordersvc/service_test.go
+    issues: []
+
+  - path: Games-Labs-Wallet/migrations/014_create_rate_catalog.sql
+    issues: []
+
+  - path: Games-Labs-Wallet/internal/models/rate_catalog.go
+    issues: []
+
+  - path: Games-Labs-Wallet/internal/repositories/exchange_rate.go
+    issues: []
+
+  - path: Games-Labs-Wallet/internal/core/ports/repositories.go
+    issues: []
+
+  - path: Games-Labs-Wallet/internal/core/ports/services.go
+    issues: []
+
+  - path: Games-Labs-Wallet/internal/core/services/walletsvc/service.go
+    issues: []
+
+  - path: Games-Labs-Wallet/internal/core/handlers/wallethdl/exchange_rate_handler.go
+    issues:
+      - line: "42-55"
+        severity: warning
+        description: >
+          Upsert and Deactivate admin endpoints lack handler-level auth. Protection
+          relies on api-gateway RBAC. Advisory: add an admin middleware guard for
+          in-cluster direct calls. Non-blocking.
+
+  - path: Games-Labs-Wallet/cmd/main.go
+    issues: []
+
+  - path: Games-Labs-Wallet/README.md
+    issues: []
+
+  - path: Games-Labs-Missions/internal/clients/wallet/client.go
+    issues: []
+
+  - path: Games-Labs-Missions/internal/services/store_service.go
+    issues: []
+
+  - path: Games-Labs-Missions/config/config.go
+    issues: []
+
+  - path: Games-Labs-Missions/cmd/main.go
+    issues: []
+
+  - path: Games-Labs-Order/internal/models/order.go
+    issues:
+      - line: "172-185"
+        severity: suggestion
+        description: >
+          WalletRateCatalog.Numerator is used as absolute coin output, not a per-unit
+          multiplier. Document assumption in model comment to prevent future misuse.
+          Non-blocking.
+
+  - path: Games-Labs-Order/internal/core/ports/adapters.go
+    issues: []
+
+  - path: Games-Labs-Order/internal/adapter/walletadt/walletadt.go
+    issues: []
+
+  - path: Games-Labs-Order/internal/core/services/ordersvc/service.go
+    issues: []
+
+next_action:
+  agent: done
+  reason: All acceptance criteria met and tested. Task is complete.
+
+transition:
+  from_phase: review
+  to_phase: done
+  agent: done
+  reason: >
+    Round-2 review passes. All three error blockers resolved, all suites green,
+    no regressions. Definition of Done met.
+
+blockers: []

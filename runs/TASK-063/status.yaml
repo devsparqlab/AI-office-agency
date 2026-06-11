@@ -1,0 +1,36 @@
+---
+task_id: TASK-063
+phase: done
+state: done
+current_agent: done
+iteration: 1
+assigned_to: dev-2
+created_at: '2026-05-21'
+updated_at: '2026-05-21'
+ready: false
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-063/reviewer-output.yaml
+history:
+  - phase: created -> pending
+    agent: pm
+    reason: >-
+      User approved follow-up to keep ListCategory public while adding optional
+      per-game playability metadata and requiring shared-lib publish/bump before
+      downstream Games-Labs-Game changes.
+  - phase: pending -> in_review
+    agent: dev-2
+    reason: >-
+      shared-lib CategoryGame playability fields were added, shared-lib was
+      published and bumped to v0.0.0-20260521084502-88c071b64c68, and
+      Games-Labs-Game now annotates ListCategory playability with fresh tests.
+  - phase: in_review -> done
+    agent: reviewer
+    reason: >-
+      Review passed with fresh shared-lib and Games-Labs-Game verification,
+      published shared-lib dependency pinning, and no replace directive in the
+      consumer go.mod.

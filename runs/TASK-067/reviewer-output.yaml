@@ -1,0 +1,67 @@
+summary: |
+  Approved. Current TASK-067 checkout satisfies the runtime scope: shared-lib is pinned to published v0.0.0-20260525172513-2504f03eefbc with no replace directive; durable check-in calendar persistence, service logic, handlers, routes, typed gRPC dispatch, and tests are present; prior idempotency and campaign_id=0 blockers are fixed.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    GOCACHE=/private/tmp/codex-gocache GOMODCACHE=/private/tmp/codex-gomodcache go test ./... passed for Games-Labs-Missions.
+    GOCACHE=/private/tmp/codex-gocache GOMODCACHE=/private/tmp/codex-gomodcache GOWORK=off go build -mod=readonly ./... exited 0.
+    go list -m -json github.com/SparqLab/shared-lib confirms v0.0.0-20260525172513-2504f03eefbc with no replace.
+artifacts:
+  - path: Games-Labs-Missions/go.mod
+    issues: []
+  - path: Games-Labs-Missions/go.sum
+    issues: []
+  - path: Games-Labs-Missions/migrations/023_check_in_calendar.sql
+    issues: []
+  - path: Games-Labs-Missions/internal/models/models.go
+    issues: []
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    issues: []
+  - path: Games-Labs-Missions/internal/repositories/mission_repo_test.go
+    issues: []
+  - path: Games-Labs-Missions/internal/services/check_in_calendar_service.go
+    issues: []
+  - path: Games-Labs-Missions/internal/services/check_in_calendar_service_test.go
+    issues: []
+  - path: Games-Labs-Missions/internal/services/mission_service.go
+    issues: []
+  - path: Games-Labs-Missions/internal/services/quest_overview_service.go
+    issues: []
+  - path: Games-Labs-Missions/internal/handlers/mission_handler.go
+    issues: []
+  - path: Games-Labs-Missions/internal/handlers/mission_handler_test.go
+    issues: []
+  - path: Games-Labs-Missions/internal/handlers/adminhdl/admin_handler.go
+    issues: []
+  - path: Games-Labs-Missions/internal/handlers/adminhdl/admin_handler_test.go
+    issues: []
+  - path: Games-Labs-Missions/internal/routes/apiv1.go
+    issues: []
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+    issues: []
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server_test.go
+    issues: []
+next_action:
+  agent: done
+  reason: No error-severity issues found and required build/test verification passed.
+context_sources:
+  github:
+    branch: main
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - codebase_status projectPath=d:\llm
+      - TASK-067 check-in calendar runtime Games-Labs-Missions check in ledger milestone restore config routes handlers
+    relevant_symbols:
+      - Games-Labs-Missions/internal/services/check_in_calendar_service.go
+      - Games-Labs-Missions/internal/repositories/mission_repo.go
+      - Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+      - shared-lib/proto/missionspb/missions.proto
+    notes: SocratiCode was used for navigation only; verdict is based on local source, diff, module metadata, tests, and readonly build.
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

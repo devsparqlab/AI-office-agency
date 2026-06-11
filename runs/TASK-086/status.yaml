@@ -1,0 +1,38 @@
+task_id: TASK-086
+phase: done
+state: done
+current_agent: devops
+iteration: 1
+assigned_to: devops
+created_at: '2026-06-10'
+updated_at: '2026-06-10'
+ready: true
+blocked_on: []
+waiting_for: []
+assignment:
+  primary: devops
+  parallel: false
+history:
+- phase: created -> in_progress
+  agent: pm
+  reason: >
+    Build the directory-mode SHA-pin template on Games-Labs-Logs (lowest-risk
+    service with full configmap flow) before rolling out to the other 7
+    directory-mode services. Differs from Wallet (kustomize): pin the image in
+    deployment.yaml directly, preserve the configmap/secret apply, and order
+    config-before-commit so ArgoCD-driven rollout reads fresh config.
+- phase: in_progress -> done
+  agent: devops
+  reason: >
+    Built the directory-mode template on Games-Labs-Logs and opened PR #1.
+    deploy.yml now pins the sha- tag into deployment.yaml and commits it (ArgoCD
+    drives rollout); config/secret apply preserved and reordered before the
+    commit; wait loop + rollout restart removed. YAML validated. Awaiting DevOps
+    review/merge before rolling out the remaining 7 directory-mode services.
+notes:
+  pr: https://github.com/SparqLab/Games-Labs-Logs/pull/1
+  branch: devops/logs-sha-pin-gitops
+  remaining_directory_mode_services:
+    group_b_configmap: [Games-Labs-Game, Games-Labs-User, Games-Labs-Order, api-gateway, Games-Labs-Auth]
+    group_a_no_configmap: [Games-Labs-Missions, Games-Labs-backoffice]
+  note: TASK-085 was taken by an unrelated dashboard task; this used TASK-086.

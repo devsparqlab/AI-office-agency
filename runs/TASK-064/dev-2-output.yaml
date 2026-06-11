@@ -1,0 +1,72 @@
+task_id: TASK-064
+agent: dev-2
+status: completed
+completed_at: '2026-05-22T13:40:59+0700'
+
+summary: |
+  Audited the Games-Labs-Game runtime URL wiring end to end and confirmed the
+  runtime path already carries both `USER_API_URL` and `MISSIONS_API_URL`
+  through the live codepath:
+  - `configs/config.go` reads both env vars.
+  - `cmd/main.go` only creates the user adapter when `USER_API_URL` is set and
+    only creates the missions adapter when `MISSIONS_API_URL` is set.
+  - `k3s/configmap.yaml`, `k3s/deployment.yaml`, and
+    `.github/workflows/deploy.yml` already wire the cluster defaults and
+    overrides for both URLs.
+
+  The remaining gap was documentation alignment. I patched `.env.example` to
+  match the cluster defaults for all external service URLs and added a README
+  note that explains the runtime contract and the guest-like fallback when
+  `USER_API_URL` is missing.
+
+changes:
+  - service: Games-Labs-Game
+    files:
+      - .env.example
+      - README.md
+    details:
+      - >-
+        Aligned the example environment with cluster defaults:
+        WALLET_API_URL=games-labs-wallet-service:50054,
+        PROVIDER_API_URL=84.247.150.206:50051,
+        USER_API_URL=games-labs-user-service:50055,
+        MISSIONS_API_URL=games-labs-missions-service:50056.
+      - Documented the runtime wiring contract in the README so the env
+        requirement is visible to operators and reviewers.
+  - service: review
+    files:
+      - cmd/main.go
+      - configs/config.go
+      - internal/adapters/useradt/useradt.go
+      - internal/adapters/missionsadt/adapter.go
+      - k3s/configmap.yaml
+      - k3s/deployment.yaml
+      - .github/workflows/deploy.yml
+    details:
+      - Verified that the runtime URL chain is already wired through the app
+        and deployment surfaces with no unrelated Golden Pass logic changes.
+
+tests:
+  - command: go test ./...
+    cwd: Games-Labs-Game
+    result: passed
+
+notes:
+  - "No service logic changes were required for TASK-064; the operational gap was
+    the example/documentation alignment."
+  - "Reviewer should focus on confirming the env contract and that the current
+    tree does not bundle unrelated Golden Pass behavior changes."
+
+artifacts:
+  - path: Games-Labs-Game/.env.example
+    action: modified
+  - path: Games-Labs-Game/README.md
+    action: modified
+  - path: ai-dev-office/runs/TASK-064/status.yaml
+    action: modified
+
+blockers: []
+
+next_action:
+  agent: reviewer
+  reason: "Runtime wiring is verified and documented; reviewer should confirm acceptance criteria against the current tree."

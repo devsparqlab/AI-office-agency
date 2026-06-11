@@ -1,0 +1,57 @@
+summary: |
+  Approved against PM-scoped acceptance criteria. Games-Labs-Game now persists round_lifecycles
+  idempotently via `UpsertRoundSettlement` (`ON CONFLICT (round_id) DO NOTHING` + inserted flag),
+  and `SettleRound` publishes `player.activity.v1` `round.settled` only when a row is newly inserted.
+  `publishRoundSettled` already emits canonical metadata (`round_count=1`, `game_id`, `game_type`,
+  `source_service=games-labs-game`, `source_reference_type=round`). `LaunchGame` does not touch
+  settlement or publishing. `TestSettleRoundPublishesOnlyWhenSettlementIsInserted` covers
+  publish-once vs duplicate paths.
+
+  task.md also asks for a real provider/game settlement path to call `SettleRound`; no handler,
+  gRPC, or Provider callback invokes it yet (only service-layer + tests). PM plan explicitly
+  deferred Provider→Game wiring to a future contract task; treat that as follow-up, not a blocker
+  for this idempotency/publish-once slice.
+review_verdict: approved
+build_check:
+  compile: pass
+  tests: pass
+  details: |
+    From Games-Labs-Game:
+    - go build ./...  (exit 0)
+    - go test ./...   (exit 0; gamesvc includes round_lifecycle_test.go)
+    No replace github.com/SparqLab/shared-lib => ../shared-lib in go.mod.
+artifacts:
+  - path: /Users/earth/Documents/GitHub/Games-Labs-Game/internal/core/ports/repositories.go
+    issues: []
+  - path: /Users/earth/Documents/GitHub/Games-Labs-Game/internal/core/repositories/game.go
+    issues: []
+  - path: /Users/earth/Documents/GitHub/Games-Labs-Game/internal/core/services/gamesvc/service.go
+    issues:
+      - line: "213-227"
+        severity: suggestion
+        description: |
+          SettleRound is correct for insert-gated publish, but no production handler or Provider
+          callback calls it yet. Track a follow-up task to invoke SettleRound from the real
+          settlement path when gamepb/Provider contract is ready.
+  - path: /Users/earth/Documents/GitHub/Games-Labs-Game/internal/core/services/gamesvc/round_lifecycle_test.go
+    issues: []
+next_action:
+  agent: done
+  reason: PM acceptance criteria met; build/tests pass; production caller wiring is documented follow-up.
+context_sources:
+  github:
+    branch: main
+    pr: ""
+  socraticode:
+    status: skipped
+    queries:
+      - "Games-Labs-Game SettleRound UpsertRoundSettlement publishRoundSettled"
+    relevant_symbols:
+      - "Games-Labs-Game/internal/core/services/gamesvc/service.go:SettleRound"
+      - "Games-Labs-Game/internal/core/repositories/game.go:UpsertRoundSettlement"
+      - "Games-Labs-Game/internal/core/services/gamesvc/player_activity.go:publishRoundSettled"
+    notes: "Verified on-disk code and local go build/test; ripgrep shows SettleRound has no non-test callers yet."
+transition:
+  from_phase: review
+  to_phase: done
+blockers: []

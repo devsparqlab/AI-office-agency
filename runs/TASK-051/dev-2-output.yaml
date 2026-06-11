@@ -1,0 +1,36 @@
+summary: |
+  Implemented the Daily Activity backoffice contract fixes in Missions. Admin create/update/activate/deactivate now re-read the persisted row before responding, so responses include stored timestamps and defaults such as `claim_limit_per_day` and `reset_timezone`. `GetDailyActivityByID` now returns the full admin detail shape, and `GetProgress` filters out inactive daily rows before status mapping so Mobile reads hide deactivated activities even if they appear in the repository result set. Added a repeatable smoke-test runbook to the Missions README and focused tests for repository, service, and handler behavior.
+artifacts:
+  - path: README.md
+    action: modified
+  - path: internal/handlers/mission_handler.go
+    action: modified
+  - path: internal/handlers/mission_handler_test.go
+    action: modified
+  - path: internal/repositories/mission_repo.go
+    action: modified
+  - path: internal/repositories/mission_repo_test.go
+    action: modified
+  - path: internal/services/mission_service.go
+    action: modified
+  - path: internal/services/mission_service_test.go
+    action: modified
+next_action:
+  agent: reviewer
+  reason: "The implementation is covered by focused contract tests and a full `go test ./...` pass."
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "TASK-051 backoffice daily activity smoke test"
+      - "DailyActivity admin routes mission_service mission_repo README"
+    relevant_symbols:
+      - "internal/handlers/mission_handler.go:UpsertDailyActivity/GetDailyActivity/UpdateDailyActivity/ActivateDailyActivity/DeactivateDailyActivity"
+      - "internal/repositories/mission_repo.go:GetDailyActivityByID"
+      - "internal/services/mission_service.go:GetProgress/filterActiveDailyActivities"
+      - "README.md:Backoffice Daily Activity Smoke Test"
+    notes: "Verified with `GOCACHE=/private/tmp/gocache go test ./...` in `Games-Labs-Missions`. An unrelated pre-existing change remains in `internal/services/daily_activity_consumer_test.go` and was left untouched."
+blockers: []

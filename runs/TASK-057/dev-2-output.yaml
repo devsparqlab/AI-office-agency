@@ -1,0 +1,91 @@
+summary: |
+  Extended shared-lib PlayerActivityEvent with optional spend_currency (THB when omitted),
+  spend_category for classification, and games-labs-wallet source constant; added typed constants
+  for THB/Diamond rails and consumption/refund/exchange categories.
+
+  Games-Labs-Wallet: RabbitMQ PlayerActivity publisher (amq.topic / player.activity.v1), wired from
+  cmd/main when RABBITMQ_URL works; walletsvc publishes spend.settled on successful Diamond debits
+  (ledger-backed consumption only), and spend.reversed on Diamond credits when metadata
+  reverses_wallet_ledger_id points at the original debit ledger id — package credits and exchange
+  flows do not emit diamond spend missions. skip_player_activity metadata suppresses publish.
+
+  Games-Labs-Missions: SPEND_DIAMOND_AMOUNT condition with admin validation (spend_currency fixed
+  DIAMOND); mapper keys off effective spend currency (default THB for legacy Order events) and
+  ignores spend_category=exchange; THB SPEND_AMOUNT no longer progresses from Diamond-tagged spend
+  events. Consumer tests cover diamond forward/reverse, THB mismatch, and exchange category.
+
+  Games-Labs-Order: explicit spend_currency=THB on THB spend.settled / spend.reversed.
+
+  Docs: Games-Labs-Missions README (fifth template, matrices, examples); Games-Labs-Wallet README
+  (publisher semantics, refund metadata, RABBITMQ_URL).
+
+  go.mod pins for shared-lib were bumped to a placeholder pseudo-version; maintainer must replace
+  with the real version from the shared-lib merge commit and run go mod tidy (see blockers).
+
+artifacts:
+  - path: shared-lib/events/player_activity.go
+    action: modified
+  - path: Games-Labs-Wallet/internal/core/ports/player_activity.go
+    action: created
+  - path: Games-Labs-Wallet/infrastructure/player_activity_publisher.go
+    action: created
+  - path: Games-Labs-Wallet/internal/core/services/walletsvc/service.go
+    action: modified
+  - path: Games-Labs-Wallet/internal/core/services/walletsvc/player_activity_publish.go
+    action: created
+  - path: Games-Labs-Wallet/cmd/main.go
+    action: modified
+  - path: Games-Labs-Wallet/README.md
+    action: modified
+  - path: Games-Labs-Wallet/go.mod
+    action: modified
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/mission_service.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/daily_activity_consumer_test.go
+    action: modified
+  - path: Games-Labs-Missions/README.md
+    action: modified
+  - path: Games-Labs-Missions/go.mod
+    action: modified
+  - path: Games-Labs-Order/internal/core/services/ordersvc/player_activity.go
+    action: modified
+  - path: Games-Labs-Order/go.mod
+    action: modified
+  - path: Games-Labs-Game/go.mod
+    action: modified
+
+next_action:
+  agent: reviewer
+  reason: >-
+    Contract, wallet producer, missions mapping/tests, Order THB tagging, and operator docs are
+    implemented; reviewer should verify go.sum refresh, full integration tests, and any additional
+    wallet debit paths that bypass Debit().
+
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "dev-2 TASK-057: Spend Diamonds Mission (SPEND_DIAMOND_AMOUNT)"
+    relevant_symbols:
+      - "shared-lib/events/player_activity.go"
+      - "Games-Labs-Wallet/internal/core/services/walletsvc/service.go"
+      - "Games-Labs-Missions/internal/services/mission_service.go (mapPlayerActivityEventToDailyProgress)"
+    notes: >-
+      Wallet diamond debits go through Debit(); exchange uses repository directly and is excluded.
+      Refunds require explicit reverses_wallet_ledger_id on DIAMOND credit metadata.
+
+blockers:
+  - >-
+    After merging shared-lib, set github.com/SparqLab/shared-lib to the real pseudo-version for that
+    commit and run `go mod tidy` in Games-Labs-Wallet, Games-Labs-Missions, Games-Labs-Order, and
+    Games-Labs-Game (placeholder v0.0.0-20260519120000-10df05705705 will fail checksum until updated).
+  - >-
+    Could not run `go test` in this session; reviewer should run tests locally. Residual risk:
+    any future Diamond debit that calls WalletRepository.ApplyTransaction directly (bypassing
+    walletsvc.Debit) would not emit player.activity events — current repo paths use Debit for
+    consumption debits and exchange is intentionally excluded.

@@ -1,0 +1,47 @@
+---
+task_id: TASK-066
+phase: done
+state: done
+current_agent: done
+iteration: 2
+assigned_to: dev-2
+created_at: '2026-05-25'
+updated_at: '2026-05-26'
+ready: true
+assignment:
+  primary: dev-2
+  parallel: false
+handoff:
+  from: reviewer
+  to: done
+  artifact: runs/TASK-066/reviewer-output.yaml
+history:
+- phase: created -> pending
+  agent: pm
+  reason: Mobile/Frontend requested Monthly Check-In Calendar and Consecutive Bonus
+    backend support. The first executable task is shared-lib contract work; downstream
+    Missions implementation is blocked until shared-lib is published and bumped.
+- phase: pending -> in_review
+  agent: dev-2
+  reason: Ready for review of the shared-lib contract and generated artifacts before
+    publishing/bumping shared-lib for downstream Missions work.
+- phase: in_review -> debugging
+  agent: reviewer
+  reason: Reviewer requested non-breaking RestoreStreak compatibility, regenerated
+    embedded swagger, and clearer downstream scope handling.
+- phase: debugging -> blocked
+  agent: debugger
+  reason: Local shared-lib fixes are ready and verified, but downstream guard cannot
+    pass until the fixed shared-lib commit is published and service pins are bumped.
+- phase: debugging -> in_review
+  agent: dev-2
+  reason: User published the fixed non-breaking shared-lib commit; all guarded services
+    were bumped to v0.0.0-20260525172513-2504f03eefbc and dependency guard passed.
+- phase: in_review -> debugging
+  agent: reviewer
+  reason: Fix stale generated swagger, restore contract compatibility or clarify breaking
+    scope, and remove out-of-scope Games-Labs-Missions changes from this task.
+- phase: in_review -> done
+  agent: reviewer
+  reason: Reviewer approved TASK-066 after shared-lib non-breaking contract fix,
+    generated swagger refresh, service pin bump, and dependency guard verification.

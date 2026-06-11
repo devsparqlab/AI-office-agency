@@ -1,0 +1,104 @@
+task:
+  id: "TASK-071"
+  title: "1UP Gameplay Turnover Settlement Validation"
+  short_name: "oneup-turnover-validation"
+  parent: "TASK-069"
+  epic: "Quest Daily Turnover / Provider Gameplay Settlement"
+  type: bugfix
+  priority: medium
+  created_at: "2026-06-01"
+scope:
+  target_services:
+    - service: Games-Labs-Provider
+      reason: "1UP owns bets/result and refund callbacks."
+    - service: Games-Labs-Game
+      reason: "Receives SettleRound; no code change expected."
+    - service: ai-dev-office
+      reason: "Tracks provider-specific verification evidence."
+  affected_files:
+    - path: "Games-Labs-Provider/internal/core/services/oneup/callback.go"
+      action: modify
+      description: "Validate wallet-success gate and SettleRound hook."
+    - path: "Games-Labs-Provider/internal/core/services/oneup/turnover.go"
+      action: modify
+      description: "Validate bet amount mapping and fallback."
+    - path: "Games-Labs-Provider/internal/core/services/oneup/turnover_test.go"
+      action: modify
+      description: "Cover primary/fallback/zero conversion behavior."
+    - path: "Games-Labs-Provider/internal/handlers/providerhdl/oneup_callback_test.go"
+      action: modify
+      description: "Cover callback hook and skip behavior."
+    - path: "Games-Labs-Provider/README.md"
+      action: modify
+      description: "Document 1UP turnover source and runtime checks."
+    - path: "ai-dev-office/runs/TASK-071/verification-evidence.md"
+      action: create
+      description: "Record 1UP SQL/log checklist and verification commands."
+description: |
+  Validate and tighten 1UP gameplay turnover as its own provider lane after TASK-070 establishes the evidence format. Keep Missions consuming Game turnover.settled only.
+acceptance_criteria:
+  - criterion: "bets/result calls Game SettleRound only after wallet debit/win operations succeed."
+  - criterion: "settled_amount uses req.Bet primary and cached bet amount fallback with minor-to-major conversion."
+  - criterion: "Refund paths do not call forward SettleRound unless reverse is intentionally implemented."
+  - criterion: "Tests cover success, wallet failure, fallback, zero bet, and refund skip."
+  - criterion: "README and evidence include 1UP log grep and SQL checklist."
+plan:
+  approach: "Reuse the IDG provider-specific verification pattern, then tighten 1UP mapper and hook tests around existing bets/result behavior."
+  subtasks:
+    - order: 1
+      id: "oneup-tests"
+      description: "Add or tighten tests for conversion, fallback, wallet failure, and refund skip."
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Provider/internal/core/services/oneup/turnover_test.go"
+        - "Games-Labs-Provider/internal/handlers/providerhdl/oneup_callback_test.go"
+      parallel_safe: false
+    - order: 2
+      id: "oneup-hook-adjustments"
+      description: "Make minimal code/docs changes if tests reveal drift."
+      agent: dev-2
+      owned_files:
+        - "Games-Labs-Provider/internal/core/services/oneup/callback.go"
+        - "Games-Labs-Provider/internal/core/services/oneup/turnover.go"
+        - "Games-Labs-Provider/README.md"
+      parallel_safe: false
+    - order: 3
+      id: "oneup-evidence"
+      description: "Record runtime SQL/log checklist and exact verification commands."
+      agent: dev-2
+      owned_files:
+        - "ai-dev-office/runs/TASK-071/verification-evidence.md"
+      parallel_safe: false
+  risks:
+    - risk: "Minor/major unit mismatch."
+      mitigation: "Lock conversion behavior with table-driven tests."
+  estimated_complexity: medium
+assignment:
+  primary: dev-2
+  parallel: false
+  reason: "Provider-specific validation should run after IDG pattern is proven."
+summary: "TASK-071 isolates 1UP turnover verification and any minimal alignment changes."
+artifacts:
+  - path: runs/TASK-071/task.md
+    action: created
+  - path: runs/TASK-071/status.yaml
+    action: created
+  - path: runs/TASK-071/pm-output.yaml
+    action: created
+next_action:
+  agent: dev-2
+  reason: "Blocked until TASK-070 is complete."
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "1UP bets/result SettleRound turnover"
+    relevant_symbols:
+      - "Games-Labs-Provider/internal/core/services/oneup/callback.go"
+      - "Games-Labs-Provider/internal/core/services/oneup/turnover.go"
+    notes: "Current code already uses req.Bet and Redis fallback; task is focused validation."
+blockers:
+  - "TASK-070 should land first so evidence/checklist format is reused."

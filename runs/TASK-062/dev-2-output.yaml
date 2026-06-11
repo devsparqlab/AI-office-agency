@@ -1,0 +1,166 @@
+task_id: TASK-062
+agent: dev-2
+status: completed
+completed_at: '2026-05-21T16:05:00+0700'
+
+summary: |
+  Implemented configurable Golden Pass game access end to end across shared-lib,
+  Games-Labs-Missions, and Games-Labs-Game. Missions now owns global
+  level_offset/max_game_level config with admin GET/PUT and internal gRPC
+  GetGoldenPassConfig; Game now applies max(user_level, min(user_level +
+  level_offset, max_game_level)) for authenticated List and LaunchGame with a
+  60-second Golden Pass config cache and live HasActivePass checks. Consumer
+  services were bumped to the published shared-lib version
+  v0.0.0-20260521061034-8816ff77bba1 with no committed go.mod replace.
+
+changes:
+  - service: shared-lib
+    files:
+      - proto/missionspb/missions.proto
+      - proto/missionspb/missions.pb.go
+      - proto/missionspb/missions.pb.gw.go
+      - proto/missionspb/missions_grpc.pb.go
+      - proto/missionspb/missions.swagger.json
+      - proto/missionspb/swagger.pb.go
+    details:
+      - Added GoldenPassConfigResponse plus GetGoldenPassConfig and admin golden-pass config RPCs/HTTP annotations.
+      - Regenerated protobuf, grpc-gateway, swagger, and grpc stubs via buf.
+  - service: Games-Labs-Missions
+    files:
+      - migrations/022_golden_pass_access_config.sql
+      - internal/models/models.go
+      - internal/repositories/mission_repo.go
+      - internal/services/mission_service.go
+      - internal/handlers/admin_handler.go
+      - internal/routes/apiv1.go
+      - internal/grpc/missiongrpc/server.go
+      - internal/grpc/missiongrpc/server_test.go
+      - cmd/main.go
+      - README.md
+      - go.mod
+      - go.sum
+    details:
+      - Persisted golden_pass_level_offset and golden_pass_max_game_level on mission_config with defaults 11 and 16.
+      - Added admin GET/PUT /api/v1/admin/store/golden-pass/config with required-field validation and 400 responses on invalid payloads.
+      - Added MissionService GetGoldenPassConfig/UpdateGoldenPassConfig and internal gRPC GetGoldenPassConfig while keeping HasActivePass behavior unchanged.
+      - Bumped shared-lib to published version v0.0.0-20260521061034-8816ff77bba1 without replace.
+  - service: Games-Labs-Game
+    files:
+      - internal/adapters/missionsadt/adapter.go
+      - internal/adapters/missionsadt/adapter_test.go
+      - internal/core/ports/adapters.go
+      - internal/core/services/gamesvc/level_access.go
+      - internal/core/services/gamesvc/level_access_test.go
+      - internal/core/services/gamesvc/service.go
+      - internal/core/services/gamesvc/service_golden_pass_test.go
+      - configs/config.go
+      - .env.example
+      - README.md
+      - cmd/main.go
+      - go.mod
+      - go.sum
+    details:
+      - Replaced the hardcoded +11 Golden Pass rule with config-driven effective_max logic in both List and LaunchGame.
+      - Added a 60-second cache for GetGoldenPassConfig only; expired refresh failures now fall back to no bonus and HasActivePass remains live.
+      - Reused shared-lib missionspb GoldenPassConfigResponse directly instead of introducing a consumer-local duplicate config type.
+      - Added MISSIONS_API_URL wiring and focused tests for formula, list, launch, and cache behavior.
+
+tests:
+  - command: go test ./...
+    cwd: shared-lib
+    result: passed
+  - command: go test ./...
+    cwd: Games-Labs-Missions
+    result: passed
+  - command: go test ./...
+    cwd: Games-Labs-Game
+    result: passed
+
+notes:
+  - TASK-062 explicitly leaves authenticated ListCategory filtering as an open product decision; this implementation preserves the task scope by applying Golden Pass gating to authenticated List and LaunchGame only.
+  - shared-lib publish/bump was completed before finalizing downstream consumer module versions, matching AGENTS.md guidance for cross-service proto changes.
+
+artifacts:
+  - path: shared-lib/proto/missionspb/missions.proto
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.pb.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.pb.gw.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions_grpc.pb.go
+    action: modified
+  - path: shared-lib/proto/missionspb/missions.swagger.json
+    action: modified
+  - path: shared-lib/proto/missionspb/swagger.pb.go
+    action: modified
+  - path: Games-Labs-Missions/migrations/022_golden_pass_access_config.sql
+    action: created
+  - path: Games-Labs-Missions/internal/models/models.go
+    action: modified
+  - path: Games-Labs-Missions/internal/repositories/mission_repo.go
+    action: modified
+  - path: Games-Labs-Missions/internal/services/mission_service.go
+    action: modified
+  - path: Games-Labs-Missions/internal/handlers/admin_handler.go
+    action: modified
+  - path: Games-Labs-Missions/internal/routes/apiv1.go
+    action: modified
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+    action: modified
+  - path: Games-Labs-Missions/internal/grpc/missiongrpc/server_test.go
+    action: created
+  - path: Games-Labs-Missions/cmd/main.go
+    action: modified
+  - path: Games-Labs-Missions/README.md
+    action: modified
+  - path: Games-Labs-Missions/go.mod
+    action: modified
+  - path: Games-Labs-Missions/go.sum
+    action: modified
+  - path: Games-Labs-Game/internal/adapters/missionsadt/adapter.go
+    action: modified
+  - path: Games-Labs-Game/internal/adapters/missionsadt/adapter_test.go
+    action: created
+  - path: Games-Labs-Game/internal/core/ports/adapters.go
+    action: modified
+  - path: Games-Labs-Game/internal/core/services/gamesvc/level_access.go
+    action: created
+  - path: Games-Labs-Game/internal/core/services/gamesvc/level_access_test.go
+    action: created
+  - path: Games-Labs-Game/internal/core/services/gamesvc/service.go
+    action: modified
+  - path: Games-Labs-Game/internal/core/services/gamesvc/service_golden_pass_test.go
+    action: created
+  - path: Games-Labs-Game/configs/config.go
+    action: modified
+  - path: Games-Labs-Game/.env.example
+    action: modified
+  - path: Games-Labs-Game/README.md
+    action: modified
+  - path: Games-Labs-Game/cmd/main.go
+    action: modified
+  - path: Games-Labs-Game/go.mod
+    action: modified
+  - path: Games-Labs-Game/go.sum
+    action: modified
+
+blockers: []
+
+next_action:
+  agent: reviewer
+  reason: Golden Pass config ownership, Game gating, published shared-lib bump, and local verification are complete and ready for review against TASK-062 acceptance criteria.
+
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: skipped
+    queries: []
+    relevant_symbols:
+      - shared-lib/proto/missionspb/missions.proto
+      - Games-Labs-Missions/internal/grpc/missiongrpc/server.go
+      - Games-Labs-Missions/internal/services/mission_service.go
+      - Games-Labs-Game/internal/adapters/missionsadt/adapter.go
+      - Games-Labs-Game/internal/core/services/gamesvc/service.go
+    notes: Local workspace inspection plus fresh go test runs were sufficient for this task.

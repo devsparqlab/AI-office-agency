@@ -1,0 +1,57 @@
+summary: |
+  Completed TASK-050 verification and hardening for turnover/spend Daily Missions.
+
+  Order was audited and already has covered producer paths for THB spend settled/reverse and turnover settled/reverse player.activity.v1 events. The events include deterministic event IDs, schema version v1, positive settled amounts, source_service=order, source_reference_type=order, source references, promotional flags, and reverse_of_event_id for reversals.
+
+  Missions was audited and already maps TURNOVER_AMOUNT from turnover.settled and SPEND_AMOUNT from spend.settled, ignores promotional events, uses Asia/Bangkok day buckets, persists daily_activity_progress idempotently, and handles reverse events through daily_activity_event_applications. Added focused SPEND_AMOUNT consumer coverage proving spend.settled updates only the THB spend rule and does not leak into other currency or turnover rules.
+
+  README Mobile QA checklist was expanded into repeatable staging/dev steps covering configured rows, pre-action overview capture, Order event fields, status progression, claim-daily, duplicate claim conflict, and the Phase 1 rule that /game/launch does not update progress.
+artifacts:
+  - path: Games-Labs-Missions/internal/services/daily_activity_consumer_test.go
+    action: modified
+    description: "Added SPEND_AMOUNT THB-only consumer test for spend.settled."
+  - path: Games-Labs-Missions/README.md
+    action: modified
+    description: "Expanded Mobile QA checklist for turnover/spend Daily Mission E2E verification."
+verification:
+  - command: go test ./internal/services -run TestHandlePlayerActivityEvent
+    working_dir: Games-Labs-Missions
+    result: passed
+  - command: go test ./internal/core/services/ordersvc -run 'TestConfirmPaymentPublishesSpendSettledEvent|TestUpdateOrderStatusPublishesSpendReverseEventForRefundedPurchase|TestUpdateOrderStatusRefundedExchangePreservesTurnoverSettlementRefs|TestCreateExchangeOrderPublishesTurnoverSettledEvent'
+    working_dir: Games-Labs-Order
+    result: passed
+  - command: go test ./...
+    working_dir: Games-Labs-Missions
+    result: passed
+  - command: go test ./...
+    working_dir: Games-Labs-Order
+    result: passed
+notes:
+  - "Scope audit: no Game SettleRound or ROUND_COUNT_* wiring was changed; that remains TASK-052/TASK-053."
+  - "Scope audit: SPEND_AMOUNT remains THB-only; Diamonds spend remains TASK-057."
+  - "Scope audit: no weekly/monthly behavior was changed."
+  - "Runner note: run-agent still fails with local Codex CLI --approval-mode incompatibility, so this dev-2 work was executed manually in the Codex session."
+next_action:
+  agent: reviewer
+  reason: TASK-050 verification, tests, and docs are complete and ready for review.
+context_sources:
+  github:
+    branch: ""
+    pr: ""
+  socraticode:
+    status: used
+    queries:
+      - "codebase_status projectPath d:\\llm"
+      - "Games-Labs-Order publish turnover.settled spend.settled player.activity.v1 Missions consumer daily_activity_progress claim-daily quest overview"
+      - "publishTurnoverSettled publishSpendSettled PlayerActivityEventTypeTurnoverSettled PlayerActivityEventTypeSpendSettled order service"
+      - "HandlePlayerActivityEvent ApplyDailyActivityForward daily_activity_progress ListDailyActivityProgress ClaimDailyMission"
+    relevant_symbols:
+      - "Games-Labs-Order/internal/core/services/ordersvc/player_activity.go:publishDailyActivitiesForOrder"
+      - "Games-Labs-Order/internal/core/services/ordersvc/player_activity.go:publishTurnoverSettled"
+      - "Games-Labs-Order/internal/core/services/ordersvc/service.go:ConfirmPayment"
+      - "Games-Labs-Order/internal/core/services/ordersvc/service.go:settleTurnover"
+      - "Games-Labs-Missions/internal/services/mission_service.go:HandlePlayerActivityEvent"
+      - "Games-Labs-Missions/internal/services/mission_service.go:mapPlayerActivityEventToDailyProgress"
+      - "Games-Labs-Missions/internal/repositories/mission_repo.go:ListActiveDailyActivityRules"
+      - "Games-Labs-Missions/internal/repositories/mission_repo.go:ApplyDailyActivityForward"
+blockers: []
